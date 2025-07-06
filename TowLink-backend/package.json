@@ -2,7 +2,7 @@
   "name": "towlink-backend",
   "version": "1.0.0",
   "description": "Backend for TowLink App",
-  "main": "index.js",
+  "main": "server.js",
   "scripts": {
     "start": "nodemon server.js"
   },
