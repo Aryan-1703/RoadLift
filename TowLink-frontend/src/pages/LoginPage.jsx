@@ -1,16 +1,15 @@
 import React, { useState } from "react";
+import { Link, useNavigate } from "react-router-dom"; // We will use this in a moment
 import axios from "axios";
-import styles from "./Auth.module.css"; // Import the CSS module
-import { Link } from "react-router-dom";
+import styles from "./Auth.module.css";
 import { EyeIcon, EyeSlashIcon } from "../components/Icons";
 
-// A simple eye icon SVG. We can use this for both pages.
-const RegisterPage = () => {
-	const [name, setName] = useState("");
+const LoginPage = () => {
 	const [phoneNumber, setPhoneNumber] = useState("");
 	const [password, setPassword] = useState("");
-	const [status, setStatus] = useState({ message: "", type: "" }); // {message, type: 'success' or 'error'}
+	const [status, setStatus] = useState({ message: "", type: "" });
 	const [isPasswordVisible, setIsPasswordVisible] = useState(false); // <-- NEW STATE
+	const navigate = useNavigate();
 
 	const togglePasswordVisibility = () => {
 		setIsPasswordVisible(!isPasswordVisible);
@@ -21,21 +20,20 @@ const RegisterPage = () => {
 		setStatus({ message: "", type: "" });
 
 		try {
-			const response = await axios.post("http://localhost:8001/api/auth/register/user", {
-				name,
+			const response = await axios.post("http://localhost:8001/api/auth/login/user", {
 				phoneNumber,
 				password,
 			});
-
-			console.log("Registration successful:", response.data);
-			setStatus({
-				message: "Registration successful! You can now log in.",
-				type: "success",
-			});
+			console.log("Login successful:", response.data);
+			localStorage.setItem("token", response.data.token);
+			setStatus({ message: "Login successful! Redirecting...", type: "success" });
+			setTimeout(() => {
+				navigate("/dashboard");
+			}, 1000);
 		} catch (error) {
 			const errorMessage =
-				error.response?.data?.message || "Registration failed. Please try again.";
-			console.error("Registration error:", errorMessage);
+				error.response?.data?.message || "Login failed. Please check your credentials.";
+			console.error("Login error:", errorMessage);
 			setStatus({ message: errorMessage, type: "error" });
 		}
 	};
@@ -44,21 +42,10 @@ const RegisterPage = () => {
 		<div className={styles.authContainer}>
 			<form className={styles.authForm} onSubmit={handleSubmit}>
 				<h1 className={styles.title}>TowLink</h1>
-				<p className={styles.subtitle}>Create your account</p>
-
+				<p className={styles.subtitle}>Welcome back! Please sign in.</p>
 				<div className={styles.inputGroup}>
 					<input
-						type="text"
-						className={styles.input}
-						placeholder="Full Name"
-						value={name}
-						onChange={e => setName(e.target.value)}
-						required
-					/>
-				</div>
-				<div className={styles.inputGroup}>
-					<input
-						type="tel" // Use type="tel" for phone numbers
+						type="tel"
 						className={styles.input}
 						placeholder="Phone Number"
 						value={phoneNumber}
@@ -68,7 +55,6 @@ const RegisterPage = () => {
 				</div>
 				<div className={styles.inputGroup}>
 					<div className={styles.passwordInputWrapper}>
-						{" "}
 						<input
 							type={isPasswordVisible ? "text" : "password"}
 							className={styles.input}
@@ -82,11 +68,9 @@ const RegisterPage = () => {
 						</span>
 					</div>
 				</div>
-
 				<button type="submit" className={styles.button}>
-					Register
+					Sign In
 				</button>
-
 				{status.message && (
 					<p
 						className={`${styles.message} ${
@@ -98,19 +82,20 @@ const RegisterPage = () => {
 				)}
 			</form>
 			<p style={{ marginTop: "20px", color: "#6c757d" }}>
-				Already have an account?{" "}
+				Don't have an account?{" "}
 				<Link
-					to="/login"
+					to="/register"
 					style={{
 						color: "var(--primary-color)",
 						textDecoration: "none",
 						fontWeight: "600",
 					}}
 				>
-					Sign In
+					Register
 				</Link>
 			</p>
 		</div>
 	);
 };
-export default RegisterPage;
+
+export default LoginPage;
