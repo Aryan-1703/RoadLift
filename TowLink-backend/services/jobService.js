@@ -1,15 +1,20 @@
 const { sequelize, Job, Driver } = require("../models");
 
-async function createJobAndFindDriver(location, userId) {
-	const { lat, lon } = location;
-	if (!lat || !lon) {
-		throw new Error("Latitude and Longitude are required.");
+async function createJobAndFindDriver(jobData, userId) {
+	const { customerLocation, vehicleMake, vehicleModel, notes } = jobData;
+	const { lat, lon } = customerLocation;
+
+	if (!lat || !lon || !vehicleMake || !vehicleModel) {
+		throw new Error("Location and vehicle details are required.");
 	}
 
 	// 1. Create the new job and associate it with the user
 	const newJob = await Job.create({
 		customerLocation: { type: "Point", coordinates: [lon, lat] },
-		userId: userId, // <-- Assign the userId
+		vehicleMake,
+		vehicleModel,
+		notes,
+		userId: userId,
 	});
 
 	// 2. Find the closest ACTIVE driver

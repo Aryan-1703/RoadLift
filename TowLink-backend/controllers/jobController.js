@@ -1,13 +1,17 @@
+
 const jobService = require("../services/jobService");
 
 const createJob = async (req, res) => {
 	try {
-		// The user object is now attached by our 'protect' middleware
+		// The user object is still attached by our 'protect' middleware
 		const userId = req.user.id;
-		const customerLocation = req.body.customerLocation;
 
-		const result = await jobService.createJobAndFindDriver(customerLocation, userId);
+		// The ONLY change is here. We now pass the entire req.body
+		// to the service, instead of just a piece of it.
+		const result = await jobService.createJobAndFindDriver(req.body, userId);
 
+		// The rest of this logic remains the same, as the service
+		// still returns the same result structure.
 		if (result.assignedDriver) {
 			res.status(201).json({
 				message: "Job created and nearest driver found.",
@@ -23,11 +27,11 @@ const createJob = async (req, res) => {
 		}
 	} catch (error) {
 		console.error("Error in jobController:", error);
-		// Differentiate between user error and server error
-		if (error.message === "Latitude and Longitude are required.") {
-			return res.status(400).send(error.message);
+		// Update the error check to be more generic for validation errors from the service.
+		if (error.message.includes("required")) {
+			return res.status(400).send({ message: error.message });
 		}
-		res.status(500).send("Server Error");
+		res.status(500).send({ message: "Server Error" });
 	}
 };
 
