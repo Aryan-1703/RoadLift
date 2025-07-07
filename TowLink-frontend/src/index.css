@@ -1,0 +1,23 @@
+/* src/index.css */
+:root {
+	--primary-color: #007aff; /* A nice blue, common in iOS */
+	--background-color: #f0f2f5; /* A light grey, common in modern apps */
+	--form-background: #ffffff;
+	--text-color: #1c1c1e;
+	--error-color: #ff3b30;
+	--success-color: #34c759;
+}
+
+body {
+	margin: 0;
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu",
+		"Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	background-color: var(--background-color);
+	color: var(--text-color);
+}
+
+* {
+	box-sizing: border-box;
+}

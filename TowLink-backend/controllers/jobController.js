@@ -2,7 +2,11 @@ const jobService = require("../services/jobService");
 
 const createJob = async (req, res) => {
 	try {
-		const result = await jobService.createJobAndFindDriver(req.body.customerLocation);
+		// The user object is now attached by our 'protect' middleware
+		const userId = req.user.id;
+		const customerLocation = req.body.customerLocation;
+
+		const result = await jobService.createJobAndFindDriver(customerLocation, userId);
 
 		if (result.assignedDriver) {
 			res.status(201).json({

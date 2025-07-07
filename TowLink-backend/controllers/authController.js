@@ -1,6 +1,34 @@
 const authService = require("../services/authServices");
 const { User, Driver } = require("../models");
 
+// Controller for logging in a User (customer)
+const loginUser = async (req, res) => {
+	try {
+		const { record, token } = await authService.login(req.body, User);
+		res.status(200).json({
+			message: "User logged in successfully!",
+			user: record,
+			token,
+		});
+	} catch (error) {
+		// Send 401 for authentication errors
+		res.status(401).json({ message: error.message });
+	}
+};
+
+// Controller for logging in a Driver
+const loginDriver = async (req, res) => {
+	try {
+		const { record, token } = await authService.login(req.body, Driver);
+		res.status(200).json({
+			message: "Driver logged in successfully!",
+			driver: record,
+			token,
+		});
+	} catch (error) {
+		res.status(401).json({ message: error.message });
+	}
+};
 // Controller for registering a User (customer)
 const registerUser = async (req, res) => {
 	try {
@@ -42,4 +70,6 @@ const registerDriver = async (req, res) => {
 module.exports = {
 	registerUser,
 	registerDriver,
+	loginUser,
+	loginDriver,
 };
