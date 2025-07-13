@@ -1,0 +1,59 @@
+/* src/css/index.css */
+
+/* --- LIGHT THEME --- */
+body[data-theme="light"] {
+	--background-start: #f0f2f5;
+	--background-end: #e9ecef;
+	--card-background: rgba(255, 255, 255, 0.9);
+	--card-border: rgba(0, 0, 0, 0.1);
+	--text-primary: #1c1c1e;
+	--text-secondary: #6c757d;
+	--accent-start: #007aff;
+	--accent-end: #0056b3;
+	--text-on-accent: #ffffff;
+	--glow-color: rgba(0, 123, 255, 0.2);
+	--shadow-lg: 0 8px 25px rgba(0, 0, 0, 0.15);
+
+	/* Component-specific variables */
+	--navbar-background: rgba(255, 255, 255, 0.7);
+	--modal-overlay-background: rgba(0, 0, 0, 0.4);
+	--modal-background: #ffffff;
+	--button-secondary-background: #e9ecef;
+	--button-secondary-background-hover: #dee2e6;
+}
+
+/* --- DARK THEME --- */
+body[data-theme="dark"] {
+	--background-start: #121212;
+	--background-end: #1c1a2e;
+	--card-background: rgba(255, 255, 255, 0.08);
+	--card-border: rgba(255, 255, 255, 0.2);
+	--text-primary: #f0f2f5;
+	--text-secondary: #a8a8b3;
+	--accent-start: #00aeff;
+	--accent-end: #007aff;
+	--text-on-accent: #ffffff;
+	--glow-color: rgba(0, 174, 255, 0.3);
+	--shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.3);
+
+	/* Component-specific variables */
+	--navbar-background: rgba(30, 30, 46, 0.8);
+	--modal-overlay-background: rgba(0, 0, 0, 0.7);
+	--modal-background: #2c2c3e;
+	--button-secondary-background: rgba(255, 255, 255, 0.1);
+	--button-secondary-background-hover: rgba(255, 255, 255, 0.2);
+}
+
+/* Base styles that use the variables */
+body {
+	margin: 0;
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu",
+		"Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+	background: linear-gradient(135deg, var(--background-start), var(--background-end));
+	transition: background 0.3s ease;
+	color: var(--text-primary);
+}
+
+* {
+	box-sizing: border-box;
+}

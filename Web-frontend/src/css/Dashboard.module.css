@@ -1,20 +1,7 @@
 /* src/css/Dashboard.module.css */
 
-/* Define our new futuristic color palette */
-:root {
-	--background-start: #121212;
-	--background-end: #1c1a2e;
-	--card-background: rgba(255, 255, 255, 0.08);
-	--card-border: rgba(255, 255, 255, 0.2);
-	--text-primary: #f0f2f5;
-	--text-secondary: #a8a8b3;
-	--accent-start: #00aeff;
-	--accent-end: #007aff;
-	--glow-color: rgba(0, 174, 255, 0.3);
-}
-
 .dashboardContainer {
-	background: linear-gradient(135deg, var(--background-start), var(--background-end));
+	/* The background is now handled by the body tag in index.css */
 	min-height: 100vh;
 	padding: 30px 20px;
 	color: var(--text-primary);
@@ -50,9 +37,9 @@
 	padding: 25px 20px;
 	text-align: center;
 	cursor: pointer;
-	backdrop-filter: blur(10px); /* This creates the glass effect! */
+	backdrop-filter: blur(10px);
 	-webkit-backdrop-filter: blur(10px);
-	transition: transform 0.3s ease, box-shadow 0.3s ease;
+	transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
 }
 
 .serviceCard:hover {
@@ -62,7 +49,10 @@
 }
 
 .serviceCard.disabled {
-	background-color: rgba(30, 30, 30, 0.5);
+	background-color: var(
+		--card-disabled-background,
+		rgba(30, 30, 30, 0.5)
+	); /* Fallback added */
 	cursor: not-allowed;
 	opacity: 0.5;
 	backdrop-filter: blur(2px);
@@ -84,6 +74,7 @@
 .serviceName {
 	font-size: 1.1rem;
 	font-weight: 600;
+	color: var(--text-primary);
 }
 
 .servicePrice {
@@ -100,7 +91,7 @@
 	font-size: 1.1rem;
 	font-weight: 600;
 	color: var(--text-primary);
-	background: rgba(255, 255, 255, 0.1);
+	background: var(--button-secondary-background);
 	border: 1px solid var(--card-border);
 	border-radius: 12px;
 	cursor: pointer;
@@ -108,5 +99,5 @@
 }
 
 .logoutButton:hover {
-	background: rgba(255, 255, 255, 0.2);
+	background: var(--button-secondary-background-hover);
 }

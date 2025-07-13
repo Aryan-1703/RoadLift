@@ -1,13 +1,15 @@
+/* src/css/Navbar.module.css */
+
 .navbar {
 	position: fixed;
 	bottom: 0;
 	left: 0;
 	right: 0;
 	height: 70px;
-	background: rgba(30, 30, 46, 0.8);
+	background: var(--navbar-background);
 	backdrop-filter: blur(15px);
 	-webkit-backdrop-filter: blur(15px);
-	border-top: 1px solid rgba(255, 255, 255, 0.1);
+	border-top: 1px solid var(--card-border);
 	display: flex;
 	justify-content: space-around;
 	align-items: center;
@@ -18,7 +20,7 @@
 	display: flex;
 	flex-direction: column;
 	align-items: center;
-	color: #a8a8b3;
+	color: var(--text-secondary);
 	text-decoration: none;
 	font-size: 0.75rem;
 	transition: color 0.2s ease, transform 0.2s ease;
@@ -30,10 +32,10 @@
 }
 
 .navLink:hover {
-	color: #f0f2f5;
+	color: var(--text-primary);
 }
 
 .navLink.active {
-	color: #00aeff;
+	color: var(--accent-start);
 	transform: scale(1.1);
 }
