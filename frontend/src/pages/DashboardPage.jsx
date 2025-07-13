@@ -1,111 +1,87 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { useNavigate } from "react-router-dom";
-import Map from "../components/Map";
-import RequestModal from "../components/RequestModal";
+import styles from "../css/Dashboard.module.css";
+
+// Import specific icons from the 'react-icons' library
+import {
+	FaCarBattery,
+	FaKey,
+	FaTools,
+	FaTruckMoving,
+	FaSignOutAlt,
+} from "react-icons/fa";
+
+// Let's create a reusable card component right here for cleanliness
+const ServiceCard = ({ icon, name, price, onClick, disabled = false }) => (
+	<div
+		className={`${styles.serviceCard} ${disabled ? styles.disabled : ""}`}
+		onClick={!disabled ? onClick : null}
+	>
+		<div className={styles.iconWrapper}>{icon}</div>
+		<div className={styles.serviceName}>{name}</div>
+		<div className={styles.servicePrice}>{price}</div>
+	</div>
+);
 
 const DashboardPage = () => {
 	const navigate = useNavigate();
-	const [currentLocation, setCurrentLocation] = useState(null);
-	const [isModalOpen, setIsModalOpen] = useState(false);
-
-	useEffect(() => {
-		// This effect runs once when the component mounts
-		if (navigator.geolocation) {
-			navigator.geolocation.getCurrentPosition(
-				position => {
-					const { latitude, longitude } = position.coords;
-					setCurrentLocation({
-						lat: latitude,
-						lng: longitude,
-					});
-				},
-				error => {
-					console.error("Error getting location", error);
-					// Fallback to a default location if user denies permission
-					setCurrentLocation({ lat: 37.7749, lng: -122.4194 });
-				}
-			);
-		}
-	}, []);
+	const user = JSON.parse(localStorage.getItem("user"));
 
 	const handleLogout = () => {
 		localStorage.removeItem("token");
+		localStorage.removeItem("user");
 		navigate("/login");
 	};
-	const openRequestModal = () => {
-		if (currentLocation) {
-			setIsModalOpen(true);
-		} else {
-			alert("Could not get your location. Please enable location services.");
-		}
+
+	const handleServiceSelection = serviceName => {
+		alert(`Selected: ${serviceName}`);
+		// Later: navigate(`/request/${serviceName}`);
 	};
 
 	return (
-		<div style={{ position: "relative", width: "100vw", height: "100vh" }}>
-			{currentLocation ? (
-				<Map center={currentLocation} />
-			) : (
-				<div
-					style={{
-						display: "flex",
-						justifyContent: "center",
-						alignItems: "center",
-						height: "100%",
-					}}
-				>
-					<p>Getting your location...</p>
-				</div>
-			)}
+		<div className={styles.dashboardContainer}>
+			<header className={styles.header}>
+				<h1 className={styles.welcomeTitle}>Welcome, {user?.name || "User"}</h1>
+				<p className={styles.subtitle}>Ready to get you back on the road.</p>
+			</header>
 
-			{/* Logout button */}
-			<div style={{ position: "absolute", top: "20px", right: "20px", zIndex: "10" }}>
-				<button
-					onClick={handleLogout}
-					style={{
-						padding: "10px 20px",
-						fontSize: "1rem",
-						backgroundColor: "#ff3b30",
-						color: "white",
-						border: "none",
-						borderRadius: "8px",
-						cursor: "pointer",
-					}}
-				>
+			<main>
+				<div className={styles.serviceGrid}>
+					<ServiceCard
+						icon={<FaCarBattery />}
+						name="Battery Boost"
+						price="$59"
+						onClick={() => handleServiceSelection("battery-boost")}
+					/>
+					<ServiceCard
+						icon={<FaKey />}
+						name="Car Lockout"
+						price="$79"
+						onClick={() => handleServiceSelection("car-lockout")}
+					/>
+					<ServiceCard
+						icon={<FaTools />}
+						name="Tire Change"
+						price="$69"
+						onClick={() => handleServiceSelection("flat-tire")}
+					/>
+					<ServiceCard
+						icon={<FaTruckMoving />}
+						name="Towing"
+						price="Coming Soon"
+						disabled={true}
+					/>
+				</div>
+			</main>
+
+			<footer>
+				<button onClick={handleLogout} className={styles.logoutButton}>
+					<FaSignOutAlt style={{ marginRight: "8px", verticalAlign: "middle" }} />
 					Logout
 				</button>
-			</div>
-			{/* Request Tow button */}
-			<div
-				style={{
-					position: "absolute",
-					bottom: "30px",
-					left: "50%",
-					transform: "translateX(-50%)",
-					zIndex: "10",
-				}}
-			>
-				<button
-					onClick={openRequestModal}
-					style={{
-						padding: "15px 30px",
-						fontSize: "1.2rem",
-						fontWeight: "bold",
-						backgroundColor: "#007aff",
-						color: "white",
-						border: "none",
-						borderRadius: "30px",
-						cursor: "pointer",
-						boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
-					}}
-				>
-					Request a Tow
-				</button>
-			</div>
-			{/* The Modal itself - it will only render when isModalOpen is true */}
-			{isModalOpen && (
-				<RequestModal location={currentLocation} onClose={() => setIsModalOpen(false)} />
-			)}
+			</footer>
 		</div>
 	);
 };
+
 export default DashboardPage;

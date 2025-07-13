@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import axios from "axios";
-import styles from "./Auth.module.css"; // Import the CSS module
+import styles from "../css/Auth.module.css";
 import { Link } from "react-router-dom";
 import { EyeIcon, EyeSlashIcon } from "../components/Icons";
 

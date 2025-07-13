@@ -1,0 +1,38 @@
+/* Define variables for the LIGHT theme */
+body[data-theme="light"] {
+	--background-start: #f0f2f5;
+	--background-end: #e9ecef;
+	--card-background: rgba(255, 255, 255, 0.8);
+	--card-border: rgba(0, 0, 0, 0.1);
+	--text-primary: #1c1c1e;
+	--text-secondary: #6c757d;
+	--accent-start: #007aff;
+	--accent-end: #0056b3;
+	--glow-color: rgba(0, 123, 255, 0.2);
+}
+
+/* Define variables for the DARK theme */
+body[data-theme="dark"] {
+	--background-start: #121212;
+	--background-end: #1c1a2e;
+	--card-background: rgba(255, 255, 255, 0.08);
+	--card-border: rgba(255, 255, 255, 0.2);
+	--text-primary: #f0f2f5;
+	--text-secondary: #a8a8b3;
+	--accent-start: #00aeff;
+	--accent-end: #007aff;
+	--glow-color: rgba(0, 174, 255, 0.3);
+}
+
+/* Base styles */
+body {
+	margin: 0;
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
+		/* etc */ sans-serif;
+	background: linear-gradient(135deg, var(--background-start), var(--background-end));
+	transition: background 0.3s ease;
+}
+
+* {
+	box-sizing: border-box;
+}

@@ -1,32 +1,31 @@
 import React from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-
-// Page Imports
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import DashboardPage from "./pages/DashboardPage";
-// Component Imports
+import SettingsPage from "./pages/SettingsPage";
 import ProtectedRoute from "./components/ProtectedRoute";
+import MainLayout from "./components/MainLayout";
 
 function App() {
 	return (
 		<BrowserRouter>
 			<Routes>
+				{/* Public Routes */}
 				<Route path="/login" element={<LoginPage />} />
 				<Route path="/register" element={<RegisterPage />} />
-
-				{/* The root path can also be the login page or a landing page */}
 				<Route path="/" element={<LoginPage />} />
-
-				{/* Protected Routes */}
+				{/* Protected Routes with MainLayout */}
 				<Route
-					path="/dashboard"
 					element={
 						<ProtectedRoute>
-							<DashboardPage />
+							<MainLayout />
 						</ProtectedRoute>
 					}
-				/>
+				>
+					<Route path="/dashboard" element={<DashboardPage />} />
+					<Route path="/settings" element={<SettingsPage />} />
+				</Route>
 			</Routes>
 		</BrowserRouter>
 	);

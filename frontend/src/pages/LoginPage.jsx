@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom"; // We will use this in a moment
+import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
-import styles from "./Auth.module.css";
+import styles from "../css/Auth.module.css";
 import { EyeIcon, EyeSlashIcon } from "../components/Icons";
 
 const LoginPage = () => {
@@ -26,6 +26,7 @@ const LoginPage = () => {
 			});
 			console.log("Login successful:", response.data);
 			localStorage.setItem("token", response.data.token);
+			localStorage.setItem("user", JSON.stringify(response.data.user));
 			setStatus({ message: "Login successful! Redirecting...", type: "success" });
 			setTimeout(() => {
 				navigate("/dashboard");
