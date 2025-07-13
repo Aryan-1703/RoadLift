@@ -15,6 +15,10 @@ export default function RootLayout() {
 				<Stack.Screen name="register" />
 				<Stack.Screen name="request-confirmation" options={{ headerShown: false }} />
 				<Stack.Screen name="finding-driver" options={{ headerShown: false }} />
+				<Stack.Screen
+					name="active-job"
+					options={{ headerShown: false, presentation: "modal" }}
+				/>
 				<Stack.Screen name="tabs" />
 			</Stack>
 		</ThemeProvider>

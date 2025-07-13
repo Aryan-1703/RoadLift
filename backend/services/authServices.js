@@ -33,9 +33,9 @@ async function register(data, Model) {
 		password: hashedPassword, // Store the hashed password
 	});
 	const token = jwt.sign(
-		{ id: newRecord.id, role: Model.name.toLowerCase() }, // Payload
-		process.env.JWT_SECRET, // Secret
-		{ expiresIn: "30d" } // Expiration
+		{ id: newRecord.id, role: Model.name.toLowerCase() },
+		process.env.JWT_SECRET,
+		{ expiresIn: "30d" }
 	);
 
 	// Remove password from the returned object

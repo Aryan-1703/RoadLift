@@ -1,31 +1,80 @@
 import React, { useEffect } from "react";
-import { View, Text, StyleSheet, SafeAreaView, ActivityIndicator } from "react-native";
-import { useLocalSearchParams } from "expo-router";
+import {
+	View,
+	Text,
+	StyleSheet,
+	SafeAreaView,
+	ActivityIndicator,
+	TouchableOpacity,
+	Alert,
+	StatusBar,
+} from "react-native";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useTheme } from "../context/ThemeContext";
 import Colors from "../constants/Colors";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import axios from "axios"; 
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+const API_URL = "http://10.0.0.125:8001/api";
 
 const FindingDriverScreen = () => {
+	// --- HOOKS & STATE ---
 	const { jobId } = useLocalSearchParams();
+	const router = useRouter();
 	const { theme } = useTheme();
+	const isDarkMode = theme === "dark";
 	const colors = Colors[theme];
 
-	// This is where we will set up our WebSocket listener in the future
+	// --- REAL-TIME LISTENER (Future) ---
 	useEffect(() => {
 		console.log(`Now listening for updates on Job ID: ${jobId}`);
-
-		// Simulate a driver being found after a few seconds for demo purposes
-		const timeout = setTimeout(() => {
-			console.log("Simulating driver found!");
-			// In the future: navigate to the live tracking map
-		}, 8000); // 8 seconds
-
-		// Cleanup function
-		return () => clearTimeout(timeout);
+		// WebSocket logic will go here
+		return () => {
+			console.log(`Stopped listening for updates on Job ID: ${jobId}`);
+			// WebSocket cleanup logic will go here
+		};
 	}, [jobId]);
 
+	// --- HANDLERS ---
+	const handleCancelRequest = () => {
+		Alert.alert(
+			"Cancel Request",
+			"Are you sure you want to cancel this service request?",
+			[
+				{ text: "Don't Cancel", style: "cancel" },
+				{
+					text: "Yes, Cancel",
+					onPress: async () => {
+						try {
+							const token = await AsyncStorage.getItem("token");
+							await axios.put(
+								`${API_URL}/jobs/${jobId}/cancel`,
+								{},
+								{
+									headers: { Authorization: `Bearer ${token}` },
+								}
+							);
+							// On success, go back to the main dashboard
+							router.replace("/tabs");
+						} catch (error) {
+							console.error("Failed to cancel job:", error.response?.data);
+							Alert.alert(
+								"Error",
+								error.response?.data?.message || "Could not cancel the request."
+							);
+						}
+					},
+					style: "destructive",
+				},
+			]
+		);
+	};
+
+	// --- RENDER ---
 	return (
 		<SafeAreaView style={[styles.container, { backgroundColor: colors.tint }]}>
+			<StatusBar barStyle="light-content" />
 			<View style={styles.content}>
 				<ActivityIndicator size="large" color="#ffffff" />
 				<Text style={styles.title}>Contacting Nearby Drivers</Text>
@@ -39,10 +88,16 @@ const FindingDriverScreen = () => {
 					style={styles.icon}
 				/>
 			</View>
+
+			{/* --- CANCEL BUTTON --- */}
+			<TouchableOpacity style={styles.cancelButton} onPress={handleCancelRequest}>
+				<Text style={styles.cancelButtonText}>Cancel Request</Text>
+			</TouchableOpacity>
 		</SafeAreaView>
 	);
 };
 
+// --- STYLESHEET ---
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
@@ -68,8 +123,19 @@ const styles = StyleSheet.create({
 	},
 	icon: {
 		position: "absolute",
-		bottom: 40,
-		opacity: 0.5,
+		zIndex: -1, // Make sure it's behind the text
+	},
+	cancelButton: {
+		backgroundColor: "rgba(0, 0, 0, 0.2)",
+		margin: 20,
+		padding: 15,
+		borderRadius: 12,
+		alignItems: "center",
+	},
+	cancelButtonText: {
+		color: "#ffffff",
+		fontSize: 16,
+		fontWeight: "600",
 	},
 });
 

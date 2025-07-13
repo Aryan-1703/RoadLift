@@ -59,9 +59,9 @@ const RequestConfirmationScreen = () => {
 			// 2. Prepare data payload
 			const jobData = {
 				serviceType: params.serviceType,
-				pickupLatitude: userLat,
-				pickupLongitude: userLon,
-				estimatedCost: price,
+				pickupLatitude: parseFloat(params.userLat),
+				pickupLongitude: parseFloat(params.userLon),
+				estimatedCost: parseFloat(params.price),
 				notes: notes,
 			};
 

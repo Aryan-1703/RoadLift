@@ -4,44 +4,51 @@ const { User, Driver } = require("../models");
 const protect = async (req, res, next) => {
 	let token;
 
-	// Check for the token in the Authorization header
+	// --- Add this for clear debugging ---
+	console.log("\n--- RUNNING PROTECT MIDDLEWARE ---");
+
 	if (req.headers.authorization && req.headers.authorization.startsWith("Bearer")) {
 		try {
-			// Get token from header (e.g., "Bearer <token>")
 			token = req.headers.authorization.split(" ")[1];
+			console.log("1. Token found:", token ? "Yes" : "No");
 
-			// Verify the token using our secret
 			const decoded = jwt.verify(token, process.env.JWT_SECRET);
+			// --- This is the most important log ---
+			console.log("2. Decoded JWT Payload:", decoded);
 
-			// The decoded payload contains the id and role we set during login
-			// Attach the user/driver info to the request object
+			// Check the role from the decoded token
 			if (decoded.role === "user") {
-				req.user = await User.findByPk(decoded.id, {
-					attributes: { exclude: ["password"] },
-				});
+				console.log(`3. Role is 'user'. Searching Users table for ID: ${decoded.id}`);
+				req.user = await User.findByPk(decoded.id);
 			} else if (decoded.role === "driver") {
-				req.user = await Driver.findByPk(decoded.id, {
-					attributes: { exclude: ["password"] },
-				});
+				console.log(`3. Role is 'driver'. Searching Drivers table for ID: ${decoded.id}`);
+				req.user = await Driver.findByPk(decoded.id);
 			}
 
-			// Add the role to the request for easy access
-			req.role = decoded.role;
+			// --- This log will tell us if the user was found in the DB ---
+			console.log(
+				"4. User found in database:",
+				req.user ? "Yes" : "No. THIS IS THE PROBLEM."
+			);
 
 			if (!req.user) {
-				return res.status(401).json({ message: "Not authorized, user not found" });
+				// If we couldn't find a user, deny access.
+				return res
+					.status(401)
+					.json({ message: "Not authorized, user not found for this token." });
 			}
 
-			// Proceed to the next middleware or the route handler
-			next();
+			req.role = decoded.role; // Attach role for later use
+			console.log("5. Middleware success. Proceeding to controller...");
+			next(); // Proceed to the next step (the controller)
 		} catch (error) {
-			console.error(error);
-			return res.status(401).json({ message: "Not authorized, token failed" });
+			console.error("--- ERROR IN PROTECT MIDDLEWARE ---", error);
+			res.status(401).json({ message: "Not authorized, token failed" });
 		}
 	}
 
 	if (!token) {
-		return res.status(401).json({ message: "Not authorized, no token provided" });
+		res.status(401).json({ message: "Not authorized, no token" });
 	}
 };
 const protectDriver = (req, res, next) => {
@@ -53,4 +60,4 @@ const protectDriver = (req, res, next) => {
 	}
 };
 
-module.exports = { protect, protectDriver }; 
+module.exports = { protect, protectDriver };

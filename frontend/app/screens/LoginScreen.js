@@ -66,7 +66,7 @@ const LoginScreen = () => {
 					await AsyncStorage.setItem("user", JSON.stringify(response.data.driver));
 					await AsyncStorage.setItem("role", "driver");
 					// TODO: Create and navigate to the driver dashboard
-					router.replace("/(driver-tabs)");
+					router.replace("/driver-tabs");
 					alert("Driver login successful!");
 				} else {
 					// It was a different error (e.g., server down), so throw it

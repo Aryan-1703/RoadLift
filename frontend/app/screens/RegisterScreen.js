@@ -55,22 +55,22 @@ const RegisterScreen = () => {
 				password,
 			});
 
-			// CORRECTED: Use the correct key from the response data ('user' or 'driver')
-			const userOrDriverData = response.data[role.toLowerCase()];
+			// Corrected code
+			const roleKey = role === "Customer" ? "user" : "driver"; // Get the correct key
+			const userOrDriverData = response.data[roleKey];
+
 			if (!userOrDriverData) {
-				throw new Error("Invalid response from server.");
+				// This check is still good to have in case the backend response changes
+				throw new Error("Invalid response structure from server.");
 			}
-
-			// Save all necessary info to storage
-			await AsyncStorage.setItem("token", response.data.token);
-			await AsyncStorage.setItem("role", role.toLowerCase());
+			await AsyncStorage.setItem("role", roleKey);
 			await AsyncStorage.setItem("user", JSON.stringify(userOrDriverData));
-
+			await AsyncStorage.setItem("token", response.data.token);
 			// CORRECTED: Navigate to the correct dashboard based on role
 			if (role === "Customer") {
-				router.replace("/(tabs)");
+				router.replace("/tabs");
 			} else {
-				router.replace("/(driver-tabs)");
+				router.replace("/driver-tabs");
 			}
 		} catch (error) {
 			const errorMessage =
