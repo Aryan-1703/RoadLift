@@ -9,16 +9,47 @@ import {
 	StatusBar,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useRouter } from "expo-router";
 import ServiceCard from "../components/ServiceCard";
 import { useTheme } from "../context/ThemeContext";
 import Colors from "../constants/Colors";
+import { useLocation } from "../context/LocationContext";
 
 const DashboardScreen = () => {
 	// --- STATE AND HOOKS ---
 	const [user, setUser] = useState(null);
 	const { theme } = useTheme();
 	const isDarkMode = theme === "dark";
+	const router = useRouter();
 	const colors = Colors[theme];
+	const { location, errorMsg, permissionGranted, requestPermission } = useLocation();
+
+	const handleServiceSelection = async service => {
+		if (!permissionGranted) {
+			const hasPermission = await requestPermission();
+			if (!hasPermission) return;
+		}
+
+		if (location) {
+			const { latitude, longitude } = location.coords;
+			router.push({
+				pathname: "/request-confirmation",
+				params: {
+					serviceName: service.name,
+					serviceType: service.type,
+					price: service.price,
+					userLat: latitude,
+					userLon: longitude,
+				},
+			});
+		} else {
+			// Show the error message from the context, or a generic one
+			Alert.alert(
+				"Location Error",
+				errorMsg || "Could not determine your location. Please try again."
+			);
+		}
+	};
 
 	useEffect(() => {
 		const loadUserData = async () => {
@@ -29,12 +60,6 @@ const DashboardScreen = () => {
 		};
 		loadUserData();
 	}, []);
-
-	// --- HANDLERS ---
-	const handleServiceSelection = serviceName => {
-		Alert.alert("Service Selected", `You selected ${serviceName}`);
-		// Next step: Navigate to a location confirmation page
-	};
 
 	// --- RENDER ---
 	return (
