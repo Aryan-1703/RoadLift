@@ -44,5 +44,13 @@ const protect = async (req, res, next) => {
 		return res.status(401).json({ message: "Not authorized, no token provided" });
 	}
 };
+const protectDriver = (req, res, next) => {
+	// This middleware should run AFTER the 'protect' middleware
+	if (req.role && req.role === "driver") {
+		next();
+	} else {
+		res.status(403).json({ message: "Forbidden: Driver access required." });
+	}
+};
 
-module.exports = { protect };
+module.exports = { protect, protectDriver }; 

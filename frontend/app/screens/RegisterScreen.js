@@ -15,10 +15,10 @@ import {
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
-import { useTheme } from "../context/ThemeContext"; // Import theme hook
-import Colors from "../constants/Colors"; // Import color definitions
+import { useTheme } from "../context/ThemeContext";
+import SegmentedControl from "../components/SegmentedControl";
+import Colors from "../constants/Colors";
 
-// Make sure this IP is correct for your local network
 const API_URL = "http://10.0.0.125:8001/api";
 
 const RegisterScreen = () => {
@@ -27,6 +27,7 @@ const RegisterScreen = () => {
 	const [phoneNumber, setPhoneNumber] = useState("");
 	const [password, setPassword] = useState("");
 	const [isLoading, setIsLoading] = useState(false);
+	const [role, setRole] = useState("Customer");
 	const router = useRouter();
 
 	// --- THEME INTEGRATION ---
@@ -42,18 +43,35 @@ const RegisterScreen = () => {
 		}
 		setIsLoading(true);
 
+		// CORRECTED: Determine the correct API endpoint based on the selected role
+		const endpoint = role === "Customer" ? "user" : "driver";
+		const apiUrl = `${API_URL}/auth/register/${endpoint}`;
+
 		try {
-			const response = await axios.post(`${API_URL}/auth/register/user`, {
+			// CORRECTED: Use the dynamic 'apiUrl' variable
+			const response = await axios.post(apiUrl, {
 				name,
 				phoneNumber,
 				password,
 			});
 
-			await AsyncStorage.setItem("token", response.data.token);
-			await AsyncStorage.setItem("user", JSON.stringify(response.data.user));
+			// CORRECTED: Use the correct key from the response data ('user' or 'driver')
+			const userOrDriverData = response.data[role.toLowerCase()];
+			if (!userOrDriverData) {
+				throw new Error("Invalid response from server.");
+			}
 
-			// Immediately log them in by navigating to the main app layout
-			router.replace("/tabs");
+			// Save all necessary info to storage
+			await AsyncStorage.setItem("token", response.data.token);
+			await AsyncStorage.setItem("role", role.toLowerCase());
+			await AsyncStorage.setItem("user", JSON.stringify(userOrDriverData));
+
+			// CORRECTED: Navigate to the correct dashboard based on role
+			if (role === "Customer") {
+				router.replace("/(tabs)");
+			} else {
+				router.replace("/(driver-tabs)");
+			}
 		} catch (error) {
 			const errorMessage =
 				error.response?.data?.message || "Registration failed. Please try again.";
@@ -76,6 +94,16 @@ const RegisterScreen = () => {
 					Let&apos;s get you on the road.
 				</Text>
 
+				{/* The SegmentedControl should be prominent */}
+				<View style={styles.inputGroup}>
+					<SegmentedControl
+						options={["Customer", "Driver"]}
+						selectedOption={role}
+						onSelect={setRole}
+					/>
+				</View>
+
+				{/* The rest of the input fields */}
 				<View style={styles.inputGroup}>
 					<TextInput
 						style={[
@@ -92,7 +120,6 @@ const RegisterScreen = () => {
 						onChangeText={setName}
 					/>
 				</View>
-
 				<View style={styles.inputGroup}>
 					<TextInput
 						style={[
@@ -110,7 +137,6 @@ const RegisterScreen = () => {
 						onChangeText={setPhoneNumber}
 					/>
 				</View>
-
 				<View style={styles.inputGroup}>
 					<TextInput
 						style={[
@@ -129,6 +155,7 @@ const RegisterScreen = () => {
 					/>
 				</View>
 
+				{/* The rest of the buttons and links */}
 				<TouchableOpacity
 					style={[styles.button, { backgroundColor: colors.tint }]}
 					onPress={handleRegister}
@@ -155,59 +182,18 @@ const RegisterScreen = () => {
 };
 
 // --- STYLESHEET ---
-// Contains only layout and non-color styles.
 const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-	},
-	innerContainer: {
-		flex: 1,
-		justifyContent: "center",
-		paddingHorizontal: 20,
-	},
-	title: {
-		fontSize: 40,
-		fontWeight: "bold",
-		textAlign: "center",
-		marginBottom: 10,
-	},
-	subtitle: {
-		fontSize: 18,
-		textAlign: "center",
-		marginBottom: 50,
-	},
-	inputGroup: {
-		marginBottom: 20,
-	},
-	input: {
-		padding: 18,
-		borderRadius: 12,
-		borderWidth: 1,
-		fontSize: 16,
-	},
-	button: {
-		padding: 18,
-		borderRadius: 12,
-		alignItems: "center",
-		marginTop: 10,
-	},
-	buttonText: {
-		color: "#ffffff",
-		fontSize: 16,
-		fontWeight: "bold",
-	},
-	linkContainer: {
-		flexDirection: "row",
-		justifyContent: "center",
-		marginTop: 30,
-	},
-	linkText: {
-		fontSize: 16,
-	},
-	link: {
-		fontSize: 16,
-		fontWeight: "bold",
-	},
+	container: { flex: 1 },
+	innerContainer: { flex: 1, justifyContent: "center", paddingHorizontal: 20 },
+	title: { fontSize: 40, fontWeight: "bold", textAlign: "center", marginBottom: 10 },
+	subtitle: { fontSize: 18, textAlign: "center", marginBottom: 30 },
+	inputGroup: { marginBottom: 20 },
+	input: { padding: 18, borderRadius: 12, borderWidth: 1, fontSize: 16 },
+	button: { padding: 18, borderRadius: 12, alignItems: "center", marginTop: 10 },
+	buttonText: { color: "#ffffff", fontSize: 16, fontWeight: "bold" },
+	linkContainer: { flexDirection: "row", justifyContent: "center", marginTop: 30 },
+	linkText: { fontSize: 16 },
+	link: { fontSize: 16, fontWeight: "bold" },
 });
 
 export default RegisterScreen;

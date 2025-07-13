@@ -1,37 +1,24 @@
-
+// towlink-backend/controllers/jobController.js
 const jobService = require("../services/jobService");
 
+// @desc    Create a new service request
+// @route   POST /api/jobs
+// @access  Private (User must be logged in)
 const createJob = async (req, res) => {
 	try {
-		// The user object is still attached by our 'protect' middleware
-		const userId = req.user.id;
+		// req.user.id is attached by our 'protect' middleware
+		const newJob = await jobService.createJob(req.body, req.user.id);
 
-		// The ONLY change is here. We now pass the entire req.body
-		// to the service, instead of just a piece of it.
-		const result = await jobService.createJobAndFindDriver(req.body, userId);
+		// In the future, this is where we'll trigger the real-time search for drivers
+		console.log(`Job ${newJob.id} created successfully. Searching for drivers...`);
 
-		// The rest of this logic remains the same, as the service
-		// still returns the same result structure.
-		if (result.assignedDriver) {
-			res.status(201).json({
-				message: "Job created and nearest driver found.",
-				job: result.job,
-				assignedDriver: result.assignedDriver,
-			});
-		} else {
-			res.status(201).json({
-				message: "Job created, but no active drivers are currently available.",
-				job: result.job,
-				assignedDriver: null,
-			});
-		}
+		res.status(201).json({
+			message: "Job created successfully.",
+			job: newJob,
+		});
 	} catch (error) {
-		console.error("Error in jobController:", error);
-		// Update the error check to be more generic for validation errors from the service.
-		if (error.message.includes("required")) {
-			return res.status(400).send({ message: error.message });
-		}
-		res.status(500).send({ message: "Server Error" });
+		console.error("Error in createJob controller:", error);
+		res.status(500).json({ message: "Server error while creating job." });
 	}
 };
 

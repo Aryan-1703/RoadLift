@@ -10,17 +10,22 @@ const Index = () => {
 		const checkAuthStatus = async () => {
 			try {
 				const token = await AsyncStorage.getItem("token");
+				const role = await AsyncStorage.getItem("role"); 
+
 				if (token) {
-					router.replace("/tabs");
+					// Direct to the correct dashboard based on saved role
+					if (role === "driver") {
+						router.replace("/driver-tabs");
+					} else {
+						router.replace("/tabs");
+					}
 				} else {
 					router.replace("/login");
 				}
 			} catch (e) {
-				console.error("Failed to check auth status:", e);
 				router.replace("/login");
 			}
 		};
-
 		checkAuthStatus();
 	}, []);
 

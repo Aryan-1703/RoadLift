@@ -11,9 +11,11 @@ app.use(express.json());
 // --- Routes ---
 const jobRoutes = require("./routes/jobRoutes");
 const authRoutes = require("./routes/authRoutes");
+const driverRoutes = require("./routes/driverRoutes");
 
 app.use("/api/jobs", jobRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/driver", driverRoutes);
 
 app.get("/", (req, res) => {
 	res.send("TowLink API is running...");

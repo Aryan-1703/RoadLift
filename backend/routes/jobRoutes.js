@@ -1,10 +1,10 @@
 const express = require("express");
 const router = express.Router();
-const jobController = require("../controllers/jobController");
-const { protect } = require("../middleware/authMiddleware"); // Import the middleware
+const { createJob } = require("../controllers/jobController");
+const { protect } = require("../middleware/authMiddleware");
 
-// To create a job, the user must be authenticated.
-// The 'protect' middleware will run before the 'createJob' controller.
-router.post("/", protect, jobController.createJob);
+// The 'protect' middleware will run first. If the token is valid,
+// it passes control to the 'createJob' controller.
+router.post("/", protect, createJob);
 
 module.exports = router;

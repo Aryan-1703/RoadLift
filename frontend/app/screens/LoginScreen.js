@@ -42,18 +42,40 @@ const LoginScreen = () => {
 		setIsLoading(true);
 
 		try {
-			const response = await axios.post(`${API_URL}/auth/login/user`, {
-				phoneNumber,
-				password,
-			});
+			// --- NEW: Unified Login Attempt ---
+			try {
+				// Attempt 1: Log in as a User
+				const response = await axios.post(`${API_URL}/auth/login/user`, {
+					phoneNumber,
+					password,
+				});
 
-			await AsyncStorage.setItem("token", response.data.token);
-			await AsyncStorage.setItem("user", JSON.stringify(response.data.user));
-			// Navigate to the tabs layout group on successful login
-			router.replace("/tabs");
+				await AsyncStorage.setItem("token", response.data.token);
+				await AsyncStorage.setItem("user", JSON.stringify(response.data.user));
+				await AsyncStorage.setItem("role", "customer");
+				router.replace("/tabs");
+			} catch (userError) {
+				// If user login fails, try logging in as a Driver
+				if (userError.response && userError.response.status === 401) {
+					const response = await axios.post(`${API_URL}/auth/login/driver`, {
+						phoneNumber,
+						password,
+					});
+
+					await AsyncStorage.setItem("token", response.data.token);
+					await AsyncStorage.setItem("user", JSON.stringify(response.data.driver));
+					await AsyncStorage.setItem("role", "driver");
+					// TODO: Create and navigate to the driver dashboard
+					router.replace("/(driver-tabs)");
+					alert("Driver login successful!");
+				} else {
+					// It was a different error (e.g., server down), so throw it
+					throw userError;
+				}
+			}
 		} catch (error) {
 			const errorMessage =
-				error.response?.data?.message || "Login failed. Please check your credentials.";
+				error.response?.data?.message || "Invalid credentials or server error.";
 			Alert.alert("Login Failed", errorMessage);
 		} finally {
 			setIsLoading(false);
