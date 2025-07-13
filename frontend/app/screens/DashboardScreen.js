@@ -1,15 +1,26 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, Alert } from "react-native";
+import {
+	View,
+	Text,
+	StyleSheet,
+	SafeAreaView,
+	ScrollView,
+	Alert,
+	StatusBar,
+} from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useRouter } from "expo-router";
-import ServiceCard from "../components/ServiceCard"; 
+import ServiceCard from "../components/ServiceCard";
+import { useTheme } from "../context/ThemeContext";
+import Colors from "../constants/Colors";
 
 const DashboardScreen = () => {
+	// --- STATE AND HOOKS ---
 	const [user, setUser] = useState(null);
-	const router = useRouter();
+	const { theme } = useTheme();
+	const isDarkMode = theme === "dark";
+	const colors = Colors[theme];
 
 	useEffect(() => {
-		// Fetch user data from storage when the screen loads
 		const loadUserData = async () => {
 			const userDataString = await AsyncStorage.getItem("user");
 			if (userDataString) {
@@ -19,20 +30,30 @@ const DashboardScreen = () => {
 		loadUserData();
 	}, []);
 
+	// --- HANDLERS ---
 	const handleServiceSelection = serviceName => {
 		Alert.alert("Service Selected", `You selected ${serviceName}`);
-		// Later: This will navigate to a location confirmation page
+		// Next step: Navigate to a location confirmation page
 	};
 
+	// --- RENDER ---
 	return (
-		<SafeAreaView style={styles.container}>
+		<SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+			<StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} />
 			<ScrollView contentContainerStyle={styles.scrollContainer}>
 				<View style={styles.header}>
-					<Text style={styles.welcomeTitle}>Welcome,</Text>
-					<Text style={styles.userName}>{user?.name || "User"}</Text>
-					<Text style={styles.subtitle}>How can we help you today?</Text>
+					<Text style={[styles.welcomeTitle, { color: colors.tabIconDefault }]}>
+						Welcome,
+					</Text>
+					<Text style={[styles.userName, { color: colors.text }]}>
+						{user?.name || "User"}
+					</Text>
+					<Text style={[styles.subtitle, { color: colors.tabIconDefault }]}>
+						How can we help you today?
+					</Text>
 				</View>
 
+				{/* The ServiceCard components will now be themed automatically */}
 				<View style={styles.serviceGrid}>
 					<ServiceCard
 						iconName="car-battery"
@@ -66,29 +87,27 @@ const DashboardScreen = () => {
 	);
 };
 
+// --- STYLESHEET (Layout Only) ---
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: "#f0f2f5",
 	},
 	scrollContainer: {
 		padding: 20,
+		paddingTop: 40, // More space at the top
 	},
 	header: {
 		marginBottom: 30,
 	},
 	welcomeTitle: {
 		fontSize: 24,
-		color: "#6c757d",
 	},
 	userName: {
 		fontSize: 36,
 		fontWeight: "bold",
-		color: "#1c1c1e",
 	},
 	subtitle: {
 		fontSize: 18,
-		color: "#6c757d",
 		marginTop: 8,
 	},
 	serviceGrid: {

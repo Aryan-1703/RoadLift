@@ -15,16 +15,25 @@ import {
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
+import { useTheme } from "../context/ThemeContext"; // Ensure this path is correct
+import Colors from "../constants/Colors"; // Ensure this path is correct
 
+// Make sure this IP is correct for your local network
 const API_URL = "http://10.0.0.125:8001/api";
 
 const LoginScreen = () => {
+	// --- STATE AND HOOKS ---
 	const [phoneNumber, setPhoneNumber] = useState("");
 	const [password, setPassword] = useState("");
 	const [isPasswordVisible, setIsPasswordVisible] = useState(false);
 	const [isLoading, setIsLoading] = useState(false);
 	const router = useRouter();
 
+	const { theme } = useTheme();
+	const isDarkMode = theme === "dark";
+	const colors = Colors[theme];
+
+	// --- API CALL ---
 	const handleLogin = async () => {
 		if (!phoneNumber || !password) {
 			Alert.alert("Missing Fields", "Please enter both phone number and password.");
@@ -40,31 +49,42 @@ const LoginScreen = () => {
 
 			await AsyncStorage.setItem("token", response.data.token);
 			await AsyncStorage.setItem("user", JSON.stringify(response.data.user));
+			// Navigate to the tabs layout group on successful login
 			router.replace("/tabs");
 		} catch (error) {
 			const errorMessage =
-				error.response?.data?.message || "Login failed. Please try again.";
+				error.response?.data?.message || "Login failed. Please check your credentials.";
 			Alert.alert("Login Failed", errorMessage);
 		} finally {
 			setIsLoading(false);
 		}
 	};
 
+	// --- RENDER ---
 	return (
-		<SafeAreaView style={styles.container}>
-			<StatusBar barStyle="dark-content" />
+		<SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+			<StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} />
 			<KeyboardAvoidingView
 				behavior={Platform.OS === "ios" ? "padding" : "height"}
 				style={styles.innerContainer}
 			>
-				<Text style={styles.title}>TowLink</Text>
-				<Text style={styles.subtitle}>Welcome back! Please sign in.</Text>
+				<Text style={[styles.title, { color: colors.tint }]}>TowLink</Text>
+				<Text style={[styles.subtitle, { color: colors.text, opacity: 0.7 }]}>
+					Welcome back! Please sign in.
+				</Text>
 
 				<View style={styles.inputGroup}>
 					<TextInput
-						style={styles.input}
+						style={[
+							styles.input,
+							{
+								backgroundColor: colors.card,
+								borderColor: colors.border,
+								color: colors.text,
+							},
+						]}
 						placeholder="Phone Number"
-						placeholderTextColor="#8e8e93"
+						placeholderTextColor={colors.tabIconDefault}
 						keyboardType="phone-pad"
 						value={phoneNumber}
 						onChangeText={setPhoneNumber}
@@ -73,9 +93,16 @@ const LoginScreen = () => {
 
 				<View style={styles.inputGroup}>
 					<TextInput
-						style={styles.input}
+						style={[
+							styles.input,
+							{
+								backgroundColor: colors.card,
+								borderColor: colors.border,
+								color: colors.text,
+							},
+						]}
 						placeholder="Password"
-						placeholderTextColor="#8e8e93"
+						placeholderTextColor={colors.tabIconDefault}
 						secureTextEntry={!isPasswordVisible}
 						value={password}
 						onChangeText={setPassword}
@@ -84,14 +111,14 @@ const LoginScreen = () => {
 						style={styles.eyeButton}
 						onPress={() => setIsPasswordVisible(!isPasswordVisible)}
 					>
-						<Text style={styles.eyeButtonText}>
+						<Text style={[styles.eyeButtonText, { color: colors.tint }]}>
 							{isPasswordVisible ? "Hide" : "Show"}
 						</Text>
 					</TouchableOpacity>
 				</View>
 
 				<TouchableOpacity
-					style={styles.button}
+					style={[styles.button, { backgroundColor: colors.tint }]}
 					onPress={handleLogin}
 					disabled={isLoading}
 				>
@@ -103,9 +130,11 @@ const LoginScreen = () => {
 				</TouchableOpacity>
 
 				<View style={styles.linkContainer}>
-					<Text style={styles.linkText}>Don&apos;t have an account? </Text>
+					<Text style={[styles.linkText, { color: colors.text, opacity: 0.7 }]}>
+						Don&apos;t have an account?{" "}
+					</Text>
 					<TouchableOpacity onPress={() => router.push("/register")}>
-						<Text style={styles.link}>Register</Text>
+						<Text style={[styles.link, { color: colors.tint }]}>Register</Text>
 					</TouchableOpacity>
 				</View>
 			</KeyboardAvoidingView>
@@ -116,7 +145,6 @@ const LoginScreen = () => {
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: "#f0f2f5",
 	},
 	innerContainer: {
 		flex: 1,
@@ -126,13 +154,11 @@ const styles = StyleSheet.create({
 	title: {
 		fontSize: 48,
 		fontWeight: "bold",
-		color: "#007aff",
 		textAlign: "center",
 		marginBottom: 10,
 	},
 	subtitle: {
 		fontSize: 18,
-		color: "#6c757d",
 		textAlign: "center",
 		marginBottom: 50,
 	},
@@ -141,13 +167,11 @@ const styles = StyleSheet.create({
 		position: "relative",
 	},
 	input: {
-		backgroundColor: "#ffffff",
 		padding: 18,
 		borderRadius: 12,
 		borderWidth: 1,
-		borderColor: "#ced4da",
 		fontSize: 16,
-		paddingRight: 60, // Make space for the "Show" button
+		paddingRight: 60,
 	},
 	eyeButton: {
 		position: "absolute",
@@ -158,11 +182,9 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 20,
 	},
 	eyeButtonText: {
-		color: "#007aff",
 		fontWeight: "600",
 	},
 	button: {
-		backgroundColor: "#007aff",
 		padding: 18,
 		borderRadius: 12,
 		alignItems: "center",
@@ -180,11 +202,9 @@ const styles = StyleSheet.create({
 	},
 	linkText: {
 		fontSize: 16,
-		color: "#6c757d",
 	},
 	link: {
 		fontSize: 16,
-		color: "#007aff",
 		fontWeight: "bold",
 	},
 });

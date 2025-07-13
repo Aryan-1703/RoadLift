@@ -1,6 +1,8 @@
 // app/(tabs)/_layout.js
 import { Tabs } from "expo-router";
 import { FontAwesome5 } from "@expo/vector-icons";
+import { useTheme } from "../context/ThemeContext";
+import Colors from "../constants/Colors";
 
 export default function TabsLayout() {
 	return (
