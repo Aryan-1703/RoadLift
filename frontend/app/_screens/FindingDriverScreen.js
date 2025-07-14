@@ -29,6 +29,8 @@ const FindingDriverScreen = () => {
 	const { socket, isConnected } = useSocket();
 
 	useEffect(() => {
+		let jobHandled = false;
+
 		if (!socket || !isConnected) {
 			console.log("Socket not available or not connected yet...");
 			return;
@@ -39,7 +41,8 @@ const FindingDriverScreen = () => {
 		const handleJobAccepted = data => {
 			console.log("Received job-accepted event:", data, "Expected jobId:", jobId);
 
-			if (String(data.jobId) === String(jobId)) {
+			if (!jobHandled && String(data.jobId) === String(jobId)) {
+				jobHandled = true;
 				Alert.alert("Driver Found!", data.message);
 				router.replace(`/live-tracking?jobId=${data.jobId}`);
 			}

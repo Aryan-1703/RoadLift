@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import {
 	View,
 	Text,
@@ -7,45 +7,30 @@ import {
 	TouchableOpacity,
 	StatusBar,
 } from "react-native";
-import { useRouter } from "expo-router";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useAuth } from "../_context/AuthContext";
 import { useTheme } from "../_context/ThemeContext";
 import Colors from "../_constants/Colors";
 import { FontAwesome5 } from "@expo/vector-icons";
-import { useSocket } from "../_context/SocketContext";
 
 const DriverProfileScreen = () => {
-	// --- HOOKS & STATE ---
-	const router = useRouter();
-	const [user, setUser] = useState(null);
-	const { theme } = useTheme(); // We don't need the toggle here, just the current theme
+	// --- CONTEXTS & THEME ---
+	const { user, logout } = useAuth(); // Get user data and logout function from context
+	const { theme } = useTheme();
 	const isDarkMode = theme === "dark";
 	const colors = Colors[theme];
-	const { disconnectSocket } = useSocket();
-	useEffect(() => {
-		// Load the driver's info from storage to display their name
-		const loadUserData = async () => {
-			const userDataString = await AsyncStorage.getItem("user");
-			if (userDataString) {
-				setUser(JSON.parse(userDataString));
-			}
-		};
-		loadUserData();
-	}, []);
 
-	// --- HANDLERS ---
+	// --- HANDLER ---
 	const handleLogout = async () => {
-		disconnectSocket();
-
-		await AsyncStorage.multiRemove(["token", "user", "role"]);
-		router.replace("/");
+		// Call the central logout function
+		await logout();
+		// Navigation is handled automatically by app/index.tsx
 	};
 
 	// --- RENDER ---
 	return (
 		<SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
 			<StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} />
-			<View style={styles.headerContainer}>
+			<View style={[styles.headerContainer, { borderBottomColor: colors.border }]}>
 				<Text style={[styles.headerTitle, { color: colors.text }]}>Profile</Text>
 			</View>
 
@@ -61,8 +46,6 @@ const DriverProfileScreen = () => {
 				</Text>
 			</View>
 
-			{/* In the future, we can add more settings rows here like in the customer settings page */}
-
 			<TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
 				<Text style={styles.logoutButtonText}>Logout</Text>
 			</TouchableOpacity>
@@ -72,24 +55,14 @@ const DriverProfileScreen = () => {
 
 // --- STYLESHEET ---
 const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-	},
+	container: { flex: 1 },
 	headerContainer: {
 		padding: 20,
 		alignItems: "center",
-		borderBottomWidth: 1,
-		borderBottomColor: "#e0e0e0", // This will be themed
+		borderBottomWidth: StyleSheet.hairlineWidth,
 	},
-	headerTitle: {
-		fontSize: 22,
-		fontWeight: "bold",
-	},
-	profileInfo: {
-		alignItems: "center",
-		marginTop: 40,
-		marginBottom: 40,
-	},
+	headerTitle: { fontSize: 22, fontWeight: "bold" },
+	profileInfo: { alignItems: "center", marginTop: 40, marginBottom: 40 },
 	avatar: {
 		width: 100,
 		height: 100,
@@ -98,28 +71,18 @@ const styles = StyleSheet.create({
 		alignItems: "center",
 		marginBottom: 15,
 	},
-	userName: {
-		fontSize: 24,
-		fontWeight: "bold",
-	},
-	userPhone: {
-		fontSize: 16,
-		marginTop: 4,
-	},
+	userName: { fontSize: 24, fontWeight: "bold" },
+	userPhone: { fontSize: 16, marginTop: 4 },
 	logoutButton: {
 		marginHorizontal: 20,
-		backgroundColor: "#ff3b30", // A standard destructive action color
+		backgroundColor: "#ff3b30",
 		borderRadius: 12,
 		padding: 15,
 		alignItems: "center",
-		marginTop: "auto", // Pushes the button to the bottom
+		marginTop: "auto",
 		marginBottom: 20,
 	},
-	logoutButtonText: {
-		color: "#fff",
-		fontSize: 17,
-		fontWeight: "600",
-	},
+	logoutButtonText: { color: "#fff", fontSize: 17, fontWeight: "600" },
 });
 
 export default DriverProfileScreen;

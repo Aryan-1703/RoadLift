@@ -13,13 +13,12 @@ import {
 	Platform,
 } from "react-native";
 import axios from "axios";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import { useTheme } from "../_context/ThemeContext";
+import { useAuth } from "../_context/AuthContext"; // 1. Import the AuthContext hook
 import SegmentedControl from "../_components/SegmentedControl";
 import Colors from "../_constants/Colors";
 import { API_URL } from "../config/constants";
-import { useSocket } from "../_context/SocketContext";
 
 const RegisterScreen = () => {
 	// --- STATE AND HOOKS ---
@@ -27,16 +26,18 @@ const RegisterScreen = () => {
 	const [phoneNumber, setPhoneNumber] = useState("");
 	const [password, setPassword] = useState("");
 	const [isLoading, setIsLoading] = useState(false);
-	const [role, setRole] = useState("Customer");
+	const [role, setRole] = useState("Customer"); // UI state for the toggle
 	const router = useRouter();
-	const { connectSocket } = useSocket();
 
-	// --- THEME INTEGRATION ---
+	// --- CONTEXTS ---
 	const { theme } = useTheme();
+	const { login } = useAuth(); 
+
+	// --- THEME ---
 	const isDarkMode = theme === "dark";
 	const colors = Colors[theme];
 
-	// --- API CALL ---
+	// --- API CALL HANDLER ---
 	const handleRegister = async () => {
 		if (!name || !phoneNumber || !password) {
 			Alert.alert("Missing Fields", "Please fill in all fields.");
@@ -44,35 +45,32 @@ const RegisterScreen = () => {
 		}
 		setIsLoading(true);
 
-		// CORRECTED: Determine the correct API endpoint based on the selected role
 		const endpoint = role === "Customer" ? "user" : "driver";
 		const apiUrl = `${API_URL}/auth/register/${endpoint}`;
 
 		try {
-			// CORRECTED: Use the dynamic 'apiUrl' variable
 			const response = await axios.post(apiUrl, {
 				name,
 				phoneNumber,
 				password,
 			});
-			const roleKey = role === "Customer" ? "user" : "driver"; 
+
+			const roleKey = role === "Customer" ? "user" : "driver";
 			const userOrDriverData = response.data[roleKey];
 
 			if (!userOrDriverData) {
 				throw new Error("Invalid response structure from server.");
 			}
 
-			await AsyncStorage.setItem("role", roleKey);
-			await AsyncStorage.setItem("user", JSON.stringify(userOrDriverData));
-			await AsyncStorage.setItem("token", response.data.token);
-			connectSocket(userOrDriverData.id);
+			// 3. Call the central login function with all the data from the successful registration
+			await login({
+				token: response.data.token,
+				user: userOrDriverData,
+				role: roleKey,
+			});
 
-			// CORRECTED: Navigate to the correct dashboard based on role
-			if (role === "Customer") {
-				router.replace("/tabs");
-			} else {
-				router.replace("/driver-tabs");
-			}
+			// NOTE: Navigation is now handled automatically by app/index.tsx
+			// when the isAuthenticated state changes. We no longer need router.replace() here.
 		} catch (error) {
 			const errorMessage =
 				error.response?.data?.message || "Registration failed. Please try again.";
@@ -83,6 +81,7 @@ const RegisterScreen = () => {
 	};
 
 	// --- RENDER ---
+	// The JSX part of your component was already perfect and does not need changes.
 	return (
 		<SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
 			<StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} />
@@ -95,7 +94,6 @@ const RegisterScreen = () => {
 					Let&apos;s get you on the road.
 				</Text>
 
-				{/* The SegmentedControl should be prominent */}
 				<View style={styles.inputGroup}>
 					<SegmentedControl
 						options={["Customer", "Driver"]}
@@ -104,7 +102,7 @@ const RegisterScreen = () => {
 					/>
 				</View>
 
-				{/* The rest of the input fields */}
+				{/* Input fields... */}
 				<View style={styles.inputGroup}>
 					<TextInput
 						style={[
@@ -156,7 +154,7 @@ const RegisterScreen = () => {
 					/>
 				</View>
 
-				{/* The rest of the buttons and links */}
+				{/* Buttons and links... */}
 				<TouchableOpacity
 					style={[styles.button, { backgroundColor: colors.tint }]}
 					onPress={handleRegister}
@@ -168,7 +166,6 @@ const RegisterScreen = () => {
 						<Text style={styles.buttonText}>Create Account</Text>
 					)}
 				</TouchableOpacity>
-
 				<View style={styles.linkContainer}>
 					<Text style={[styles.linkText, { color: colors.text, opacity: 0.7 }]}>
 						Already have an account?{" "}
@@ -182,7 +179,7 @@ const RegisterScreen = () => {
 	);
 };
 
-// --- STYLESHEET ---
+// The styles part of your component was also perfect and does not need changes.
 const styles = StyleSheet.create({
 	container: { flex: 1 },
 	innerContainer: { flex: 1, justifyContent: "center", paddingHorizontal: 20 },

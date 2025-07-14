@@ -1,41 +1,43 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import socketService from "../services/socket";
+import socketService from "../services/socket"; // Your singleton socket manager
 
 const SocketContext = createContext();
 
 export const useSocket = () => useContext(SocketContext);
 
 export const SocketProvider = ({ children }) => {
-	const [socket, setSocket] = useState(null);
-	const [isConnected, setIsConnected] = useState(false);
+	const [isConnected, setIsConnected] = useState(
+		socketService.getSocket()?.connected || false
+	);
 
-	const connectSocket = userId => {
-		console.log("Connecting socket for user ID:", userId);
-		socketService.connect(userId);
-		const newSocket = socketService.getSocket();
-
-		// Only set the new socket once it connects
-		newSocket.on("connect", () => {
-			console.log("Socket connected:", newSocket.id);
-			setSocket(newSocket);
-			setIsConnected(true);
-		});
-
-		newSocket.on("disconnect", () => {
-			console.log("Socket disconnected");
-			setIsConnected(false);
-			setSocket(null);
-		});
+	const connectSocket = (userId, role) => {
+		socketService.connect(userId, role);
 	};
 
 	const disconnectSocket = () => {
-		socketService.disconnect();
-		setSocket(null);
-		setIsConnected(false);
+		if (socketService.getSocket()) {
+			socketService.disconnect();
+		}
 	};
 
+	useEffect(() => {
+		const socket = socketService.getSocket();
+		if (!socket) return;
+
+		const handleConnect = () => setIsConnected(true);
+		const handleDisconnect = () => setIsConnected(false);
+
+		socket.on("connect", handleConnect);
+		socket.on("disconnect", handleDisconnect);
+
+		return () => {
+			socket.off("connect", handleConnect);
+			socket.off("disconnect", handleDisconnect);
+		};
+	}, []); // ✅ Empty dependency array — only runs once on mount
+
 	const value = {
-		socket,
+		socket: socketService.getSocket(), // Share actual socket instance
 		isConnected,
 		connectSocket,
 		disconnectSocket,

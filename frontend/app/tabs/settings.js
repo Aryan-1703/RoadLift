@@ -6,58 +6,63 @@ import {
 	SafeAreaView,
 	TouchableOpacity,
 	Switch,
+	StatusBar,
 } from "react-native";
-import { useRouter } from "expo-router";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useTheme } from "../_context/ThemeContext"; // Import our theme hook
+import { useAuth } from "../_context/AuthContext";
+import { useTheme } from "../_context/ThemeContext";
+import Colors from "../_constants/Colors";
 import { FontAwesome5 } from "@expo/vector-icons";
-import { useSocket } from "../_context/SocketContext";
 
-// A reusable component for each settings row
-const SettingsRow = ({ icon, label, children }) => (
-	<View style={styles.row}>
+// A reusable component for each settings row, now fully themed
+const SettingsRow = ({ icon, label, children, colors }) => (
+	<View style={[styles.row, { borderBottomColor: colors.border }]}>
 		<View style={styles.labelContainer}>
-			<FontAwesome5 name={icon} size={20} color="#6c757d" style={styles.icon} />
-			<Text style={styles.labelText}>{label}</Text>
+			<FontAwesome5
+				name={icon}
+				size={20}
+				color={colors.tabIconDefault}
+				style={styles.icon}
+			/>
+			<Text style={[styles.labelText, { color: colors.text }]}>{label}</Text>
 		</View>
 		<View>{children}</View>
 	</View>
 );
 
 const SettingsScreen = () => {
-	const router = useRouter();
-	const { theme, toggleTheme } = useTheme(); // Use our theme context
+	// --- CONTEXTS & THEME ---
+	const { logout } = useAuth(); // Get the central logout function
+	const { theme, toggleTheme } = useTheme();
 	const isDarkMode = theme === "dark";
-	const { disconnectSocket } = useSocket();
+	const colors = Colors[theme];
 
+	// --- HANDLER ---
 	const handleLogout = async () => {
-		disconnectSocket();
-		await AsyncStorage.multiRemove(["token", "user", "role"]);
-		router.replace("/");
+		// This single function now handles clearing state, storage, and disconnecting the socket
+		await logout();
+		// Navigation is handled automatically by the app/index.tsx gatekeeper
 	};
 
+	// --- RENDER ---
 	return (
-		<SafeAreaView style={isDarkMode ? styles.containerDark : styles.containerLight}>
-			<View style={styles.header}>
-				<Text style={isDarkMode ? styles.headerTextDark : styles.headerTextLight}>
-					Settings
-				</Text>
+		<SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+			<StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} />
+			<View style={[styles.header, { borderBottomColor: colors.border }]}>
+				<Text style={[styles.headerText, { color: colors.text }]}>Settings</Text>
 			</View>
 
-			<View style={styles.settingsGroup}>
-				<SettingsRow icon="moon" label="Dark Mode">
+			<View style={[styles.settingsGroup, { backgroundColor: colors.card }]}>
+				<SettingsRow icon="moon" label="Dark Mode" colors={colors}>
 					<Switch
-						trackColor={{ false: "#767577", true: "#81b0ff" }}
-						thumbColor={isDarkMode ? "#007aff" : "#f4f3f4"}
+						trackColor={{ false: "#767577", true: colors.tint }}
+						thumbColor={isDarkMode ? colors.tint : "#f4f3f4"}
 						ios_backgroundColor="#3e3e3e"
 						onValueChange={toggleTheme}
 						value={isDarkMode}
 					/>
 				</SettingsRow>
-				{/* We can add more settings rows here in the future */}
-				<SettingsRow icon="user-circle" label="Account">
-					{/* Placeholder for account screen navigation */}
-					<FontAwesome5 name="chevron-right" size={16} color="#6c757d" />
+				<SettingsRow icon="user-circle" label="Account" colors={colors}>
+					<FontAwesome5 name="chevron-right" size={16} color={colors.tabIconDefault} />
 				</SettingsRow>
 			</View>
 
@@ -68,68 +73,37 @@ const SettingsScreen = () => {
 	);
 };
 
+// --- STYLESHEET (Layout & Themed) ---
 const styles = StyleSheet.create({
-	containerLight: {
-		flex: 1,
-		backgroundColor: "#f0f2f5",
-	},
-	containerDark: {
-		flex: 1,
-		backgroundColor: "#000",
-	},
-	header: {
-		padding: 20,
-		borderBottomWidth: 1,
-		borderBottomColor: "#e0e0e0",
-	},
-	headerTextLight: {
-		fontSize: 32,
-		fontWeight: "bold",
-		color: "#1c1c1e",
-	},
-	headerTextDark: {
-		fontSize: 32,
-		fontWeight: "bold",
-		color: "#fff",
-	},
+	container: { flex: 1 },
+	header: { padding: 20, borderBottomWidth: StyleSheet.hairlineWidth },
+	headerText: { fontSize: 32, fontWeight: "bold" },
 	settingsGroup: {
 		marginTop: 30,
 		marginHorizontal: 15,
-		backgroundColor: "#fff", // This will change with theme later
 		borderRadius: 10,
+		overflow: "hidden",
 	},
 	row: {
 		flexDirection: "row",
 		justifyContent: "space-between",
 		alignItems: "center",
-		paddingVertical: 15,
-		paddingHorizontal: 20,
-		borderBottomWidth: 1,
-		borderBottomColor: "#f0f0f0",
+		padding: 18,
+		borderBottomWidth: StyleSheet.hairlineWidth,
 	},
-	labelContainer: {
-		flexDirection: "row",
-		alignItems: "center",
-	},
-	icon: {
-		marginRight: 15,
-	},
-	labelText: {
-		fontSize: 17,
-	},
+	labelContainer: { flexDirection: "row", alignItems: "center" },
+	icon: { marginRight: 15, width: 22 },
+	labelText: { fontSize: 17 },
 	logoutButton: {
-		marginTop: 40,
-		marginHorizontal: 15,
+		marginHorizontal: 20,
 		backgroundColor: "#ff3b30",
-		borderRadius: 10,
+		borderRadius: 12,
 		padding: 15,
 		alignItems: "center",
+		marginTop: "auto",
+		marginBottom: 20,
 	},
-	logoutButtonText: {
-		color: "#fff",
-		fontSize: 17,
-		fontWeight: "600",
-	},
+	logoutButtonText: { color: "#fff", fontSize: 17, fontWeight: "600" },
 });
 
 export default SettingsScreen;

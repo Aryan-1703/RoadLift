@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import {
 	SafeAreaView,
 	FlatList,
@@ -12,12 +12,12 @@ import {
 } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import axios from "axios";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import JobCard from "../_components/JobCard";
+import { useAuth } from "../_context/AuthContext";
 import { useTheme } from "../_context/ThemeContext";
+import { useSocket } from "../_context/SocketContext";
+import JobCard from "../_components/JobCard";
 import Colors from "../_constants/Colors";
-
-const API_URL = "http://10.0.0.125:8001/api";
+import { API_URL } from "../config/constants";
 
 const DriverDashboardScreen = () => {
 	// --- HOOKS & STATE ---
@@ -26,15 +26,51 @@ const DriverDashboardScreen = () => {
 	const [refreshing, setRefreshing] = useState(false);
 	const router = useRouter();
 
-	// --- THEME ---
+	// --- CONTEXTS ---
 	const { theme } = useTheme();
+	const { token } = useAuth(); // Get token from AuthContext
+	const { socket } = useSocket();
+
+	// --- THEME ---
 	const isDarkMode = theme === "dark";
 	const colors = Colors[theme];
 
+	// --- REAL-TIME LOGIC ---
+	useEffect(() => {
+		if (!socket) return;
+
+		// 2. Listener for when a new job is created by any customer
+		const handleNewJob = newJob => {
+			console.log("DriverDashboard: Received new job via socket:", newJob.id);
+			// Add the new job to the top of the list in real-time
+			setJobs(prevJobs => [newJob, ...prevJobs]);
+			Alert.alert(
+				"New Job Available!",
+				`A new ${newJob.serviceType} request has been posted.`
+			);
+		};
+
+		// 3. Listener for when a job is taken by ANOTHER driver
+		const handleJobTaken = data => {
+			console.log(`DriverDashboard: Job ${data.jobId} was accepted by another driver.`);
+			// Remove the accepted job from this driver's list so they can't accept it
+			setJobs(prevJobs => prevJobs.filter(job => job.id !== data.jobId));
+		};
+
+		socket.on("new-job", handleNewJob);
+		socket.on("job-accepted", handleJobTaken);
+
+		// Cleanup listeners when the component is unmounted	
+		return () => {
+			socket.off("new-job", handleNewJob);
+			socket.off("job-accepted", handleJobTaken);
+		};
+	}, [socket]);
+
 	// --- DATA FETCHING ---
 	const fetchAvailableJobs = useCallback(async () => {
+		if (!token) return;
 		try {
-			const token = await AsyncStorage.getItem("token");
 			const response = await axios.get(`${API_URL}/driver/jobs/available`, {
 				headers: { Authorization: `Bearer ${token}` },
 			});
@@ -46,8 +82,9 @@ const DriverDashboardScreen = () => {
 			setIsLoading(false);
 			setRefreshing(false);
 		}
-	}, []);
+	}, [token]);
 
+	// useFocusEffect will re-fetch data every time the driver comes back to this screen
 	useFocusEffect(
 		useCallback(() => {
 			setIsLoading(true);
@@ -63,7 +100,6 @@ const DriverDashboardScreen = () => {
 	// --- HANDLERS ---
 	const handleAcceptJob = async jobId => {
 		try {
-			const token = await AsyncStorage.getItem("token");
 			await axios.put(
 				`${API_URL}/driver/jobs/${jobId}/accept`,
 				{},
@@ -71,19 +107,14 @@ const DriverDashboardScreen = () => {
 					headers: { Authorization: `Bearer ${token}` },
 				}
 			);
-
-			// On success, navigate to the active job screen
-			router.push({
-				pathname: "/active-job",
-				params: { jobId },
-			});
+			router.push({ pathname: "/active-job", params: { jobId } });
 		} catch (error) {
 			console.error("Failed to accept job:", error.response?.data || error.message);
 			Alert.alert(
 				"Could Not Accept Job",
 				error.response?.data?.message || "This job may have been taken by another driver."
 			);
-			onRefresh(); // Refresh the list to remove the taken job
+			onRefresh();
 		}
 	};
 
@@ -114,7 +145,7 @@ const DriverDashboardScreen = () => {
 							No available jobs right now.
 						</Text>
 						<Text style={[styles.emptySubtext, { color: colors.tabIconDefault }]}>
-							Pull down to refresh.
+							Pull down to refresh or wait for new jobs.
 						</Text>
 					</View>
 				}
@@ -131,6 +162,7 @@ const DriverDashboardScreen = () => {
 	);
 };
 
+// --- STYLES ---
 const styles = StyleSheet.create({
 	container: { flex: 1 },
 	listContainer: { paddingVertical: 20 },

@@ -1,37 +1,21 @@
 import React, { useEffect } from "react";
 import { View, ActivityIndicator, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useAuth } from "./_context/AuthContext";
 
 const Index = () => {
 	const router = useRouter();
+	const { isAuthenticated, role, authLoaded } = useAuth();
 
 	useEffect(() => {
-		const checkAuthStatusAndConnect = async () => {
-			try {
-				const token = await AsyncStorage.getItem("token");
-				const userString = await AsyncStorage.getItem("user");
+		if (!authLoaded) return;
 
-				if (token && userString) {
-					const role = await AsyncStorage.getItem("role");
-
-					// Navigate to the correct dashboard
-					if (role === "driver") {
-						router.replace("/driver-tabs");
-					} else {
-						router.replace("/tabs");
-					}
-				} else {
-					router.replace("/login");
-				}
-			} catch (e) {
-				console.error("Failed to check auth status:", e);
-				router.replace("/login");
-			}
-		};
-
-		checkAuthStatusAndConnect();
-	}, []);
+		if (isAuthenticated) {
+			router.replace(role === "driver" ? "/driver-tabs" : "/tabs");
+		} else {
+			router.replace("/login");
+		}
+	}, [authLoaded, isAuthenticated, role]);
 
 	return (
 		<View style={styles.container}>
@@ -48,4 +32,5 @@ const styles = StyleSheet.create({
 		backgroundColor: "#f0f2f5",
 	},
 });
+
 export default Index;

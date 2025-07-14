@@ -19,9 +19,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useTheme } from "../_context/ThemeContext";
 import Colors from "../_constants/Colors";
 import ModalHeader from "../_components/ModalHeader";
-
-// --- IMPORTANT ---
-const API_URL = "http://10.0.0.125:8001/api";
+import { API_URL } from "../config/constants";
 
 const RequestConfirmationScreen = () => {
 	// --- HOOKS & STATE ---

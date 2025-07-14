@@ -13,12 +13,11 @@ import {
 	Platform,
 } from "react-native";
 import axios from "axios";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
-import { useTheme } from "../_context/ThemeContext"; // Ensure this path is correct
-import Colors from "../_constants/Colors"; // Ensure this path is correct
+import { useTheme } from "../_context/ThemeContext";
+import { useAuth } from "../_context/AuthContext"; // 1. Import the central AuthContext hook
+import Colors from "../_constants/Colors";
 import { API_URL } from "../config/constants";
-import { useSocket } from "../_context/SocketContext";
 
 const LoginScreen = () => {
 	// --- STATE AND HOOKS ---
@@ -27,13 +26,16 @@ const LoginScreen = () => {
 	const [isPasswordVisible, setIsPasswordVisible] = useState(false);
 	const [isLoading, setIsLoading] = useState(false);
 	const router = useRouter();
-	const { connectSocket } = useSocket();
 
+	// --- CONTEXTS ---
 	const { theme } = useTheme();
+	const { login } = useAuth(); // 2. Get the central login function
+
+	// --- THEME ---
 	const isDarkMode = theme === "dark";
 	const colors = Colors[theme];
 
-	// --- API CALL ---
+	// --- API CALL HANDLER ---
 	const handleLogin = async () => {
 		if (!phoneNumber || !password) {
 			Alert.alert("Missing Fields", "Please enter both phone number and password.");
@@ -42,38 +44,41 @@ const LoginScreen = () => {
 		setIsLoading(true);
 
 		try {
-			// --- NEW: Unified Login Attempt ---
+			let response;
+			let roleKey;
+
+			// Attempt to log in as a User first
 			try {
-				const response = await axios.post(`${API_URL}/auth/login/user`, {
+				response = await axios.post(`${API_URL}/auth/login/user`, {
 					phoneNumber,
 					password,
 				});
-				const user = response.data.user;
-
-				await AsyncStorage.setItem("token", response.data.token);
-				await AsyncStorage.setItem("user", JSON.stringify(response.data.user));
-				await AsyncStorage.setItem("role", "customer");
-				connectSocket(user.id);
-				router.replace("/tabs");
+				roleKey = "user";
 			} catch (userError) {
-				// If user login fails, try logging in as a Driver
+				// If that fails with a 401, try as a Driver
 				if (userError.response && userError.response.status === 401) {
-					const response = await axios.post(`${API_URL}/auth/login/driver`, {
+					response = await axios.post(`${API_URL}/auth/login/driver`, {
 						phoneNumber,
 						password,
 					});
-
-					await AsyncStorage.setItem("token", response.data.token);
-					await AsyncStorage.setItem("user", JSON.stringify(response.data.driver));
-					await AsyncStorage.setItem("role", "driver");
-					// TODO: Create and navigate to the driver dashboard
-					router.replace("/driver-tabs");
-					alert("Driver login successful!");
+					roleKey = "driver";
 				} else {
-					// It was a different error (e.g., server down), so throw it
-					throw userError;
+					throw userError; // It was a different error, so let it fail
 				}
 			}
+
+			// Prepare the data object for our context
+			const loginData = {
+				token: response.data.token,
+				user: response.data[roleKey],
+				role: roleKey,
+			};
+
+			// 3. Call the central login function from the context
+			// This single call handles setting state, saving to storage, and connecting the socket.
+			await login(loginData);
+
+			// Navigation is now handled by app/index.tsx, so we don't need router.replace() here.
 		} catch (error) {
 			const errorMessage =
 				error.response?.data?.message || "Invalid credentials or server error.";
@@ -83,7 +88,7 @@ const LoginScreen = () => {
 		}
 	};
 
-	// --- RENDER ---
+	// --- RENDER (Your JSX was perfect, no changes needed here) ---
 	return (
 		<SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
 			<StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} />
@@ -96,6 +101,7 @@ const LoginScreen = () => {
 					Welcome back! Please sign in.
 				</Text>
 
+				{/* Inputs and buttons... */}
 				<View style={styles.inputGroup}>
 					<TextInput
 						style={[
@@ -113,7 +119,6 @@ const LoginScreen = () => {
 						onChangeText={setPhoneNumber}
 					/>
 				</View>
-
 				<View style={styles.inputGroup}>
 					<TextInput
 						style={[
@@ -139,7 +144,6 @@ const LoginScreen = () => {
 						</Text>
 					</TouchableOpacity>
 				</View>
-
 				<TouchableOpacity
 					style={[styles.button, { backgroundColor: colors.tint }]}
 					onPress={handleLogin}
@@ -151,7 +155,6 @@ const LoginScreen = () => {
 						<Text style={styles.buttonText}>Sign In</Text>
 					)}
 				</TouchableOpacity>
-
 				<View style={styles.linkContainer}>
 					<Text style={[styles.linkText, { color: colors.text, opacity: 0.7 }]}>
 						Don&apos;t have an account?{" "}
@@ -165,30 +168,13 @@ const LoginScreen = () => {
 	);
 };
 
+// Styles were also perfect, no changes needed.
 const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-	},
-	innerContainer: {
-		flex: 1,
-		justifyContent: "center",
-		paddingHorizontal: 20,
-	},
-	title: {
-		fontSize: 48,
-		fontWeight: "bold",
-		textAlign: "center",
-		marginBottom: 10,
-	},
-	subtitle: {
-		fontSize: 18,
-		textAlign: "center",
-		marginBottom: 50,
-	},
-	inputGroup: {
-		marginBottom: 20,
-		position: "relative",
-	},
+	container: { flex: 1 },
+	innerContainer: { flex: 1, justifyContent: "center", paddingHorizontal: 20 },
+	title: { fontSize: 48, fontWeight: "bold", textAlign: "center", marginBottom: 10 },
+	subtitle: { fontSize: 18, textAlign: "center", marginBottom: 50 },
+	inputGroup: { marginBottom: 20, position: "relative" },
 	input: {
 		padding: 18,
 		borderRadius: 12,
@@ -204,32 +190,12 @@ const styles = StyleSheet.create({
 		justifyContent: "center",
 		paddingHorizontal: 20,
 	},
-	eyeButtonText: {
-		fontWeight: "600",
-	},
-	button: {
-		padding: 18,
-		borderRadius: 12,
-		alignItems: "center",
-		marginTop: 10,
-	},
-	buttonText: {
-		color: "#ffffff",
-		fontSize: 16,
-		fontWeight: "bold",
-	},
-	linkContainer: {
-		flexDirection: "row",
-		justifyContent: "center",
-		marginTop: 30,
-	},
-	linkText: {
-		fontSize: 16,
-	},
-	link: {
-		fontSize: 16,
-		fontWeight: "bold",
-	},
+	eyeButtonText: { fontWeight: "600" },
+	button: { padding: 18, borderRadius: 12, alignItems: "center", marginTop: 10 },
+	buttonText: { color: "#ffffff", fontSize: 16, fontWeight: "bold" },
+	linkContainer: { flexDirection: "row", justifyContent: "center", marginTop: 30 },
+	linkText: { fontSize: 16 },
+	link: { fontSize: 16, fontWeight: "bold" },
 });
 
 export default LoginScreen;

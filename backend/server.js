@@ -37,12 +37,17 @@ app.get("/", (req, res) => {
 io.on("connection", socket => {
 	console.log(`Socket connected: ${socket.id}`);
 
-	socket.on("join-room", userId => {
+	socket.on("join-room", ({ userId, role }) => {
 		console.log(
-			`--- JOIN-ROOM EVENT RECEIVED from socket ${socket.id} for User ID: ${userId} ---`
+			`--- JOIN-ROOM EVENT RECEIVED from socket ${socket.id} for User ID: ${userId}, Role: ${role} ---`
 		);
-		socket.join(String(userId)); // Join the private room for this user
-		console.log(`--- Socket ${socket.id} successfully joined room: ${userId} ---`);
+		if (userId) {
+			socket.join(String(userId)); // Join private room for customer/driver
+		}
+		if (role === "driver") {
+			socket.join("drivers"); // All drivers join shared room
+			console.log(`--- Driver ${userId} joined 'drivers' room ---`);
+		}
 	});
 
 	socket.on("disconnect", () => {
