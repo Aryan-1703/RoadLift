@@ -13,9 +13,9 @@ import {
 import { useFocusEffect, useRouter } from "expo-router";
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import JobCard from "../components/JobCard";
-import { useTheme } from "../context/ThemeContext";
-import Colors from "../constants/Colors";
+import JobCard from "../_components/JobCard";
+import { useTheme } from "../_context/ThemeContext";
+import Colors from "../_constants/Colors";
 
 const API_URL = "http://10.0.0.125:8001/api";
 

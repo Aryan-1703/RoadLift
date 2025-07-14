@@ -16,9 +16,9 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import MapView, { Marker } from "react-native-maps";
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useTheme } from "../context/ThemeContext";
-import Colors from "../constants/Colors";
-import ModalHeader from "../components/ModalHeader";
+import { useTheme } from "../_context/ThemeContext";
+import Colors from "../_constants/Colors";
+import ModalHeader from "../_components/ModalHeader";
 
 // --- IMPORTANT ---
 const API_URL = "http://10.0.0.125:8001/api";

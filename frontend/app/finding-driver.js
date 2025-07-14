@@ -1,2 +1,2 @@
-import FindingDriverScreen from "./screens/FindingDriverScreen";
+import FindingDriverScreen from "./_screens/FindingDriverScreen";
 export default FindingDriverScreen;

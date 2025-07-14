@@ -15,12 +15,11 @@ import { useLocalSearchParams, router } from "expo-router";
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
-import ModalHeader from "../components/ModalHeader";
-import { useTheme } from "../context/ThemeContext";
-import Colors from "../constants/Colors";
+import ModalHeader from "../_components/ModalHeader";
+import { useTheme } from "../_context/ThemeContext";
+import Colors from "../_constants/Colors";
 import { FontAwesome5 } from "@expo/vector-icons";
-
-const API_URL = "http://10.0.0.125:8001/api";
+import { API_URL } from "../config/constants";
 
 // A helper function to format service types for display
 const formatServiceType = type => {

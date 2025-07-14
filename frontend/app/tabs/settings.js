@@ -9,8 +9,9 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useTheme } from "../context/ThemeContext"; // Import our theme hook
-import { FontAwesome5 } from "@expo/vector-icons"; // For icons
+import { useTheme } from "../_context/ThemeContext"; // Import our theme hook
+import { FontAwesome5 } from "@expo/vector-icons";
+import { useSocket } from "../_context/SocketContext";
 
 // A reusable component for each settings row
 const SettingsRow = ({ icon, label, children }) => (
@@ -27,10 +28,12 @@ const SettingsScreen = () => {
 	const router = useRouter();
 	const { theme, toggleTheme } = useTheme(); // Use our theme context
 	const isDarkMode = theme === "dark";
+	const { disconnectSocket } = useSocket();
 
 	const handleLogout = async () => {
-		await AsyncStorage.multiRemove(["token", "user"]);
-		router.replace("/"); // Go back to the initial loading/gatekeeper screen
+		disconnectSocket();
+		await AsyncStorage.multiRemove(["token", "user", "role"]);
+		router.replace("/");
 	};
 
 	return (

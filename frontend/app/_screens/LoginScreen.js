@@ -15,11 +15,10 @@ import {
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
-import { useTheme } from "../context/ThemeContext"; // Ensure this path is correct
-import Colors from "../constants/Colors"; // Ensure this path is correct
-
-// Make sure this IP is correct for your local network
-const API_URL = "http://10.0.0.125:8001/api";
+import { useTheme } from "../_context/ThemeContext"; // Ensure this path is correct
+import Colors from "../_constants/Colors"; // Ensure this path is correct
+import { API_URL } from "../config/constants";
+import { useSocket } from "../_context/SocketContext";
 
 const LoginScreen = () => {
 	// --- STATE AND HOOKS ---
@@ -28,6 +27,7 @@ const LoginScreen = () => {
 	const [isPasswordVisible, setIsPasswordVisible] = useState(false);
 	const [isLoading, setIsLoading] = useState(false);
 	const router = useRouter();
+	const { connectSocket } = useSocket();
 
 	const { theme } = useTheme();
 	const isDarkMode = theme === "dark";
@@ -44,15 +44,16 @@ const LoginScreen = () => {
 		try {
 			// --- NEW: Unified Login Attempt ---
 			try {
-				// Attempt 1: Log in as a User
 				const response = await axios.post(`${API_URL}/auth/login/user`, {
 					phoneNumber,
 					password,
 				});
+				const user = response.data.user;
 
 				await AsyncStorage.setItem("token", response.data.token);
 				await AsyncStorage.setItem("user", JSON.stringify(response.data.user));
 				await AsyncStorage.setItem("role", "customer");
+				connectSocket(user.id);
 				router.replace("/tabs");
 			} catch (userError) {
 				// If user login fails, try logging in as a Driver

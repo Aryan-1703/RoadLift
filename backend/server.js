@@ -1,48 +1,56 @@
 require("dotenv").config();
 const express = require("express");
-const db = require("./models");
+const http = require("http"); // Required to attach socket.io
 const cors = require("cors");
-const http = require("http");
-const io = require("./socket");
 
+const db = require("./models");
+const io = require("./socket"); // Import our shared, singleton socket instance
+
+// --- SERVER AND APP SETUP ---
 const app = express();
 const server = http.createServer(app);
+
+// Attach the imported io instance to the HTTP server
 io.attach(server);
-// Middleware
+
+// --- MIDDLEWARE ---
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// --- Routes ---
-const jobRoutes = require("./routes/jobRoutes");
+// --- API ROUTES ---
 const authRoutes = require("./routes/authRoutes");
+const jobRoutes = require("./routes/jobRoutes");
 const driverRoutes = require("./routes/driverRoutes");
 
-app.use("/api/jobs", jobRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/jobs", jobRoutes);
 app.use("/api/driver", driverRoutes);
-// --- Socket.IO Connection Logic ---
-io.on("connection", socket => {
-	console.log(`User connected with socket ID: ${socket.id}`);
 
-	// When a user logs in, they should join a room based on their userId
-	socket.on("join-room", userId => {
-		socket.join(userId);
-		console.log(`Socket ${socket.id} joined room for User ID: ${userId}`);
-	});
-
-	socket.on("disconnect", () => {
-		console.log(`User disconnected with socket ID: ${socket.id}`);
-	});
-});
-
-module.exports.io = io;
-
+// --- HEALTH CHECK ROUTE ---
 app.get("/", (req, res) => {
 	res.send("TowLink API is running...");
 });
 
-// --- Start Server ---
+// --- SOCKET.IO CONNECTION LOGIC ---
+// This is where we define what happens when a new client connects
+io.on("connection", socket => {
+	console.log(`Socket connected: ${socket.id}`);
+
+	socket.on("join-room", userId => {
+		console.log(
+			`--- JOIN-ROOM EVENT RECEIVED from socket ${socket.id} for User ID: ${userId} ---`
+		);
+		socket.join(String(userId)); // Join the private room for this user
+		console.log(`--- Socket ${socket.id} successfully joined room: ${userId} ---`);
+	});
+
+	socket.on("disconnect", () => {
+		console.log(`Socket disconnected: ${socket.id}`);
+	});
+});
+
+// --- SERVER STARTUP ---
 const PORT = process.env.PORT || 8001;
 
 const startServer = async () => {
@@ -50,12 +58,15 @@ const startServer = async () => {
 		await db.sequelize.authenticate();
 		console.log("Database connected...");
 
-		await db.sequelize.sync({ force: true }); // Use { alter: true } in production
+		// IMPORTANT: { force: true } deletes all your tables on every restart.
+		// Good for dev, but switch to { alter: true } soon to preserve data.
+		await db.sequelize.sync({ force: true });
 		console.log("Database synchronized.");
 
+		// Start the combined HTTP/Socket.IO server
 		server.listen(PORT, () => console.log(`Server started on port ${PORT}`));
 	} catch (err) {
-		console.log("Error starting server:", err);
+		console.error("Error starting server:", err); // Use console.error for errors
 	}
 };
 

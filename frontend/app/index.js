@@ -7,13 +7,15 @@ const Index = () => {
 	const router = useRouter();
 
 	useEffect(() => {
-		const checkAuthStatus = async () => {
+		const checkAuthStatusAndConnect = async () => {
 			try {
 				const token = await AsyncStorage.getItem("token");
-				const role = await AsyncStorage.getItem("role"); 
+				const userString = await AsyncStorage.getItem("user");
 
-				if (token) {
-					// Direct to the correct dashboard based on saved role
+				if (token && userString) {
+					const role = await AsyncStorage.getItem("role");
+
+					// Navigate to the correct dashboard
 					if (role === "driver") {
 						router.replace("/driver-tabs");
 					} else {
@@ -23,10 +25,12 @@ const Index = () => {
 					router.replace("/login");
 				}
 			} catch (e) {
+				console.error("Failed to check auth status:", e);
 				router.replace("/login");
 			}
 		};
-		checkAuthStatus();
+
+		checkAuthStatusAndConnect();
 	}, []);
 
 	return (
@@ -44,5 +48,4 @@ const styles = StyleSheet.create({
 		backgroundColor: "#f0f2f5",
 	},
 });
-
 export default Index;

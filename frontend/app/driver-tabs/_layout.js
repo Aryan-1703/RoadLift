@@ -2,8 +2,8 @@ import React from "react";
 import { Tabs } from "expo-router";
 import { FontAwesome5 } from "@expo/vector-icons";
 // We can reuse the same theme logic
-import { useTheme } from "../context/ThemeContext";
-import Colors from "../constants/Colors";
+import { useTheme } from "../_context/ThemeContext";
+import Colors from "../_constants/Colors";
 
 export default function DriverTabsLayout() {
 	const { theme } = useTheme();

@@ -15,11 +15,11 @@ import {
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
-import { useTheme } from "../context/ThemeContext";
-import SegmentedControl from "../components/SegmentedControl";
-import Colors from "../constants/Colors";
-
-const API_URL = "http://10.0.0.125:8001/api";
+import { useTheme } from "../_context/ThemeContext";
+import SegmentedControl from "../_components/SegmentedControl";
+import Colors from "../_constants/Colors";
+import { API_URL } from "../config/constants";
+import { useSocket } from "../_context/SocketContext";
 
 const RegisterScreen = () => {
 	// --- STATE AND HOOKS ---
@@ -29,6 +29,7 @@ const RegisterScreen = () => {
 	const [isLoading, setIsLoading] = useState(false);
 	const [role, setRole] = useState("Customer");
 	const router = useRouter();
+	const { connectSocket } = useSocket();
 
 	// --- THEME INTEGRATION ---
 	const { theme } = useTheme();
@@ -54,18 +55,18 @@ const RegisterScreen = () => {
 				phoneNumber,
 				password,
 			});
-
-			// Corrected code
-			const roleKey = role === "Customer" ? "user" : "driver"; // Get the correct key
+			const roleKey = role === "Customer" ? "user" : "driver"; 
 			const userOrDriverData = response.data[roleKey];
 
 			if (!userOrDriverData) {
-				// This check is still good to have in case the backend response changes
 				throw new Error("Invalid response structure from server.");
 			}
+
 			await AsyncStorage.setItem("role", roleKey);
 			await AsyncStorage.setItem("user", JSON.stringify(userOrDriverData));
 			await AsyncStorage.setItem("token", response.data.token);
+			connectSocket(userOrDriverData.id);
+
 			// CORRECTED: Navigate to the correct dashboard based on role
 			if (role === "Customer") {
 				router.replace("/tabs");

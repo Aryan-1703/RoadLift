@@ -10,13 +10,14 @@ import {
 	StatusBar,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useTheme } from "../context/ThemeContext";
-import Colors from "../constants/Colors";
+import { useTheme } from "../_context/ThemeContext";
+import Colors from "../_constants/Colors";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import axios from "axios"; 
+import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useSocket } from "../_context/SocketContext";
 
-const API_URL = "http://10.0.0.125:8001/api";
+import { API_URL } from "../config/constants";
 
 const FindingDriverScreen = () => {
 	// --- HOOKS & STATE ---
@@ -25,16 +26,32 @@ const FindingDriverScreen = () => {
 	const { theme } = useTheme();
 	const isDarkMode = theme === "dark";
 	const colors = Colors[theme];
+	const { socket, isConnected } = useSocket();
 
-	// --- REAL-TIME LISTENER (Future) ---
 	useEffect(() => {
-		console.log(`Now listening for updates on Job ID: ${jobId}`);
-		// WebSocket logic will go here
-		return () => {
-			console.log(`Stopped listening for updates on Job ID: ${jobId}`);
-			// WebSocket cleanup logic will go here
+		if (!socket || !isConnected) {
+			console.log("Socket not available or not connected yet...");
+			return;
+		}
+
+		console.log(`Listening for 'job-accepted' event for Job ID: ${jobId}`);
+
+		const handleJobAccepted = data => {
+			console.log("Received job-accepted event:", data, "Expected jobId:", jobId);
+
+			if (String(data.jobId) === String(jobId)) {
+				Alert.alert("Driver Found!", data.message);
+				router.replace(`/live-tracking?jobId=${data.jobId}`);
+			}
 		};
-	}, [jobId]);
+
+		socket.on("job-accepted", handleJobAccepted);
+
+		return () => {
+			console.log(`Removing 'job-accepted' listener for Job ID: ${jobId}`);
+			socket.off("job-accepted", handleJobAccepted);
+		};
+	}, [socket, isConnected, jobId, router]);
 
 	// --- HANDLERS ---
 	const handleCancelRequest = () => {

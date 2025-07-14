@@ -13,13 +13,14 @@ const getAvailableJobs = async (req, res) => {
 const acceptJob = async (req, res) => {
 	try {
 		const { jobId } = req.params;
-		const driverId = req.user.id; // From our 'protect' middleware
+		const driverId = req.user.id;
 
-		const updatedJob = await driverService.acceptJob(jobId, driverId);
+		const io = req.app.get("io");
+		const updatedJob = await driverService.acceptJob(jobId, driverId, io);
+
 		res.status(200).json(updatedJob);
 	} catch (error) {
 		console.error("Error accepting job:", error.message);
-		// Send a 409 Conflict if the job was already taken
 		if (error.message.includes("longer available")) {
 			return res.status(409).json({ message: error.message });
 		}
@@ -31,6 +32,7 @@ const completeJob = async (req, res) => {
 	try {
 		const { jobId } = req.params;
 		const driverId = req.user.id;
+
 		const updatedJob = await driverService.completeJob(jobId, driverId);
 		res.status(200).json(updatedJob);
 	} catch (error) {
@@ -43,4 +45,8 @@ const completeJob = async (req, res) => {
 	}
 };
 
-module.exports = { getAvailableJobs, acceptJob, completeJob };
+module.exports = {
+	getAvailableJobs,
+	acceptJob,
+	completeJob,
+};

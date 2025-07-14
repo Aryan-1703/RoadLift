@@ -10,10 +10,10 @@ import {
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
-import ServiceCard from "../components/ServiceCard";
-import { useTheme } from "../context/ThemeContext";
-import Colors from "../constants/Colors";
-import { useLocation } from "../context/LocationContext";
+import ServiceCard from "../_components/ServiceCard";
+import { useTheme } from "../_context/ThemeContext";
+import Colors from "../_constants/Colors";
+import { useLocation } from "../_context/LocationContext";
 
 const DashboardScreen = () => {
 	// --- STATE AND HOOKS ---

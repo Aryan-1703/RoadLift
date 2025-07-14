@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
-import { useTheme } from "../context/ThemeContext";
-import Colors from "../constants/Colors";
+import { useTheme } from "../_context/ThemeContext";
+import Colors from "../_constants/Colors";
 import { FontAwesome5 } from "@expo/vector-icons";
 
 const JobCard = ({ job, onAccept }) => {

@@ -1,8 +1,8 @@
 import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useTheme } from "../context/ThemeContext";
-import Colors from "../constants/Colors"; 
+import { useTheme } from "../_context/ThemeContext";
+import Colors from "../_constants/Colors"; 
 
 const ServiceCard = ({ iconName, name, price, onPress, disabled = false }) => {
 	// --- THEME INTEGRATION ---

@@ -2,8 +2,8 @@ import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
 import { FontAwesome5 } from "@expo/vector-icons";
-import { useTheme } from "../context/ThemeContext";
-import Colors from "../constants/Colors";
+import { useTheme } from "../_context/ThemeContext";
+import Colors from "../_constants/Colors";
 
 const ModalHeader = ({ title }) => {
 	const router = useRouter();

@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
-import { useTheme } from "../context/ThemeContext";
-import Colors from "../constants/Colors";
+import { useTheme } from "../_context/ThemeContext";
+import Colors from "../_constants/Colors";
 
 const SegmentedControl = ({ options, selectedOption, onSelect }) => {
 	const { theme } = useTheme();

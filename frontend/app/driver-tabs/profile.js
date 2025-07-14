@@ -9,9 +9,10 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useTheme } from "../context/ThemeContext";
-import Colors from "../constants/Colors";
+import { useTheme } from "../_context/ThemeContext";
+import Colors from "../_constants/Colors";
 import { FontAwesome5 } from "@expo/vector-icons";
+import { useSocket } from "../_context/SocketContext";
 
 const DriverProfileScreen = () => {
 	// --- HOOKS & STATE ---
@@ -20,7 +21,7 @@ const DriverProfileScreen = () => {
 	const { theme } = useTheme(); // We don't need the toggle here, just the current theme
 	const isDarkMode = theme === "dark";
 	const colors = Colors[theme];
-
+	const { disconnectSocket } = useSocket();
 	useEffect(() => {
 		// Load the driver's info from storage to display their name
 		const loadUserData = async () => {
@@ -34,8 +35,9 @@ const DriverProfileScreen = () => {
 
 	// --- HANDLERS ---
 	const handleLogout = async () => {
+		disconnectSocket();
+
 		await AsyncStorage.multiRemove(["token", "user", "role"]);
-		// Go back to the very beginning of the app flow
 		router.replace("/");
 	};
 

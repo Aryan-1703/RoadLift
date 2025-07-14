@@ -1,9 +1,9 @@
 import React from "react";
 import { Tabs } from "expo-router";
 import { FontAwesome5 } from "@expo/vector-icons";
-import { useTheme } from "../context/ThemeContext";
-import Colors from "../constants/Colors";
-import { LocationProvider } from "../context/LocationContext";
+import { useTheme } from "../_context/ThemeContext";
+import Colors from "../_constants/Colors";
+import { LocationProvider } from "../_context/LocationContext";
 
 export default function TabsLayout() {
 	const { theme } = useTheme();

@@ -55,7 +55,7 @@ const registerDriver = async (req, res) => {
 		const { createdRecord, token } = await authService.register(req.body, Driver);
 		res.status(201).json({
 			message: "Driver registered successfully!",
-			driver: createdRecord, 
+			driver: createdRecord,
 			token,
 		});
 	} catch (error) {

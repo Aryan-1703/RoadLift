@@ -1,3 +1,3 @@
-import RequestConfirmationScreen from "./screens/RequestConfirmationScreen";
+import RequestConfirmationScreen from "./_screens/RequestConfirmationScreen";
 
 export default RequestConfirmationScreen;

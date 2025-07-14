@@ -1,2 +1,2 @@
-import DriverDashboardScreen from "../screens/DriverDashboardScreen";
+import DriverDashboardScreen from "../_screens/DriverDashboardScreen";
 export default DriverDashboardScreen;
