@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
 	View,
 	Text,
@@ -21,25 +21,24 @@ import { API_URL } from "../config/constants";
 
 const FindingDriverScreen = () => {
 	// --- HOOKS & STATE ---
-	const { jobId } = useLocalSearchParams();
 	const router = useRouter();
 	const { theme } = useTheme();
 	const isDarkMode = theme === "dark";
 	const colors = Colors[theme];
 	const { socket, isConnected } = useSocket();
+	const { jobId } = useLocalSearchParams();
+	const [listenerAttached, setListenerAttached] = useState(false);
 
 	useEffect(() => {
+		if (!socket || !isConnected || !jobId) return;
+
+		console.log(
+			`✅ Socket connected. Attaching 'job-accepted' listener for Job ID: ${jobId}`
+		);
 		let jobHandled = false;
 
-		if (!socket || !isConnected) {
-			console.log("Socket not available or not connected yet...");
-			return;
-		}
-
-		console.log(`Listening for 'job-accepted' event for Job ID: ${jobId}`);
-
 		const handleJobAccepted = data => {
-			console.log("Received job-accepted event:", data, "Expected jobId:", jobId);
+			console.log("📨 Received job-accepted event:", data);
 
 			if (!jobHandled && String(data.jobId) === String(jobId)) {
 				jobHandled = true;
@@ -51,7 +50,7 @@ const FindingDriverScreen = () => {
 		socket.on("job-accepted", handleJobAccepted);
 
 		return () => {
-			console.log(`Removing 'job-accepted' listener for Job ID: ${jobId}`);
+			console.log("🧹 Cleaning up 'job-accepted' listener");
 			socket.off("job-accepted", handleJobAccepted);
 		};
 	}, [socket, isConnected, jobId, router]);

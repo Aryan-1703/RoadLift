@@ -14,7 +14,7 @@ import {
 import { useLocalSearchParams, router } from "expo-router";
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
+// import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import ModalHeader from "../_components/ModalHeader";
 import { useTheme } from "../_context/ThemeContext";
 import Colors from "../_constants/Colors";
@@ -114,7 +114,7 @@ const ActiveJobScreen = () => {
 		<SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
 			<StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} />
 			<ModalHeader title="Active Job" />
-			<MapView
+			{/* <MapView
 				style={styles.map}
 				provider={PROVIDER_GOOGLE}
 				initialRegion={{
@@ -131,7 +131,7 @@ const ActiveJobScreen = () => {
 					}}
 					title="Customer Location"
 				/>
-			</MapView>
+			</MapView> */}
 			<View
 				style={[
 					styles.detailsContainer,
