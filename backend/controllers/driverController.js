@@ -1,5 +1,8 @@
 const driverService = require("../services/driverService");
 
+// @desc    Get all available (pending) jobs
+// @route   GET /api/driver/jobs/available
+// @access  Private (Driver)
 const getAvailableJobs = async (req, res) => {
 	try {
 		const jobs = await driverService.getAvailableJobs();
@@ -10,14 +13,15 @@ const getAvailableJobs = async (req, res) => {
 	}
 };
 
+// @desc    Accept a pending job
+// @route   PUT /api/driver/jobs/:jobId/accept
+// @access  Private (Driver)
 const acceptJob = async (req, res) => {
 	try {
 		const { jobId } = req.params;
 		const driverId = req.user.id;
-
-		const io = req.app.get("io");
-		const updatedJob = await driverService.acceptJob(jobId, driverId, io);
-
+		// The service handles the 'io' instance internally
+		const updatedJob = await driverService.acceptJob(jobId, driverId);
 		res.status(200).json(updatedJob);
 	} catch (error) {
 		console.error("Error accepting job:", error.message);
@@ -28,11 +32,13 @@ const acceptJob = async (req, res) => {
 	}
 };
 
+// @desc    Mark an accepted job as complete
+// @route   PUT /api/driver/jobs/:jobId/complete
+// @access  Private (Driver who accepted it)
 const completeJob = async (req, res) => {
 	try {
 		const { jobId } = req.params;
 		const driverId = req.user.id;
-
 		const updatedJob = await driverService.completeJob(jobId, driverId);
 		res.status(200).json(updatedJob);
 	} catch (error) {

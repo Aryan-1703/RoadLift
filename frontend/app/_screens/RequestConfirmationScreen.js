@@ -13,7 +13,7 @@ import {
 	StatusBar,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-// import MapView, { Marker } from "react-native-maps";
+import MapView, { Marker } from "react-native-maps";
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useTheme } from "../_context/ThemeContext";
@@ -69,9 +69,6 @@ const RequestConfirmationScreen = () => {
 					Authorization: `Bearer ${token}`,
 				},
 			});
-
-			console.log("Job created successfully:", response.data.job);
-
 			// 4. Navigate to the next screen on success
 			router.replace({
 				pathname: "/finding-driver",
@@ -97,7 +94,7 @@ const RequestConfirmationScreen = () => {
 				behavior={Platform.OS === "ios" ? "padding" : "height"}
 				style={{ flex: 1 }}
 			>
-				{/* Check if location is valid before rendering map
+				{/* Check if location is valid before rendering map */}
 				{userLat !== 0 && userLon !== 0 ? (
 					<MapView
 						style={styles.map}
@@ -120,7 +117,7 @@ const RequestConfirmationScreen = () => {
 						<ActivityIndicator />
 						<Text style={{ marginTop: 10, color: colors.text }}>Getting location...</Text>
 					</View>
-				)} */}
+				)}
 
 				<View
 					style={[

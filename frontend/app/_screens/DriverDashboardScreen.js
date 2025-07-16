@@ -36,13 +36,14 @@ const DriverDashboardScreen = () => {
 	const colors = Colors[theme];
 
 	// --- REAL-TIME LOGIC ---
+	// In DriverDashboardScreen.js
 	useEffect(() => {
 		if (!socket) return;
 
-		// 2. Listener for when a new job is created by any customer
+		socket.emit("join-drivers-room");
+		console.log("DriverDashboard: Joined 'drivers' room.");
+
 		const handleNewJob = newJob => {
-			console.log("DriverDashboard: Received new job via socket:", newJob.id);
-			// Add the new job to the top of the list in real-time
 			setJobs(prevJobs => [newJob, ...prevJobs]);
 			Alert.alert(
 				"New Job Available!",
@@ -50,20 +51,19 @@ const DriverDashboardScreen = () => {
 			);
 		};
 
-		// 3. Listener for when a job is taken by ANOTHER driver
+		// --- THIS IS THE NEW LISTENER ---
 		const handleJobTaken = data => {
-			console.log(`DriverDashboard: Job ${data.jobId} was accepted by another driver.`);
-			// Remove the accepted job from this driver's list so they can't accept it
-			setJobs(prevJobs => prevJobs.filter(job => job.id !== data.jobId));
+			console.log(`DriverDashboard: Job ${data.jobId} was taken. Removing from list.`);
+			// Remove the job from the local state array
+			setJobs(prevJobs => prevJobs.filter(job => String(job.id) !== String(data.jobId)));
 		};
 
 		socket.on("new-job", handleNewJob);
-		socket.on("job-accepted", handleJobTaken);
+		socket.on("job-taken", handleJobTaken); // Add the new listener
 
-		// Cleanup listeners when the component is unmounted	
 		return () => {
 			socket.off("new-job", handleNewJob);
-			socket.off("job-accepted", handleJobTaken);
+			socket.off("job-taken", handleJobTaken); // Clean up the listener
 		};
 	}, [socket]);
 

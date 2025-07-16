@@ -15,45 +15,54 @@ import Colors from "../_constants/Colors";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import useJobAcceptedListener from "../hooks/useJobAcceptedListener";
 import { useSocket } from "../_context/SocketContext";
 
 import { API_URL } from "../config/constants";
 
 const FindingDriverScreen = () => {
 	// --- HOOKS & STATE ---
+	const { jobId } = useLocalSearchParams();
 	const router = useRouter();
 	const { theme } = useTheme();
 	const isDarkMode = theme === "dark";
 	const colors = Colors[theme];
+
 	const { socket, isConnected } = useSocket();
-	const { jobId } = useLocalSearchParams();
-	const [listenerAttached, setListenerAttached] = useState(false);
 
+	// useJobAcceptedListener(jobId);
 	useEffect(() => {
-		if (!socket || !isConnected || !jobId) return;
+		// We only care about one condition: is the socket connected and do we have a job ID?
+		if (isConnected && socket && jobId) {
+			console.log(
+				`✅ Socket is connected. Attaching direct listener for Job ID: ${jobId}`
+			);
 
-		console.log(
-			`✅ Socket connected. Attaching 'job-accepted' listener for Job ID: ${jobId}`
-		);
-		let jobHandled = false;
+			const handleDirectAccept = data => {
+				console.log("--- DIRECT EVENT RECEIVED! ---", data);
+				if (String(data.jobId) === String(jobId)) {
+					Alert.alert("DIRECT: Driver Found!", data.message);
+					router.replace({
+						pathname: "/live-tracking",
+						params: { jobId: data.jobId },
+					});
+				}
+			};
 
-		const handleJobAccepted = data => {
-			console.log("📨 Received job-accepted event:", data);
+			// Attach listener to the stable socket instance
+			socket.on("job-accepted", handleDirectAccept);
 
-			if (!jobHandled && String(data.jobId) === String(jobId)) {
-				jobHandled = true;
-				Alert.alert("Driver Found!", data.message);
-				router.replace(`/live-tracking?jobId=${data.jobId}`);
-			}
-		};
-
-		socket.on("job-accepted", handleJobAccepted);
-
-		return () => {
-			console.log("🧹 Cleaning up 'job-accepted' listener");
-			socket.off("job-accepted", handleJobAccepted);
-		};
-	}, [socket, isConnected, jobId, router]);
+			// The cleanup function is crucial
+			return () => {
+				console.log(`🧹 Cleaning up direct listener for Job ID: ${jobId}`);
+				socket.off("job-accepted", handleDirectAccept);
+			};
+		} else {
+			console.log(
+				`...Waiting for connection. isConnected: ${isConnected}, socket exists: ${!!socket}, jobId: ${jobId}`
+			);
+		}
+	}, [isConnected, socket, jobId]); // Depend on isConnected, socket, and jobId
 
 	// --- HANDLERS ---
 	const handleCancelRequest = () => {

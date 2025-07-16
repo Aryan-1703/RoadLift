@@ -12,7 +12,7 @@ const server = http.createServer(app);
 
 // Attach the imported io instance to the HTTP server
 io.attach(server);
-
+app.set("io", io);
 // --- MIDDLEWARE ---
 app.use(cors());
 app.use(express.json());
