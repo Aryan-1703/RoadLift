@@ -12,7 +12,7 @@ const serviceIcons = {
 	towing: "tow-truck",
 };
 
-const JobCard = ({ job, onAccept }) => {
+const JobCard = ({ job, distanceKm, onAccept }) => {
 	const { theme } = useTheme();
 	const colors = Colors[theme];
 	// Determine color based on distance
@@ -21,13 +21,13 @@ const JobCard = ({ job, onAccept }) => {
 		if (distance < 7) return "#ff9800"; // orange
 		return "#f44336"; // red
 	};
-	const distanceText = job.distance
-		? `${parseFloat(job.distance).toFixed(1)} km away`
-		: "Distance N/A";
+	const distanceText =
+		distanceKm !== undefined
+			? `${parseFloat(distanceKm).toFixed(1)} km away`
+			: "Distance N/A";
 
-	const distanceColor = job.distance
-		? getDistanceColor(job.distance)
-		: colors.tabIconDefault;
+	const distanceColor =
+		distanceKm !== undefined ? getDistanceColor(distanceKm) : colors.tabIconDefault;
 
 	return (
 		<View

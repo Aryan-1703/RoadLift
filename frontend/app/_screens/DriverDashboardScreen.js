@@ -18,45 +18,89 @@ import { useSocket } from "../_context/SocketContext";
 import JobCard from "../_components/JobCard";
 import Colors from "../_constants/Colors";
 import { API_URL } from "../config/constants";
+import { useLocation } from "../_context/LocationContext";
+import getDrivingDistanceInKm from "../utils/getDrivingDistanceInKm";
+
+const DISTANCE_LIMIT_KM = 50;
 
 const DriverDashboardScreen = () => {
-	// --- HOOKS & STATE ---
 	const [jobs, setJobs] = useState([]);
 	const [isLoading, setIsLoading] = useState(true);
 	const [refreshing, setRefreshing] = useState(false);
 	const router = useRouter();
 
-	// --- CONTEXTS ---
 	const { theme } = useTheme();
-	const { token, user } = useAuth(); // Get token from AuthContext
+	const { token, user } = useAuth();
 	const { socket } = useSocket();
+	const { location } = useLocation();
 
-	// --- THEME ---
 	const isDarkMode = theme === "dark";
 	const colors = Colors[theme];
 
-	useEffect(() => {
+	const fetchAvailableJobs = useCallback(async () => {
+		try {
+			const res = await axios.get(`${API_URL}/driver/jobs/available`, {
+				headers: { Authorization: `Bearer ${token}` },
+			});
+			const nearbyJobs = await Promise.all(
+				res.data.map(async job => {
+					if (!location?.coords || !job.pickupLocation?.coordinates?.length) return null;
 
-		if (!socket || !user) return;
-		// Join proper socket room
+					const [pickupLon, pickupLat] = job.pickupLocation.coordinates;
+
+					const distanceKm = await getDrivingDistanceInKm(
+						location.coords.latitude,
+						location.coords.longitude,
+						pickupLat,
+						pickupLon
+					);
+					return distanceKm !== Infinity && distanceKm <= DISTANCE_LIMIT_KM
+						? { ...job, distanceKm }
+						: null;
+				})
+			);
+			setJobs(nearbyJobs.filter(Boolean));
+		} catch (err) {
+			console.error("Error fetching jobs:", err);
+			Alert.alert("Error", "Could not load jobs. Please try again later.");
+		} finally {
+			setIsLoading(false);
+			setRefreshing(false);
+		}
+	}, [token, location]);
+
+	useEffect(() => {
+		if (!socket || !user || !location?.coords) return;
+
 		socket.emit("join-room", {
 			userId: user.id,
 			role: user.role,
 		});
-		console.log("🔗 Emitted join-room with user:", user.id, user.role);
 
-		const handleNewJob = newJob => {
-			console.log("📦 Received 'new-job':", newJob);
-			setJobs(prevJobs => [newJob, ...prevJobs]);
+		const handleNewJob = async newJob => {
+			const [pickupLon, pickupLat] = newJob.pickupLocation.coordinates;
+			const distanceKm = await getDrivingDistanceInKm(
+				location.coords.latitude,
+				location.coords.longitude,
+				pickupLat,
+				pickupLon
+			);
+
+			if (distanceKm > DISTANCE_LIMIT_KM || distanceKm === Infinity) return;
+
+			// Add the distance to the job object before setting it
+			const jobWithDistance = { ...newJob, distanceKm };
+
+			setJobs(prev => [jobWithDistance, ...prev]);
+
 			Alert.alert(
-				"New Job Available!",
-				`A new ${newJob.serviceType} request has been posted.`
+				"🚨 New Job Available!",
+				`A new ${newJob.serviceType} job is available ${distanceKm.toFixed(1)} km away.`
 			);
 		};
 
 		const handleJobTaken = data => {
-			console.log(`❌ Job ${data.jobId} taken, removing from list`);
-			setJobs(prevJobs => prevJobs.filter(job => String(job.id) !== String(data.jobId)));
+			setJobs(prev => prev.filter(job => String(job.id) !== String(data.jobId)));
 		};
 
 		socket.on("new-job", handleNewJob);
@@ -66,31 +110,17 @@ const DriverDashboardScreen = () => {
 			socket.off("new-job", handleNewJob);
 			socket.off("job-taken", handleJobTaken);
 		};
-	}, [socket, user]);
+	}, [socket, user, location]);
 
-	// --- DATA FETCHING ---
-	const fetchAvailableJobs = useCallback(async () => {
-		if (!token) return;
-		try {
-			const response = await axios.get(`${API_URL}/driver/jobs/available`, {
-				headers: { Authorization: `Bearer ${token}` },
-			});
-			setJobs(response.data);
-		} catch (error) {
-			console.error("Failed to fetch jobs:", error.response?.data || error.message);
-			Alert.alert("Error", "Could not fetch available jobs.");
-		} finally {
-			setIsLoading(false);
-			setRefreshing(false);
-		}
-	}, [token]);
-
-	// useFocusEffect will re-fetch data every time the driver comes back to this screen
 	useFocusEffect(
 		useCallback(() => {
-			setIsLoading(true);
-			fetchAvailableJobs();
-		}, [fetchAvailableJobs])
+			if (location) {
+				setIsLoading(true);
+				fetchAvailableJobs();
+			} else {
+				setIsLoading(true);
+			}
+		}, [location, fetchAvailableJobs])
 	);
 
 	const onRefresh = useCallback(() => {
@@ -98,28 +128,23 @@ const DriverDashboardScreen = () => {
 		fetchAvailableJobs();
 	}, [fetchAvailableJobs]);
 
-	// --- HANDLERS ---
 	const handleAcceptJob = async jobId => {
 		try {
 			await axios.put(
 				`${API_URL}/driver/jobs/${jobId}/accept`,
 				{},
-				{
-					headers: { Authorization: `Bearer ${token}` },
-				}
+				{ headers: { Authorization: `Bearer ${token}` } }
 			);
 			router.push({ pathname: "/active-job", params: { jobId } });
-		} catch (error) {
-			console.error("Failed to accept job:", error.response?.data || error.message);
+		} catch (err) {
 			Alert.alert(
 				"Could Not Accept Job",
-				error.response?.data?.message || "This job may have been taken by another driver."
+				err.response?.data?.message || "This job may have been taken already."
 			);
 			onRefresh();
 		}
 	};
 
-	// --- RENDER ---
 	if (isLoading) {
 		return (
 			<View style={[styles.center, { backgroundColor: colors.background }]}>
@@ -134,7 +159,11 @@ const DriverDashboardScreen = () => {
 			<FlatList
 				data={jobs}
 				renderItem={({ item }) => (
-					<JobCard job={item} onAccept={() => handleAcceptJob(item.id)} />
+					<JobCard
+						job={item}
+						distanceKm={item.distanceKm}
+						onAccept={() => handleAcceptJob(item.id)}
+					/>
 				)}
 				keyExtractor={item => item.id.toString()}
 				ListHeaderComponent={
@@ -163,7 +192,6 @@ const DriverDashboardScreen = () => {
 	);
 };
 
-// --- STYLES ---
 const styles = StyleSheet.create({
 	container: { flex: 1 },
 	listContainer: { paddingVertical: 20 },
