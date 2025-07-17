@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
 	View,
 	Text,
@@ -13,13 +13,15 @@ import {
 	StatusBar,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import MapView, { Marker } from "react-native-maps";
+import MapView, { PROVIDER_GOOGLE } from "react-native-maps";
+import * as Location from "expo-location"; // Import the full location library
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useTheme } from "../_context/ThemeContext";
 import Colors from "../_constants/Colors";
 import ModalHeader from "../_components/ModalHeader";
 import { API_URL } from "../config/constants";
+import { FontAwesome5 } from "@expo/vector-icons";
 
 const RequestConfirmationScreen = () => {
 	// --- HOOKS & STATE ---
@@ -29,95 +31,165 @@ const RequestConfirmationScreen = () => {
 	const [notes, setNotes] = useState("");
 	const [isLoading, setIsLoading] = useState(false);
 
-	// --- THEME & COLOR SETUP ---
+	const initialLocation = {
+		latitude: parseFloat(params.userLat || "0"),
+		longitude: parseFloat(params.userLon || "0"),
+	};
+
+	const [pickupLocation, setPickupLocation] = useState(initialLocation);
+	const [selectedAddress, setSelectedAddress] = useState("Loading address...");
+	const [isMapReady, setIsMapReady] = useState(false);
+	const mapRef = useRef(null);
+
+	// --- THEME & COLOR ---
 	const isDarkMode = theme === "dark";
 	const colors = Colors[theme];
 
-	// --- PARSE PARAMS (with safety checks) ---
+	// --- PARAMS ---
 	const serviceName = params.serviceName || "Service";
 	const price = parseFloat(params.price || "0");
-	const userLat = parseFloat(params.userLat || "0");
-	const userLon = parseFloat(params.userLon || "0");
 
-	// --- API CALL HANDLER ---
+	// --- EFFECT FOR REVERSE GEOCODING ---
+	useEffect(() => {
+		const getAddressFromCoords = async coords => {
+			// Prevent geocoding if coords are not valid
+			if (!coords || coords.latitude === 0) {
+				setSelectedAddress("Cannot determine address.");
+				return;
+			}
+			try {
+				const geocodeResult = await Location.reverseGeocodeAsync(coords);
+				if (geocodeResult && geocodeResult.length > 0) {
+					const addr = geocodeResult[0];
+					const formattedAddress = `${addr.streetNumber || ""} ${addr.street || ""}, ${
+						addr.city || ""
+					}`.trim();
+					setSelectedAddress(formattedAddress || "Address details unavailable");
+				} else {
+					setSelectedAddress("Could not find address");
+				}
+			} catch (error) {
+				console.error("Reverse geocoding failed:", error);
+				setSelectedAddress("Address unavailable");
+			}
+		};
+
+		// Get address whenever the pickupLocation changes
+		getAddressFromCoords(pickupLocation);
+	}, [pickupLocation]);
+
+	// --- HANDLERS ---
 	const handleConfirmRequest = async () => {
 		setIsLoading(true);
 		try {
-			// 1. Get auth token
 			const token = await AsyncStorage.getItem("token");
 			if (!token) {
-				Alert.alert(
-					"Authentication Error",
-					"You are not logged in. Please log in again."
-				);
+				Alert.alert("Authentication Error", "You are not logged in.");
 				router.replace("/login");
+				setIsLoading(false);
 				return;
 			}
 
-			// 2. Prepare data payload
 			const jobData = {
 				serviceType: params.serviceType,
-				pickupLatitude: parseFloat(params.userLat),
-				pickupLongitude: parseFloat(params.userLon),
-				estimatedCost: parseFloat(params.price),
+				pickupLatitude: pickupLocation.latitude,
+				pickupLongitude: pickupLocation.longitude,
+				estimatedCost: price,
 				notes: notes,
 			};
-
-			// 3. Make authenticated API call
 			const response = await axios.post(`${API_URL}/jobs`, jobData, {
-				headers: {
-					Authorization: `Bearer ${token}`,
-				},
+				headers: { Authorization: `Bearer ${token}` },
 			});
-			// 4. Navigate to the next screen on success
+
 			router.replace({
 				pathname: "/finding-driver",
 				params: { jobId: response.data.job.id },
 			});
 		} catch (error) {
 			console.error("Job creation error:", error.response?.data || error.message);
-			Alert.alert(
-				"Request Failed",
-				"Could not create your service request. Please try again."
-			);
+			Alert.alert("Request Failed", "Could not create your service request.");
 		} finally {
 			setIsLoading(false);
 		}
+	};
+
+	const handleRegionChangeComplete = async region => {
+		setPickupLocation({
+			latitude: region.latitude,
+			longitude: region.longitude,
+		});
+
+		try {
+			const geocode = await Location.reverseGeocodeAsync({
+				latitude: region.latitude,
+				longitude: region.longitude,
+			});
+			if (geocode.length > 0) {
+				const addr = geocode[0];
+				const readable = `${addr.name || ""} ${addr.street || ""}, ${addr.city || ""}, ${
+					addr.region || ""
+				}`;
+				setSelectedAddress(readable.trim());
+			} else {
+				setSelectedAddress("Unknown location");
+			}
+		} catch (error) {
+			console.error("Reverse geocoding failed:", error);
+			setSelectedAddress("Address unavailable");
+		}
+	};
+
+	const recenterMap = () => {
+		mapRef.current?.animateToRegion(
+			{
+				...initialLocation,
+				latitudeDelta: 0.005,
+				longitudeDelta: 0.005,
+			},
+			500
+		);
 	};
 
 	// --- RENDER ---
 	return (
 		<SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
 			<StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} />
-			<ModalHeader title="Confirm Your Request" />
+			<ModalHeader title="Confirm Pickup Location" />
 			<KeyboardAvoidingView
 				behavior={Platform.OS === "ios" ? "padding" : "height"}
 				style={{ flex: 1 }}
 			>
-				{/* Check if location is valid before rendering map */}
-				{userLat !== 0 && userLon !== 0 ? (
+				<View style={styles.mapContainer}>
 					<MapView
 						style={styles.map}
 						initialRegion={{
-							latitude: userLat,
-							longitude: userLon,
-							latitudeDelta: 0.01,
-							longitudeDelta: 0.01,
+							...initialLocation,
+							latitudeDelta: 0.005,
+							longitudeDelta: 0.005,
 						}}
-						provider="google"
-						customMapStyle={isDarkMode ? mapStyleDark : []}
-					>
-						<Marker
-							coordinate={{ latitude: userLat, longitude: userLon }}
-							title="Your Location"
-						/>
-					</MapView>
-				) : (
-					<View style={styles.map}>
-						<ActivityIndicator />
-						<Text style={{ marginTop: 10, color: colors.text }}>Getting location...</Text>
+						onRegionChangeComplete={handleRegionChangeComplete}
+						onMapReady={() => setIsMapReady(true)}
+					/>
+
+					<View style={styles.pinContainer}>
+						<FontAwesome5 name="map-marker-alt" size={40} color={colors.danger} />
 					</View>
-				)}
+
+					<View style={[styles.locationBar, { backgroundColor: colors.card }]}>
+						<FontAwesome5
+							name="map-pin"
+							size={20}
+							color={colors.text}
+							style={{ marginRight: 10 }}
+						/>
+						<Text style={[styles.addressText, { color: colors.text }]} numberOfLines={1}>
+							{selectedAddress}
+						</Text>
+						<TouchableOpacity style={styles.recenterButton} onPress={recenterMap}>
+							<FontAwesome5 name="crosshairs" size={20} color={colors.tint} />
+						</TouchableOpacity>
+					</View>
+				</View>
 
 				<View
 					style={[
@@ -167,41 +239,43 @@ const RequestConfirmationScreen = () => {
 
 // --- STYLESHEET ---
 const styles = StyleSheet.create({
-	container: {
-		flex: 1,
+	container: { flex: 1 },
+	mapContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
+	map: { ...StyleSheet.absoluteFillObject },
+	pinContainer: {
+		position: "absolute",
+		left: "50%",
+		top: "50%",
+		marginLeft: -12,
+		marginTop: -40,
 	},
-	header: {
-		padding: 15,
+	locationBar: {
+		position: "absolute",
+		top: 15,
+		left: 15,
+		right: 15,
+		paddingVertical: 12,
+		paddingHorizontal: 15,
+		borderRadius: 12,
+		flexDirection: "row",
 		alignItems: "center",
+		shadowColor: "#000",
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.2,
+		shadowRadius: 4,
+		elevation: 5,
 	},
-	headerTitle: {
-		fontSize: 22,
-		fontWeight: "bold",
-	},
-	map: {
-		flex: 1,
-		justifyContent: "center",
-		alignItems: "center",
-	},
-	detailsContainer: {
-		padding: 20,
-		paddingBottom: 30, // Extra space at the bottom
-		borderTopWidth: 1,
-	},
+	addressText: { flex: 1, fontSize: 16, fontWeight: "600", marginRight: 10 },
+	recenterButton: { padding: 5 },
+	detailsContainer: { padding: 20, paddingBottom: 30, borderTopWidth: 1 },
 	serviceRow: {
 		flexDirection: "row",
 		justifyContent: "space-between",
 		alignItems: "center",
 		marginBottom: 15,
 	},
-	serviceName: {
-		fontSize: 20,
-		fontWeight: "600",
-	},
-	servicePrice: {
-		fontSize: 20,
-		fontWeight: "bold",
-	},
+	serviceName: { fontSize: 20, fontWeight: "600" },
+	servicePrice: { fontSize: 20, fontWeight: "bold" },
 	notesInput: {
 		height: 80,
 		borderWidth: 1,
@@ -211,18 +285,11 @@ const styles = StyleSheet.create({
 		marginBottom: 15,
 		fontSize: 16,
 	},
-	confirmButton: {
-		padding: 15,
-		borderRadius: 10,
-		alignItems: "center",
-	},
-	buttonText: {
-		color: "#fff",
-		fontSize: 18,
-		fontWeight: "bold",
-	},
+	confirmButton: { padding: 15, borderRadius: 10, alignItems: "center" },
+	buttonText: { color: "#fff", fontSize: 18, fontWeight: "bold" },
 });
 
+// --- DARK MAP STYLE ---
 const mapStyleDark = [
 	{ elementType: "geometry", stylers: [{ color: "#242f3e" }] },
 	{ elementType: "labels.text.fill", stylers: [{ color: "#746855" }] },

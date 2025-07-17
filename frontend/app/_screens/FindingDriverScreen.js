@@ -32,7 +32,6 @@ const FindingDriverScreen = () => {
 	const { socket } = useSocket();
 
 	useEffect(() => {
-		console.log(socket);
 
 		if (socket && jobId) {
 			socket.emit("join-room", {
@@ -41,7 +40,6 @@ const FindingDriverScreen = () => {
 			});
 
 			const handleDirectAccept = data => {
-				console.log("--- DIRECT EVENT RECEIVED! ---", data);
 				if (String(data.jobId) === String(jobId)) {
 					Alert.alert("DIRECT: Driver Found!", data.message);
 					router.replace({
