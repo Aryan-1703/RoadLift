@@ -28,7 +28,7 @@ const DriverDashboardScreen = () => {
 
 	// --- CONTEXTS ---
 	const { theme } = useTheme();
-	const { token, user, role } = useAuth(); // Get token from AuthContext
+	const { token, user } = useAuth(); // Get token from AuthContext
 	const { socket } = useSocket();
 
 	// --- THEME ---
@@ -40,7 +40,7 @@ const DriverDashboardScreen = () => {
 		// Join proper socket room
 		socket.emit("join-room", {
 			userId: user.id,
-			role: role,
+			role: user.role,
 		});
 		console.log("🔗 Emitted join-room with user:", user.id, user.role);
 

@@ -7,15 +7,18 @@ const SocketContext = createContext();
 export const useSocket = () => useContext(SocketContext);
 
 export const SocketProvider = ({ children }) => {
-	const { user, role, isAuthenticated } = useAuth();
+	const { user, isAuthenticated } = useAuth();
 	const [socket, setSocket] = useState(null);
 	const [isConnected, setIsConnected] = useState(false);
 
 	useEffect(() => {
-		if (isAuthenticated && user && role) {
-			socketService.connect(user.id, role);
+		if (isAuthenticated && user && user.role) {
+			socketService.connect(user.id, user.role);
 			const s = socketService.getSocket();
-
+			if (!s) {
+				console.log("SocketService.getSocket() returned null");
+				return;
+			}
 			const onConnect = () => {
 				setIsConnected(true);
 				console.log("✅ Socket connected:", s.id);
@@ -36,7 +39,7 @@ export const SocketProvider = ({ children }) => {
 				s.disconnect();
 			};
 		}
-	}, [isAuthenticated, user, role]);
+	}, [isAuthenticated, user]);
 
 	return (
 		<SocketContext.Provider value={{ socket, isConnected }}>

@@ -15,7 +15,6 @@ import Colors from "../_constants/Colors";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import useJobAcceptedListener from "../hooks/useJobAcceptedListener";
 import { useSocket } from "../_context/SocketContext";
 
 import { API_URL } from "../config/constants";
@@ -28,12 +27,12 @@ const FindingDriverScreen = () => {
 	const isDarkMode = theme === "dark";
 	const colors = Colors[theme];
 
-	const { socket, isConnected } = useSocket();
+	const { socket } = useSocket();
 
-	// useJobAcceptedListener(jobId);
 	useEffect(() => {
-		// We only care about one condition: is the socket connected and do we have a job ID?
-		if (isConnected && socket && jobId) {
+		console.log(socket);
+
+		if (socket && jobId) {
 			console.log(
 				`✅ Socket is connected. Attaching direct listener for Job ID: ${jobId}`
 			);
@@ -49,20 +48,18 @@ const FindingDriverScreen = () => {
 				}
 			};
 
-			// Attach listener to the stable socket instance
 			socket.on("job-accepted", handleDirectAccept);
 
-			// The cleanup function is crucial
 			return () => {
 				console.log(`🧹 Cleaning up direct listener for Job ID: ${jobId}`);
 				socket.off("job-accepted", handleDirectAccept);
 			};
 		} else {
 			console.log(
-				`...Waiting for connection. isConnected: ${isConnected}, socket exists: ${!!socket}, jobId: ${jobId}`
+				`...Waiting for connection. Socket exists: ${!!socket}, jobId: ${jobId}`
 			);
 		}
-	}, [isConnected, socket, jobId]); // Depend on isConnected, socket, and jobId
+	}, [socket, jobId]);
 
 	// --- HANDLERS ---
 	const handleCancelRequest = () => {
