@@ -36,6 +36,7 @@ const DriverDashboardScreen = () => {
 	const colors = Colors[theme];
 
 	useEffect(() => {
+
 		if (!socket || !user) return;
 		// Join proper socket room
 		socket.emit("join-room", {

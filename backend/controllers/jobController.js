@@ -7,7 +7,6 @@ const io = require("../socket"); // 1. Import the shared socket instance
 const createJob = async (req, res) => {
 	try {
 		const newJob = await jobService.createJob(req.body, req.user.id);
-		console.log(`Job ${newJob.id} created successfully.`);
 
 		// --- REAL-TIME EMIT TO DRIVERS ---
 		// 2. Use the imported 'io' instance directly

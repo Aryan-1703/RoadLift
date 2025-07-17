@@ -16,6 +16,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useSocket } from "../_context/SocketContext";
+import { useAuth } from "../_context/AuthContext";
 
 import { API_URL } from "../config/constants";
 
@@ -26,6 +27,7 @@ const FindingDriverScreen = () => {
 	const { theme } = useTheme();
 	const isDarkMode = theme === "dark";
 	const colors = Colors[theme];
+	const { user } = useAuth();
 
 	const { socket } = useSocket();
 
@@ -33,9 +35,10 @@ const FindingDriverScreen = () => {
 		console.log(socket);
 
 		if (socket && jobId) {
-			console.log(
-				`✅ Socket is connected. Attaching direct listener for Job ID: ${jobId}`
-			);
+			socket.emit("join-room", {
+				userId: user.id,
+				role: user.role,
+			});
 
 			const handleDirectAccept = data => {
 				console.log("--- DIRECT EVENT RECEIVED! ---", data);
