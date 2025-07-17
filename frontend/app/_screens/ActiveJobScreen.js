@@ -20,6 +20,7 @@ import { useTheme } from "../_context/ThemeContext";
 import Colors from "../_constants/Colors";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { API_URL } from "../config/constants";
+import fetchWithAuth from "../services/fetchWithAuth";
 
 // A helper function to format service types for display
 const formatServiceType = type => {
@@ -38,12 +39,15 @@ const ActiveJobScreen = () => {
 	useEffect(() => {
 		const fetchJobDetails = async () => {
 			if (!jobId) return;
+
 			try {
-				const token = await AsyncStorage.getItem("token");
-				const response = await axios.get(`${API_URL}/jobs/${jobId}`, {
-					headers: { Authorization: `Bearer ${token}` },
-				});
-				setJob(response.data);
+				const response = await fetchWithAuth(`${API_URL}/jobs/${jobId}`);
+				if (response) {
+					const data = await response.json();
+					setJob(data);
+				} else {
+					console.warn("No response received. Possibly unauthorized.");
+				}
 			} catch (error) {
 				console.error("Failed to fetch job details:", error);
 				Alert.alert("Error", "Could not load job details.");
@@ -51,6 +55,7 @@ const ActiveJobScreen = () => {
 				setIsLoading(false);
 			}
 		};
+
 		fetchJobDetails();
 	}, [jobId]);
 

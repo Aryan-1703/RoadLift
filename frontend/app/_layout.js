@@ -5,9 +5,9 @@ import { AuthProvider } from "./_context/AuthContext";
 
 export default function RootLayout() {
 	return (
-		<ThemeProvider>
+		<AuthProvider>
 			<SocketProvider>
-				<AuthProvider>
+				<ThemeProvider>
 					<Stack
 						screenOptions={{
 							animation: "slide_from_right",
@@ -26,8 +26,8 @@ export default function RootLayout() {
 						<Stack.Screen name="tabs" />
 						<Stack.Screen name="live-tracking" options={{ headerShown: false }} />
 					</Stack>
-				</AuthProvider>
+				</ThemeProvider>
 			</SocketProvider>
-		</ThemeProvider>
+		</AuthProvider>
 	);
 }

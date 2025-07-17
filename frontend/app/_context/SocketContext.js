@@ -1,46 +1,48 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import socketService from "../services/socket"; // Your singleton socket manager
+import socketService from "../services/socket";
+import { useAuth } from "./AuthContext"; // ✅ Add this
 
 const SocketContext = createContext();
 
 export const useSocket = () => useContext(SocketContext);
 
 export const SocketProvider = ({ children }) => {
-	const [isConnected, setIsConnected] = useState(
-		socketService.getSocket()?.connected || false
-	);
+	const { user, role, isAuthenticated } = useAuth(); // ✅ Pull auth context
+	const [isConnected, setIsConnected] = useState(false);
+	const [socket, setSocket] = useState(null);
 
-	const connectSocket = (userId, role) => {
-		socketService.connect(userId, role);
-	};
-
-	const disconnectSocket = () => {
-		if (socketService.getSocket()) {
-			socketService.disconnect();
-		}
-	};
-
+	// 🔁 Automatically connect/disconnect socket based on auth
 	useEffect(() => {
-		const socket = socketService.getSocket();
-		if (!socket) return;
+		if (isAuthenticated && user && role) {
+			socketService.connect(user.id, role);
+			const activeSocket = socketService.getSocket();
 
-		const handleConnect = () => setIsConnected(true);
-		const handleDisconnect = () => setIsConnected(false);
+			const handleConnect = () => {
+				console.log("✅ Socket connected:", activeSocket.id);
+				setIsConnected(true);
+			};
 
-		socket.on("connect", handleConnect);
-		socket.on("disconnect", handleDisconnect);
+			const handleDisconnect = () => {
+				console.log("❌ Socket disconnected");
+				setIsConnected(false);
+			};
 
-		return () => {
-			socket.off("connect", handleConnect);
-			socket.off("disconnect", handleDisconnect);
-		};
-	}, []); // ✅ Empty dependency array — only runs once on mount
+			activeSocket.on("connect", handleConnect);
+			activeSocket.on("disconnect", handleDisconnect);
+
+			setSocket(activeSocket);
+
+			return () => {
+				activeSocket.off("connect", handleConnect);
+				activeSocket.off("disconnect", handleDisconnect);
+				activeSocket.disconnect(); // Clean up on logout
+			};
+		}
+	}, [isAuthenticated, user, role]);
 
 	const value = {
-		socket: socketService.getSocket(), // Share actual socket instance
+		socket,
 		isConnected,
-		connectSocket,
-		disconnectSocket,
 	};
 
 	return <SocketContext.Provider value={value}>{children}</SocketContext.Provider>;
