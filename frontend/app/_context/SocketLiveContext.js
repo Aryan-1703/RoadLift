@@ -8,12 +8,12 @@ export const useSocket = () => useContext(SocketLiveContext);
 export const SocketLiveProvider = ({ children }) => {
 	const [isConnected, setIsConnected] = useState(false);
 
-	const connectSocket = (userId, role) => {
+	const connect = (userId, role) => {
 		socketService.connect(userId, role);
 		setIsConnected(true);
 	};
 
-	const disconnectSocket = () => {
+	const disconnect = () => {
 		socketService.disconnect();
 		setIsConnected(false);
 	};
@@ -32,7 +32,7 @@ export const SocketLiveProvider = ({ children }) => {
 	}, []);
 
 	return (
-		<SocketLiveContext.Provider value={{ connectSocket, disconnectSocket, isConnected }}>
+		<SocketLiveContext.Provider value={{ connect, disconnect, isConnected }}>
 			{children}
 		</SocketLiveContext.Provider>
 	);

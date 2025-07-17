@@ -1,49 +1,46 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
+import { useAuth } from "./AuthContext";
 import socketService from "../services/socket";
-import { useAuth } from "./AuthContext"; // ✅ Add this
 
 const SocketContext = createContext();
 
 export const useSocket = () => useContext(SocketContext);
 
 export const SocketProvider = ({ children }) => {
-	const { user, role, isAuthenticated } = useAuth(); // ✅ Pull auth context
-	const [isConnected, setIsConnected] = useState(false);
+	const { user, role, isAuthenticated } = useAuth();
 	const [socket, setSocket] = useState(null);
+	const [isConnected, setIsConnected] = useState(false);
 
-	// 🔁 Automatically connect/disconnect socket based on auth
 	useEffect(() => {
 		if (isAuthenticated && user && role) {
 			socketService.connect(user.id, role);
-			const activeSocket = socketService.getSocket();
+			const s = socketService.getSocket();
 
-			const handleConnect = () => {
-				console.log("✅ Socket connected:", activeSocket.id);
+			const onConnect = () => {
 				setIsConnected(true);
+				console.log("✅ Socket connected:", s.id);
 			};
 
-			const handleDisconnect = () => {
-				console.log("❌ Socket disconnected");
+			const onDisconnect = () => {
 				setIsConnected(false);
+				console.log("❌ Socket disconnected");
 			};
 
-			activeSocket.on("connect", handleConnect);
-			activeSocket.on("disconnect", handleDisconnect);
-
-			setSocket(activeSocket);
+			s.on("connect", onConnect);
+			s.on("disconnect", onDisconnect);
+			setSocket(s);
 
 			return () => {
-				activeSocket.off("connect", handleConnect);
-				activeSocket.off("disconnect", handleDisconnect);
-				activeSocket.disconnect(); // Clean up on logout
+				s.off("connect", onConnect);
+				s.off("disconnect", onDisconnect);
+				s.disconnect();
 			};
 		}
 	}, [isAuthenticated, user, role]);
 
-	const value = {
-		socket,
-		isConnected,
-	};
-
-	return <SocketContext.Provider value={value}>{children}</SocketContext.Provider>;
+	return (
+		<SocketContext.Provider value={{ socket, isConnected }}>
+			{children}
+		</SocketContext.Provider>
+	);
 };
