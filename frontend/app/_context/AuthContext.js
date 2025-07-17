@@ -16,26 +16,27 @@ export const AuthProvider = ({ children }) => {
 		(async () => {
 			const storedToken = await AsyncStorage.getItem("token");
 			const storedUser = await AsyncStorage.getItem("user");
-			const storedRole = await AsyncStorage.getItem("role");
 
-			if (storedToken && storedUser && storedRole) {
+			if (storedToken && storedUser) {
+				const parsedUser = JSON.parse(storedUser);
 				setToken(storedToken);
-				setUser(JSON.parse(storedUser));
-				setRole(storedRole);
+				setUser(parsedUser);
 			}
+
 			setAuthLoaded(true);
 		})();
 	}, []);
-
 	const login = async ({ token, user, role }) => {
+		const fullUser = { ...user, role };
+
 		await AsyncStorage.multiSet([
 			["token", token],
-			["user", JSON.stringify(user)],
-			["role", role],
+			["user", JSON.stringify(fullUser)],
 		]);
+
 		setToken(token);
-		setUser(user);
-		setRole(role);
+		setUser(fullUser);
+
 		router.replace(role === "driver" ? "/driver-tabs" : "/tabs");
 	};
 

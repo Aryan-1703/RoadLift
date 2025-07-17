@@ -5,17 +5,17 @@ import { useAuth } from "./_context/AuthContext";
 
 const Index = () => {
 	const router = useRouter();
-	const { isAuthenticated, role, authLoaded } = useAuth();
+	const { isAuthenticated, user, authLoaded } = useAuth();
 
 	useEffect(() => {
 		if (!authLoaded) return;
 
 		if (isAuthenticated) {
-			router.replace(role === "driver" ? "/driver-tabs" : "/tabs");
+			router.replace(user?.role === "driver" ? "/driver-tabs" : "/tabs");
 		} else {
 			router.replace("/login");
 		}
-	}, [authLoaded, isAuthenticated, role]);
+	}, [authLoaded, isAuthenticated, user]);
 
 	return (
 		<View style={styles.container}>

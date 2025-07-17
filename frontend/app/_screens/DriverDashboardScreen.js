@@ -28,22 +28,24 @@ const DriverDashboardScreen = () => {
 
 	// --- CONTEXTS ---
 	const { theme } = useTheme();
-	const { token } = useAuth(); // Get token from AuthContext
+	const { token, user, role } = useAuth(); // Get token from AuthContext
 	const { socket } = useSocket();
 
 	// --- THEME ---
 	const isDarkMode = theme === "dark";
 	const colors = Colors[theme];
 
-	// --- REAL-TIME LOGIC ---
-	// In DriverDashboardScreen.js
 	useEffect(() => {
-		if (!socket) return;
-
-		socket.emit("join-drivers-room");
-		console.log("DriverDashboard: Joined 'drivers' room.");
+		if (!socket || !user) return;
+		// Join proper socket room
+		socket.emit("join-room", {
+			userId: user.id,
+			role: role,
+		});
+		console.log("🔗 Emitted join-room with user:", user.id, user.role);
 
 		const handleNewJob = newJob => {
+			console.log("📦 Received 'new-job':", newJob);
 			setJobs(prevJobs => [newJob, ...prevJobs]);
 			Alert.alert(
 				"New Job Available!",
@@ -51,21 +53,19 @@ const DriverDashboardScreen = () => {
 			);
 		};
 
-		// --- THIS IS THE NEW LISTENER ---
 		const handleJobTaken = data => {
-			console.log(`DriverDashboard: Job ${data.jobId} was taken. Removing from list.`);
-			// Remove the job from the local state array
+			console.log(`❌ Job ${data.jobId} taken, removing from list`);
 			setJobs(prevJobs => prevJobs.filter(job => String(job.id) !== String(data.jobId)));
 		};
 
 		socket.on("new-job", handleNewJob);
-		socket.on("job-taken", handleJobTaken); // Add the new listener
+		socket.on("job-taken", handleJobTaken);
 
 		return () => {
 			socket.off("new-job", handleNewJob);
-			socket.off("job-taken", handleJobTaken); // Clean up the listener
+			socket.off("job-taken", handleJobTaken);
 		};
-	}, [socket]);
+	}, [socket, user]);
 
 	// --- DATA FETCHING ---
 	const fetchAvailableJobs = useCallback(async () => {
