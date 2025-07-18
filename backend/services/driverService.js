@@ -1,4 +1,4 @@
-const { Job, User, sequelize,Driver } = require("../models");
+const { Job, User, sequelize, Driver } = require("../models");
 const io = require("../socket");
 
 async function getAvailableJobs() {
@@ -33,13 +33,11 @@ async function acceptJob(jobId, driverId) {
 			message: "A driver has accepted your request!",
 			driverId: driverId, // Send the driver's ID too
 		});
-		console.log(`Emitted 'job-accepted' to customer room: ${job.userId}`);
 
 		// 2. Notify ALL other connected drivers that this job is now taken.
 		io.to("drivers").emit("job-taken", {
 			jobId: job.id,
 		});
-		console.log(`Emitted 'job-taken' to all drivers for job: ${job.id}`);
 
 		return job;
 	});
@@ -48,7 +46,6 @@ async function acceptJob(jobId, driverId) {
 }
 
 async function updateStatus(driverId, isActive) {
-	console.log("Updating status for driver:", driverId, "to:", isActive);
 	const driver = await Driver.findByPk(driverId);
 	if (!driver) {
 		console.error("Driver not found for ID:", driverId);

@@ -27,7 +27,6 @@ const RegisterPage = () => {
 				password,
 			});
 
-			console.log("Registration successful:", response.data);
 			setStatus({
 				message: "Registration successful! You can now log in.",
 				type: "success",

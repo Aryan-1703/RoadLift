@@ -25,9 +25,9 @@ const RequestModal = ({ location, onClose }) => {
 						lat: location.lat,
 						lon: location.lng,
 					},
-					vehicleMake: vehicleMake, 
-					vehicleModel: vehicleModel, 
-					notes: notes, 
+					vehicleMake: vehicleMake,
+					vehicleModel: vehicleModel,
+					notes: notes,
 				},
 				{
 					headers: {
@@ -35,8 +35,6 @@ const RequestModal = ({ location, onClose }) => {
 					},
 				}
 			);
-
-			console.log("Job created successfully!", response.data);
 			alert("Help is on the way!"); // Simple confirmation for now
 			onClose(); // Close the modal on success
 		} catch (err) {

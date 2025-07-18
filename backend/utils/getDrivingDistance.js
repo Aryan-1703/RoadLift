@@ -12,7 +12,6 @@ async function getDrivingDistance(origin, destination) {
 	const destinationStr = `${destination.lat},${destination.lng}`;
 
 	const apiKey = process.env.GOOGLE_MAPS_API_KEY;
-	console.log(apiKey);
 	if (!apiKey) {
 		console.error("🚫 Google Maps API key not found in environment");
 		throw new Error("Google Maps API key not found in environment");

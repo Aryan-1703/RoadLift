@@ -32,7 +32,6 @@ const FindingDriverScreen = () => {
 	const { socket } = useSocket();
 
 	useEffect(() => {
-
 		if (socket && jobId) {
 			socket.emit("join-room", {
 				userId: user.id,
@@ -52,7 +51,6 @@ const FindingDriverScreen = () => {
 			socket.on("job-accepted", handleDirectAccept);
 
 			return () => {
-				console.log(`🧹 Cleaning up direct listener for Job ID: ${jobId}`);
 				socket.off("job-accepted", handleDirectAccept);
 			};
 		} else {

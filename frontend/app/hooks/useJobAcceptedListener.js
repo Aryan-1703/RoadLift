@@ -18,11 +18,7 @@ const useJobAcceptedListener = jobId => {
 			return;
 		}
 
-		console.log(`useJobAcceptedListener: Attaching listener for Job ID: ${jobId}`);
-
 		const handleJobAccepted = data => {
-			console.log("useJobAcceptedListener: Received 'job-accepted' event:", data);
-
 			// Compare incoming jobId with the one this hook is listening for
 			if (String(data.jobId) === String(jobId)) {
 				Alert.alert("Driver Found!", data.message);

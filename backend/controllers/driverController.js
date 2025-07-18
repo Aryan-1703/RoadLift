@@ -63,7 +63,6 @@ const updateStatus = async (req, res) => {
 	try {
 		const driverId = req.user.id;
 		const { isActive } = req.body;
-		console.log("DriverID from token:", driverId, "New status:", isActive);
 
 		if (typeof isActive !== "boolean") {
 			return res.status(400).json({ message: "isActive must be a boolean." });

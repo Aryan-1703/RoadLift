@@ -14,8 +14,7 @@ const getDrivingDistanceInKm = async (originLat, originLng, destLat, destLng) =>
 		const response = await axios.get(`${API_URL}/utils/distance`, {
 			params: { originLat, originLng, destLat, destLng },
 		});
-		// distanceValue is meters; convert to km
-		console.log(response.data.distanceValue / 1000);
+		//convert to km
 		return response.data.distanceValue / 1000;
 	} catch (error) {
 		console.error("Failed to fetch driving distance:", error);
