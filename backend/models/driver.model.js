@@ -15,7 +15,11 @@ module.exports = sequelize => {
 			type: DataTypes.STRING,
 			allowNull: false,
 		},
-		isActive: { type: DataTypes.BOOLEAN, defaultValue: false },
+		isActive: {
+			type: DataTypes.BOOLEAN,
+			defaultValue: false,
+			allowNull: false,
+		},
 		currentLocation: DataTypes.GEOMETRY("POINT", 4326),
 		pushToken: { type: DataTypes.STRING },
 	});

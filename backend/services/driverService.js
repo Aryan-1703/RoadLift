@@ -1,5 +1,5 @@
-const { Job, User, sequelize } = require("../models");
-const io = require('../socket');
+const { Job, User, sequelize,Driver } = require("../models");
+const io = require("../socket");
 
 async function getAvailableJobs() {
 	// Find all jobs that are pending and include the name of the user who requested it.
@@ -47,4 +47,16 @@ async function acceptJob(jobId, driverId) {
 	return result;
 }
 
-module.exports = { getAvailableJobs, acceptJob };
+async function updateStatus(driverId, isActive) {
+	console.log("Updating status for driver:", driverId, "to:", isActive);
+	const driver = await Driver.findByPk(driverId);
+	if (!driver) {
+		console.error("Driver not found for ID:", driverId);
+		throw new Error("Driver not found.");
+	}
+	driver.isActive = isActive;
+	await driver.save();
+	return driver;
+}
+
+module.exports = { getAvailableJobs, acceptJob, updateStatus };

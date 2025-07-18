@@ -56,7 +56,9 @@ const cancelJob = async (req, res) => {
 	try {
 		const { jobId } = req.params;
 		const userId = req.user.id;
+
 		await jobService.cancelJob(jobId, userId);
+		io.to("drivers").emit("job-cancelled", { jobId });
 		res.status(200).json({ message: "Job successfully cancelled." });
 	} catch (error) {
 		if (error.message === "Forbidden") {

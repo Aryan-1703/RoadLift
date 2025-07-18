@@ -1,10 +1,18 @@
 const driverService = require("../services/driverService");
+const { Driver } = require("../models");
 
 // @desc    Get all available (pending) jobs
 // @route   GET /api/driver/jobs/available
 // @access  Private (Driver)
 const getAvailableJobs = async (req, res) => {
 	try {
+		const driverId = req.user.id;
+		// Fetch the driver
+		const driver = await Driver.findByPk(driverId);
+		if (!driver || !driver.isActive) {
+			return res.status(403).json({ message: "You must be active to view jobs." });
+		}
+		// Continue with job fetch
 		const jobs = await driverService.getAvailableJobs();
 		res.status(200).json(jobs);
 	} catch (error) {
@@ -51,8 +59,27 @@ const completeJob = async (req, res) => {
 	}
 };
 
+const updateStatus = async (req, res) => {
+	try {
+		const driverId = req.user.id;
+		const { isActive } = req.body;
+		console.log("DriverID from token:", driverId, "New status:", isActive);
+
+		if (typeof isActive !== "boolean") {
+			return res.status(400).json({ message: "isActive must be a boolean." });
+		}
+
+		const updatedDriver = await driverService.updateStatus(driverId, isActive);
+		return res.status(200).json(updatedDriver);
+	} catch (error) {
+		console.error("❌ Failed to update driver status:", error);
+		return res.status(500).json({ message: "Server error while updating status." });
+	}
+};
+
 module.exports = {
 	getAvailableJobs,
 	acceptJob,
 	completeJob,
+	updateStatus,
 };

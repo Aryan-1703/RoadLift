@@ -6,24 +6,45 @@ import {
 	StyleSheet,
 	TouchableOpacity,
 	StatusBar,
+	Switch,
+	Alert,
 } from "react-native";
 import { useAuth } from "../_context/AuthContext";
 import { useTheme } from "../_context/ThemeContext";
 import Colors from "../_constants/Colors";
 import { FontAwesome5 } from "@expo/vector-icons";
+import axios from "axios";
+import { API_URL } from "../config/constants";
 
 const DriverProfileScreen = () => {
 	// --- CONTEXTS & THEME ---
-	const { user, logout } = useAuth(); // Get user data and logout function from context
+	// We now need the login function to update the user object in our global state
+	const { user, token, logout, login } = useAuth();
 	const { theme } = useTheme();
 	const isDarkMode = theme === "dark";
 	const colors = Colors[theme];
 
-	// --- HANDLER ---
+	// Determine the driver's current status from the user object
+	const isActive = user?.isActive || false;
+
+	// --- HANDLERS ---
 	const handleLogout = async () => {
-		// Call the central logout function
 		await logout();
-		// Navigation is handled automatically by app/index.tsx
+	};
+
+	const handleStatusChange = async newStatus => {
+		try {
+			const response = await axios.put(
+				`${API_URL}/driver/status`,
+				{ isActive: newStatus },
+				{ headers: { Authorization: `Bearer ${token}` } }
+			);
+
+			await login({ token, user: response.data, role: "driver" });
+		} catch (error) {
+			console.error("Failed to update status:", error);
+			Alert.alert("Error", "Could not update your status. Please try again.");
+		}
 	};
 
 	// --- RENDER ---
@@ -31,7 +52,26 @@ const DriverProfileScreen = () => {
 		<SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
 			<StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} />
 			<View style={[styles.headerContainer, { borderBottomColor: colors.border }]}>
-				<Text style={[styles.headerTitle, { color: colors.text }]}>Profile</Text>
+				<Text style={[styles.headerTitle, { color: colors.text }]}>Profile & Status</Text>
+			</View>
+
+			{/* --- NEW STATUS TOGGLE SECTION --- */}
+			<View style={styles.statusContainer}>
+				<View
+					style={[
+						styles.statusIndicator,
+						{ backgroundColor: isActive ? "#34c759" : "#ff3b30" },
+					]}
+				/>
+				<Text style={[styles.statusText, { color: colors.text }]}>
+					You are currently {isActive ? "Online" : "Offline"}
+				</Text>
+				<Switch
+					trackColor={{ false: "#767577", true: colors.tint }}
+					thumbColor={isDarkMode ? colors.tint : "#f4f3f4"}
+					onValueChange={handleStatusChange}
+					value={isActive}
+				/>
 			</View>
 
 			<View style={styles.profileInfo}>
@@ -53,7 +93,7 @@ const DriverProfileScreen = () => {
 	);
 };
 
-// --- STYLESHEET ---
+// --- STYLESHEET (with new styles) ---
 const styles = StyleSheet.create({
 	container: { flex: 1 },
 	headerContainer: {
@@ -62,7 +102,30 @@ const styles = StyleSheet.create({
 		borderBottomWidth: StyleSheet.hairlineWidth,
 	},
 	headerTitle: { fontSize: 22, fontWeight: "bold" },
-	profileInfo: { alignItems: "center", marginTop: 40, marginBottom: 40 },
+	// --- NEW STYLES ---
+	statusContainer: {
+		flexDirection: "row",
+		alignItems: "center",
+		padding: 20,
+		margin: 15,
+		borderRadius: 12,
+		backgroundColor: "#f8f9fa", // A light neutral color
+		borderWidth: 1,
+		borderColor: "#e9ecef",
+	},
+	statusIndicator: {
+		width: 12,
+		height: 12,
+		borderRadius: 6,
+		marginRight: 15,
+	},
+	statusText: {
+		flex: 1,
+		fontSize: 18,
+		fontWeight: "600",
+	},
+	// ---
+	profileInfo: { alignItems: "center", marginTop: 20, marginBottom: 40 },
 	avatar: {
 		width: 100,
 		height: 100,
