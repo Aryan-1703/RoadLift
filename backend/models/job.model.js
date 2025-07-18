@@ -14,7 +14,13 @@ module.exports = sequelize => {
 			allowNull: false,
 		},
 		serviceType: {
-			type: DataTypes.ENUM("battery-boost", "car-lockout", "tire-change", "towing"),
+			type: DataTypes.ENUM(
+				"battery-boost",
+				"car-lockout",
+				"tire-change",
+				"towing",
+				"fuel-delivery"
+			),
 			allowNull: false,
 		},
 		// Renaming this to be consistent with our service logic

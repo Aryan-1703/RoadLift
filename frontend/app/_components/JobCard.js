@@ -9,6 +9,7 @@ const serviceIcons = {
 	"battery-boost": "car-battery",
 	"car-lockout": "key-variant",
 	"tire-change": "tire",
+	"fuel-delivery": "gas-station",
 	towing: "tow-truck",
 };
 

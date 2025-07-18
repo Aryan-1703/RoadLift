@@ -83,24 +83,24 @@ const DashboardScreen = () => {
 					<ServiceCard
 						iconName="car-battery"
 						name="Battery Boost"
-						price="$59"
+						price="$85"
 						onPress={() =>
 							handleServiceSelection({
 								name: "Battery Boost",
 								type: "battery-boost",
-								price: 59,
+								price: 85,
 							})
 						}
 					/>
 					<ServiceCard
 						iconName="key-variant"
 						name="Car Lockout"
-						price="$79"
+						price="$85"
 						onPress={() =>
 							handleServiceSelection({
 								name: "Car Lockout",
 								type: "car-lockout",
-								price: 79,
+								price: 85,
 							})
 						}
 					/>
@@ -109,20 +109,34 @@ const DashboardScreen = () => {
 					<ServiceCard
 						iconName="tire"
 						name="Tire Change"
-						price="$69"
+						price="$85"
 						onPress={() =>
 							handleServiceSelection({
 								name: "Tire Change",
 								type: "tire-change",
-								price: 69,
+								price: 85,
 							})
 						}
 					/>
 					<ServiceCard
+						iconName="gas-station"
+						name="Fuel Delivery (5L)"
+						price="$85"
+						onPress={() =>
+							handleServiceSelection({
+								name: "Emergency Fuel Delivery (5L)",
+								type: "fuel-delivery",
+								price: 85,
+							})
+						}
+					/>
+				</View>
+				<View style={styles.serviceGrid}>
+					<ServiceCard
 						iconName="tow-truck"
 						name="Towing"
 						price="V2 Feature"
-						disabled={true} // Towing is correctly disabled for V1
+						disabled={true}
 					/>
 				</View>
 			</ScrollView>
