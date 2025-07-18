@@ -19,9 +19,16 @@ export const SocketProvider = ({ children }) => {
 				console.log("SocketService.getSocket() returned null");
 				return;
 			}
+
 			const onConnect = () => {
 				setIsConnected(true);
 				console.log("✅ Socket connected:", s.id);
+
+				// ✅ Rejoin rooms on reconnect
+				s.emit("join-room", {
+					userId: user.id,
+					role: user.role,
+				});
 			};
 
 			const onDisconnect = () => {
@@ -31,6 +38,7 @@ export const SocketProvider = ({ children }) => {
 
 			s.on("connect", onConnect);
 			s.on("disconnect", onDisconnect);
+
 			setSocket(s);
 
 			return () => {

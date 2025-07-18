@@ -9,7 +9,7 @@ module.exports = sequelize => {
 		phoneNumber: {
 			type: DataTypes.STRING,
 			allowNull: false,
-			unique: true, 
+			unique: true,
 		},
 		password: {
 			type: DataTypes.STRING,
@@ -17,6 +17,7 @@ module.exports = sequelize => {
 		},
 		isActive: { type: DataTypes.BOOLEAN, defaultValue: false },
 		currentLocation: DataTypes.GEOMETRY("POINT", 4326),
+		pushToken: { type: DataTypes.STRING },
 	});
 	return Driver;
 };

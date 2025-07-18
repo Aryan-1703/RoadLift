@@ -20,8 +20,6 @@ async function getDrivingDistance(origin, destination) {
 
 	const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${originStr}&destination=${destinationStr}&key=${apiKey}`;
 
-	console.log("API URL:", url);
-
 	try {
 		const response = await axios.get(url);
 

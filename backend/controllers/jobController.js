@@ -1,5 +1,8 @@
 const jobService = require("../services/jobService");
-const io = require("../socket"); // 1. Import the shared socket instance
+const io = require("../socket");
+const { sendPushNotification } = require("../utils/sendPushNotification");
+const { Driver } = require("../models");
+const { Op } = require("sequelize");
 
 // @desc    Create a new service request
 // @route   POST /api/jobs
@@ -9,12 +12,31 @@ const createJob = async (req, res) => {
 		const newJob = await jobService.createJob(req.body, req.user.id);
 
 		// --- REAL-TIME EMIT TO DRIVERS ---
-		// 2. Use the imported 'io' instance directly
-		// We get fresh job details with user info to send to the driver app
 		const jobWithUserData = await jobService.getJobById(newJob.id);
+
 		if (jobWithUserData) {
+			// 1. Emit to all drivers via WebSocket
 			io.to("drivers").emit("new-job", jobWithUserData);
-			console.log(`✅ Emitted 'new-job' event to 'drivers' room for job ${newJob.id}.`);
+
+			// 2. Get all driver push tokens
+			const allDrivers = await Driver.findAll({
+				where: {
+					pushToken: {
+						[Op.ne]: null,
+					},
+				},
+			});
+
+			const pushTokens = allDrivers
+				.map(driver => driver.pushToken)
+				.filter(token => token?.startsWith("ExponentPushToken"));
+
+			// 3. Send push notification to each driver
+			for (const token of pushTokens) {
+				await sendPushNotification(token, jobWithUserData);
+			}
+
+			console.log(`📲 Sent push notifications to ${pushTokens.length} drivers.`);
 		}
 
 		res.status(201).json({
