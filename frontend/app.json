@@ -20,9 +20,11 @@
       "supportsTablet": true,
       "infoPlist": {
         "UIBackgroundModes": [
+          "remote-notification",
           "remote-notification"
         ],
-        "NSUserTrackingUsageDescription": "We use notifications to keep you updated about towing jobs and services."
+        "NSUserTrackingUsageDescription": "We use notifications to keep you updated about towing jobs and services.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "web": {
