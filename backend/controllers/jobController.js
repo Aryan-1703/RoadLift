@@ -15,28 +15,29 @@ const createJob = async (req, res) => {
 		const jobWithUserData = await jobService.getJobById(newJob.id);
 
 		if (jobWithUserData) {
-			// 1. Emit to all drivers via WebSocket
+			// Emit to all drivers in "drivers" room
 			io.to("drivers").emit("new-job", jobWithUserData);
 
-			// 2. Get all driver push tokens
-			const allDrivers = await Driver.findAll({
+			// Get all active drivers with a pushToken
+			const activeDrivers = await Driver.findAll({
 				where: {
+					isActive: true, // Only active drivers
 					pushToken: {
 						[Op.ne]: null,
 					},
 				},
 			});
 
-			const pushTokens = allDrivers
+			const pushTokens = activeDrivers
 				.map(driver => driver.pushToken)
 				.filter(token => token?.startsWith("ExponentPushToken"));
 
-			// 3. Send push notification to each driver
+			// Send push notification to each active driver
 			for (const token of pushTokens) {
 				await sendPushNotification(token, jobWithUserData);
 			}
 
-			console.log(`📲 Sent push notifications to ${pushTokens.length} drivers.`);
+			console.log(`📲 Sent push notifications to ${pushTokens.length} active drivers.`);
 		}
 
 		res.status(201).json({

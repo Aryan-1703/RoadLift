@@ -75,10 +75,34 @@ const updateStatus = async (req, res) => {
 		return res.status(500).json({ message: "Server error while updating status." });
 	}
 };
+const storePushToken = async (req, res) => {
+	try {
+		const userId = req.user.id;
+		const { token: pushToken } = req.body;
+
+		if (!pushToken || !pushToken.startsWith("ExponentPushToken")) {
+			return res.status(400).json({ message: "Invalid push token." });
+		}
+
+		const driver = await Driver.findByPk(userId);
+		if (!driver) {
+			return res.status(404).json({ message: "Driver not found." });
+		}
+
+		driver.pushToken = pushToken;
+		await driver.save();
+
+		return res.status(200).json({ message: "Push token saved successfully." });
+	} catch (error) {
+		console.error("❌ Error saving push token:", error);
+		return res.status(500).json({ message: "Server error." });
+	}
+};
 
 module.exports = {
 	getAvailableJobs,
 	acceptJob,
 	completeJob,
 	updateStatus,
+	storePushToken,
 };

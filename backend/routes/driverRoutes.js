@@ -5,6 +5,7 @@ const {
 	acceptJob,
 	completeJob,
 	updateStatus,
+	storePushToken,
 } = require("../controllers/driverController");
 const { protect, protectDriver } = require("../middleware/authMiddleware");
 
@@ -15,5 +16,6 @@ router.get("/jobs/available", protect, protectDriver, getAvailableJobs);
 router.put("/jobs/:jobId/accept", protect, protectDriver, acceptJob);
 router.put("/jobs/:jobId/complete", protect, protectDriver, completeJob);
 router.put("/status", protect, protectDriver, updateStatus);
+router.post("/store-push-token", protect, protectDriver, storePushToken);
 
 module.exports = router;

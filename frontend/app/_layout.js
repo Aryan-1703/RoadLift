@@ -15,7 +15,7 @@ function NotificationSetup() {
 			const pushToken = await registerForPushNotificationsAsync();
 			if (pushToken && user) {
 				try {
-					await fetch(`${API_URL}/store-push-token`, {
+					await fetch(`${API_URL}/api/driver/store-push-token`, {
 						method: "POST",
 						headers: {
 							Authorization: `Bearer ${token}`,
