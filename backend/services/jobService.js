@@ -30,19 +30,13 @@ async function createJob(jobData, userId) {
 	// 2. Handle all real-time notifications and broadcasts
 	try {
 		const jobWithUserData = await getJobById(newJob.id);
-
-		// Emit to drivers who currently have the app open
-		io.to("drivers").emit("new-job", jobWithUserData);
-		console.log(`✅ Emitted 'new-job' socket event for job ${newJob.id}.`);
-
 		// Find drivers who have opted-in for push notifications
 		const driversToNotify = await Driver.findAll({
 			where: {
-				// You can add more conditions here, e.g., isActive: true
 				pushToken: { [Op.ne]: null },
+				isActive: true,
 			},
 		});
-
 		// Send push notifications to drivers who may have the app in the background
 		console.log(`📲 Found ${driversToNotify.length} drivers with push tokens to notify.`);
 		for (const driver of driversToNotify) {

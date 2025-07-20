@@ -13,7 +13,8 @@ import {
 	UIManager,
 	Platform,
 } from "react-native";
-import { useFocusEffect, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
+import { useFocusEffect } from "@react-navigation/native";
 import axios from "axios";
 import { useAuth } from "../_context/AuthContext";
 import { useTheme } from "../_context/ThemeContext";
