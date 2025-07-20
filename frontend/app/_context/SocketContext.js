@@ -21,7 +21,6 @@ export const SocketProvider = ({ children }) => {
 
 			const onConnect = () => {
 				setIsConnected(true);
-				console.log("✅ Socket connected:", s.id);
 
 				// ✅ Rejoin rooms on reconnect
 				s.emit("join-room", {
@@ -32,14 +31,10 @@ export const SocketProvider = ({ children }) => {
 
 			const onDisconnect = () => {
 				setIsConnected(false);
-				console.log("❌ Socket disconnected");
 			};
-
 			s.on("connect", onConnect);
 			s.on("disconnect", onDisconnect);
-
 			setSocket(s);
-
 			return () => {
 				s.off("connect", onConnect);
 				s.off("disconnect", onDisconnect);
