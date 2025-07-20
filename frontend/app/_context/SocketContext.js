@@ -13,32 +13,39 @@ export const SocketProvider = ({ children }) => {
 	useEffect(() => {
 		if (isAuthenticated && user && user.role) {
 			socketService.connect(user.id, user.role);
-			const s = socketService.getSocket();
-			if (!s) {
-				console.log("SocketService.getSocket() returned null");
-				return;
-			}
 
-			const onConnect = () => {
-				setIsConnected(true);
+			const interval = setInterval(() => {
+				const s = socketService.getSocket();
+				if (!s) return;
 
-				// ✅ Rejoin rooms on reconnect
-				s.emit("join-room", {
-					userId: user.id,
-					role: user.role,
-				});
-			};
+				setSocket(s);
 
-			const onDisconnect = () => {
-				setIsConnected(false);
-			};
-			s.on("connect", onConnect);
-			s.on("disconnect", onDisconnect);
-			setSocket(s);
+				const onConnect = () => {
+					setIsConnected(true);
+					s.emit("join-room", {
+						userId: user.id,
+						role: user.role,
+					});
+				};
+
+				const onDisconnect = () => {
+					setIsConnected(false);
+				};
+
+				s.on("connect", onConnect);
+				s.on("disconnect", onDisconnect);
+
+				clearInterval(interval); // Stop once connected
+			}, 100); // Retry until socket is ready
+
 			return () => {
-				s.off("connect", onConnect);
-				s.off("disconnect", onDisconnect);
-				s.disconnect();
+				const s = socketService.getSocket();
+				if (s) {
+					s.off("connect");
+					s.off("disconnect");
+					s.disconnect();
+				}
+				clearInterval(interval);
 			};
 		}
 	}, [isAuthenticated, user]);
