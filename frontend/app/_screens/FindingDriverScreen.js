@@ -30,6 +30,7 @@ const FindingDriverScreen = () => {
 	const { user } = useAuth();
 
 	const { socket } = useSocket();
+
 	useEffect(() => {
 		if (socket && jobId) {
 			socket.emit("join-room", {
