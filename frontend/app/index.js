@@ -5,17 +5,26 @@ import { useAuth } from "./_context/AuthContext";
 
 const Index = () => {
 	const router = useRouter();
-	const { isAuthenticated, user, authLoaded } = useAuth();
+	// 1. Get the correct, top-level 'role' state from the context
+	const { isAuthenticated, isLoading, role } = useAuth();
 
 	useEffect(() => {
-		if (!authLoaded) return;
+		if (isLoading) {
+			return;
+		}
 
 		if (isAuthenticated) {
-			router.replace(user?.role === "driver" ? "/driver-tabs" : "/tabs");
+			// 2. Use the top-level 'role' state for the check
+			if (role === "driver") {
+				router.replace("/driver-tabs");
+			} else {
+				router.replace("/tabs");
+			}
 		} else {
+			// If not authenticated, send to login
 			router.replace("/login");
 		}
-	}, [authLoaded, isAuthenticated, user]);
+	}, [isLoading, isAuthenticated, role, router]); 
 
 	return (
 		<View style={styles.container}>

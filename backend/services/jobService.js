@@ -1,5 +1,7 @@
-const { Job, User } = require("../models");
-
+const { Op } = require("sequelize");
+const { Job, User, Driver, sequelize } = require("../models");
+const io = require("../socket");
+const { sendPushNotification } = require("../utils/sendPushNotification");
 /**
  * Creates a new service request job in the database.
  * @param {object} jobData - Contains serviceType, location, notes, cost, etc.
@@ -7,27 +9,52 @@ const { Job, User } = require("../models");
  * @returns {object} The newly created job record.
  */
 async function createJob(jobData, userId) {
+	// 1. Create the job in the database
 	const { serviceType, pickupLatitude, pickupLongitude, estimatedCost, notes } = jobData;
-
-	// Validate essential data
 	if (!serviceType || !pickupLatitude || !pickupLongitude || !userId) {
 		throw new Error("Missing required job data.");
 	}
-
-	// Format location for PostGIS (GeoJSON Point)
 	const pickupLocation = {
 		type: "Point",
-		coordinates: [pickupLongitude, pickupLatitude], // [lon, lat]
+		coordinates: [pickupLongitude, pickupLatitude],
 	};
-
 	const newJob = await Job.create({
-		userId, // Associate the job with the logged-in user
-		status: "pending", // Initial status
+		userId,
+		status: "pending",
 		serviceType,
 		pickupLocation,
 		estimatedCost: estimatedCost || null,
 		notes: notes || null,
 	});
+
+	// 2. Handle all real-time notifications and broadcasts
+	try {
+		const jobWithUserData = await getJobById(newJob.id);
+
+		// Emit to drivers who currently have the app open
+		io.to("drivers").emit("new-job", jobWithUserData);
+		console.log(`✅ Emitted 'new-job' socket event for job ${newJob.id}.`);
+
+		// Find drivers who have opted-in for push notifications
+		const driversToNotify = await Driver.findAll({
+			where: {
+				// You can add more conditions here, e.g., isActive: true
+				pushToken: { [Op.ne]: null },
+			},
+		});
+
+		// Send push notifications to drivers who may have the app in the background
+		console.log(`📲 Found ${driversToNotify.length} drivers with push tokens to notify.`);
+		for (const driver of driversToNotify) {
+			await sendPushNotification(driver.pushToken, jobWithUserData);
+		}
+	} catch (error) {
+		// Log the error but don't let it crash the job creation process
+		console.error(
+			"⚠️ Error during post-job-creation broadcast/notification:",
+			error.message
+		);
+	}
 
 	return newJob;
 }

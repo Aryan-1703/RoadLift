@@ -1,58 +1,67 @@
 {
-  "expo": {
-    "name": "TowLink",
-    "slug": "TowLink",
-    "version": "1.0.0",
-    "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
-    "scheme": "TowLink",
-    "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
-    "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
-      },
-      "edgeToEdgeEnabled": true
-    },
-    "ios": {
-      "bundleIdentifier": "com.aryan1703.TowLink",
-      "supportsTablet": true,
-      "infoPlist": {
-        "UIBackgroundModes": [
-          "remote-notification",
-          "remote-notification"
-        ],
-        "NSUserTrackingUsageDescription": "We use notifications to keep you updated about towing jobs and services.",
-        "ITSAppUsesNonExemptEncryption": false
-      }
-    },
-    "web": {
-      "bundler": "metro",
-      "output": "static",
-      "favicon": "./assets/images/favicon.png"
-    },
-    "plugins": [
-      "expo-router",
-      [
-        "expo-splash-screen",
-        {
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 200,
-          "resizeMode": "contain",
-          "backgroundColor": "#ffffff"
-        }
-      ]
-    ],
-    "experiments": {
-      "typedRoutes": true
-    },
-    "extra": {
-      "router": {},
-      "eas": {
-        "projectId": "91e4237a-aa54-4ef7-a29d-2bc0cfa3683e"
-      }
-    },
-    "owner": "aryan1703"
-  }
+	"expo": {
+		"name": "TowLink",
+		"slug": "TowLink",
+		"version": "1.0.0",
+		"orientation": "portrait",
+		"icon": "./assets/images/icon.png",
+		"scheme": "TowLink",
+		"userInterfaceStyle": "automatic",
+		"android": {
+			"adaptiveIcon": {
+				"foregroundImage": "./assets/images/adaptive-icon.png",
+				"backgroundColor": "#ffffff"
+			},
+			"edgeToEdgeEnabled": true
+		},
+		"ios": {
+			"bundleIdentifier": "com.aryan1703.TowLink",
+			"supportsTablet": true,
+			"config": {
+				"googleMapsApiKey": "YOUR_GOOGLE_MAPS_API_KEY"
+			},
+			"infoPlist": {
+				"UIBackgroundModes": ["remote-notification", "remote-notification"],
+				"NSUserTrackingUsageDescription": "We use notifications to keep you updated about towing jobs and services.",
+				"NSLocationWhenInUseUsageDescription": "This app needs access to your location to track towing jobs in real-time.",
+				"NSLocationAlwaysAndWhenInUseUsageDescription": "Location access is required to provide live updates even when the app is in background.",
+				"ITSAppUsesNonExemptEncryption": false
+			}
+		},
+		"web": {
+			"bundler": "metro",
+			"output": "static",
+			"favicon": "./assets/images/favicon.png"
+		},
+		"plugins": [
+			"expo-router",
+			[
+				"expo-splash-screen",
+				{
+					"image": "./assets/images/splash-icon.png",
+					"imageWidth": 200,
+					"resizeMode": "contain",
+					"backgroundColor": "#ffffff"
+				}
+			],
+			[
+				"expo-notifications",
+				{
+					"icon": "./assets/images/notification-icon.png",
+					"color": "#ffffff",
+					"sounds": []
+				}
+			]
+		],
+		"experiments": {
+			"typedRoutes": true
+		},
+		"extra": {
+			"router": {},
+			"eas": {
+				"projectId": "91e4237a-aa54-4ef7-a29d-2bc0cfa3683e"
+			}
+		},
+		"owner": "aryan1703"
+	}
 }

@@ -10,7 +10,6 @@ export const SocketProvider = ({ children }) => {
 	const { user, isAuthenticated } = useAuth();
 	const [socket, setSocket] = useState(null);
 	const [isConnected, setIsConnected] = useState(false);
-
 	useEffect(() => {
 		if (isAuthenticated && user && user.role) {
 			socketService.connect(user.id, user.role);
