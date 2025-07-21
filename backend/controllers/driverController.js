@@ -98,6 +98,16 @@ const storePushToken = async (req, res) => {
 		return res.status(500).json({ message: "Server error." });
 	}
 };
+const removePushToken = async (req, res) => {
+	try {
+		const userId = req.user.id;
+		await Driver.update({ pushToken: null }, { where: { id: userId } });
+		res.status(200).json({ message: "Push token removed." });
+	} catch (err) {
+		console.error("Error removing push token:", err);
+		res.status(500).json({ message: "Failed to remove push token." });
+	}
+};
 
 module.exports = {
 	getAvailableJobs,
@@ -105,4 +115,5 @@ module.exports = {
 	completeJob,
 	updateStatus,
 	storePushToken,
+	removePushToken,
 };

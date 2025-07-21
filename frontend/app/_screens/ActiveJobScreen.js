@@ -121,7 +121,7 @@ const ActiveJobScreen = () => {
 			<ModalHeader title="Active Job" />
 			<MapView
 				style={styles.map}
-				provider={PROVIDER_GOOGLE}
+				// provider={PROVIDER_GOOGLE}
 				initialRegion={{
 					latitude: job.pickupLocation.coordinates[1],
 					longitude: job.pickupLocation.coordinates[0],

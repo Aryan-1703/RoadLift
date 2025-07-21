@@ -73,6 +73,16 @@ export const AuthProvider = ({ children }) => {
 	};
 
 	const logout = async () => {
+		try {
+			if (user?.role === "driver" && token) {
+				await axios.delete(`${API_URL}/driver/remove-push-token`, {
+					headers: { Authorization: `Bearer ${token}` },
+				});
+			}
+		} catch (error) {
+			console.error("AuthContext: Failed to remove push token on logout", error);
+		}
+
 		setUser(null);
 		setToken(null);
 		await AsyncStorage.multiRemove(["token", "user"]);
