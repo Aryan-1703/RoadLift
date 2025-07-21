@@ -23,11 +23,13 @@ const authRoutes = require("./routes/authRoutes");
 const jobRoutes = require("./routes/jobRoutes");
 const driverRoutes = require("./routes/driverRoutes");
 const utilsRoutes = require("./routes/utils");
+const directionsRoutes = require("./routes/directionsRoutes");
 
 app.use("/api/auth", authRoutes);
 app.use("/api/jobs", jobRoutes);
 app.use("/api/driver", driverRoutes);
 app.use("/api/utils", utilsRoutes);
+app.use("/api/direction", directionsRoutes);
 
 // --- HEALTH CHECK ROUTE ---
 app.get("/", (req, res) => {
