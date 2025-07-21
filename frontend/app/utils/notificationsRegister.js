@@ -6,7 +6,8 @@ import Constants from "expo-constants";
 // This configures how notifications behave when the app is in the FOREGROUND.
 Notifications.setNotificationHandler({
 	handleNotification: async () => ({
-		shouldShowAlert: true,
+		shouldShowBanner: true, 
+		shouldShowList: true, // Adds to notification center list (iOS)
 		shouldPlaySound: true,
 		shouldSetBadge: false,
 	}),
