@@ -31,6 +31,8 @@ async function createJob(jobData, userId) {
 	try {
 		const jobWithUserData = await getJobById(newJob.id);
 		// Find drivers who have opted-in for push notifications
+
+		io.to("drivers").emit("new-job", jobWithUserData);
 		const driversToNotify = await Driver.findAll({
 			where: {
 				pushToken: { [Op.ne]: null },

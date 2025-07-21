@@ -99,7 +99,6 @@ const DriverDashboardScreen = () => {
 	// Setup socket listeners for new and taken jobs
 	useEffect(() => {
 		if (!socket || !user?.isActive || !location?.coords) return;
-
 		socket.emit("join-room", {
 			userId: user.id,
 			role: user.role,
@@ -107,7 +106,6 @@ const DriverDashboardScreen = () => {
 
 		const handleNewJob = async newJob => {
 			if (!newJob.pickupLocation?.coordinates?.length) return;
-
 			const [pickupLon, pickupLat] = newJob.pickupLocation.coordinates;
 			const distanceKm = await getDrivingDistanceInKm(
 				location.coords.latitude,
