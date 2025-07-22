@@ -2,6 +2,9 @@ require("dotenv").config();
 const express = require("express");
 const http = require("http"); // Required to attach socket.io
 const cors = require("cors");
+const { Job
+
+} = require("./models");
 
 const db = require("./models");
 const io = require("./socket"); // Import our shared, singleton socket instance
@@ -56,6 +59,24 @@ io.on("connection", socket => {
 
 	socket.on("disconnect", () => {
 		console.log(`Socket disconnected: ${socket.id}`);
+	});
+	socket.on("driver-location-update", async data => {
+		const { jobId, location } = data;
+
+		try {
+			const job = await Job.findByPk(jobId, { attributes: ["userId"] });
+			if (job && job.userId) {
+				// Relay the location to that specific customer's private room.
+				io.to(String(job.userId)).emit("driver-location-updated", {
+					jobId: jobId,
+					location: location, // { latitude, longitude }
+				});
+				// Log for debugging
+				// console.log(`Relayed location for job ${jobId} to customer ${job.userId}`);
+			}
+		} catch (error) {
+			console.error(`Error relaying location for job ${jobId}:`, error);
+		}
 	});
 });
 

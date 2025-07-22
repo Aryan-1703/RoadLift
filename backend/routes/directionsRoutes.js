@@ -3,6 +3,6 @@ const router = express.Router();
 const { getDirections } = require("../controllers/directionsController");
 const { protect, protectDriver } = require("../middleware/authMiddleware");
 
-router.post("/get-directions", protect, protectDriver, getDirections);
+router.get("/get-directions", protect, protectDriver, getDirections);
 
 module.exports = router;

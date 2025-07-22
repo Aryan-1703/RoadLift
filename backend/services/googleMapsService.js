@@ -1,6 +1,6 @@
-import axios from "axios";
+const axios = require("axios");
 
-export const getRouteFromGoogle = async (origin, destination) => {
+const getRouteFromGoogle = async (origin, destination) => {
 	const apiKey = process.env.GOOGLE_MAPS_API_KEY;
 
 	const url = `https://maps.googleapis.com/maps/api/directions/json`;
@@ -10,8 +10,9 @@ export const getRouteFromGoogle = async (origin, destination) => {
 		key: apiKey,
 		mode: "driving",
 	};
-
+	
 	const response = await axios.get(url, { params });
+	console.log(response)
 
 	if (response.data.status !== "OK") {
 		throw new Error(`Google Maps error: ${response.data.status}`);
@@ -25,4 +26,8 @@ export const getRouteFromGoogle = async (origin, destination) => {
 		durationText: leg.duration.text,
 		encodedPolyline: route.overview_polyline.points,
 	};
+};
+
+module.exports = {
+	getRouteFromGoogle,
 };

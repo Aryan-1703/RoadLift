@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
 	View,
 	Text,
@@ -8,95 +8,105 @@ import {
 	Alert,
 	TouchableOpacity,
 	Linking,
-	StatusBar,
 	Platform,
+	StatusBar,
 } from "react-native";
-import { useLocalSearchParams, router } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import axios from "axios";
 import * as Location from "expo-location";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import MapView, { Marker, Polyline } from "react-native-maps";
+import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import ModalHeader from "../_components/ModalHeader";
 import { useTheme } from "../_context/ThemeContext";
 import Colors from "../_constants/Colors";
-import { FontAwesome5 } from "@expo/vector-icons";
 import { API_URL } from "../config/constants";
-import fetchWithAuth from "../services/fetchWithAuth";
+import { useAuth } from "../_context/AuthContext";
+import { useSocket } from "../_context/SocketContext";
+import { FontAwesome5 } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const ActiveJobScreen = () => {
 	const { jobId } = useLocalSearchParams();
-	const [job, setJob] = useState(null);
-	const [isLoading, setIsLoading] = useState(true);
-	const [driverLocation, setDriverLocation] = useState(null);
-	const [routeCoords, setRouteCoords] = useState([]);
+	const router = useRouter();
+	const { token } = useAuth();
+	const { socket } = useSocket();
 	const { theme } = useTheme();
-	const isDarkMode = theme === "dark";
+
+	const [job, setJob] = useState(null);
+	const [driverLocation, setDriverLocation] = useState(null);
+	const [isLoading, setIsLoading] = useState(true);
+	const locationSubscription = useRef(null);
+
+	const isDark = theme === "dark";
 	const colors = Colors[theme];
 
+	// Effect to load job details and start location tracking
 	useEffect(() => {
-		const fetchJobDetails = async () => {
-			if (!jobId) return;
+		const loadJobAndStartTracking = async () => {
+			if (!jobId) {
+				setIsLoading(false);
+				return;
+			}
 			try {
-				const response = await fetchWithAuth(`${API_URL}/jobs/${jobId}`);
-				if (response) {
-					const data = await response.json();
-					setJob(data);
-				}
+				// Fetch job details
+				const response = await axios.get(`${API_URL}/jobs/${jobId}`, {
+					headers: { Authorization: `Bearer ${token}` },
+				});
+				setJob(response.data);
+
+				// Start watching the driver's position
+				locationSubscription.current = await Location.watchPositionAsync(
+					{
+						accuracy: Location.Accuracy.BestForNavigation,
+						timeInterval: 5000,
+						distanceInterval: 10,
+					},
+					loc => {
+						const newLocation = loc.coords;
+						setDriverLocation(newLocation);
+
+						// --- SEND LOCATION UPDATE TO BACKEND VIA SOCKET ---
+						if (socket && socket.connected) {
+							socket.emit("driver-location-update", {
+								jobId: jobId,
+								location: {
+									latitude: newLocation.latitude,
+									longitude: newLocation.longitude,
+								},
+							});
+						}
+					}
+				);
 			} catch (error) {
-				Alert.alert("Error", "Could not load job details.");
+				Alert.alert("Error", "Failed to load job details.");
 			} finally {
 				setIsLoading(false);
 			}
 		};
 
-		const fetchLocation = async () => {
-			const { status } = await Location.requestForegroundPermissionsAsync();
-			if (status !== "granted") return;
+		loadJobAndStartTracking();
 
-			const loc = await Location.getCurrentPositionAsync({});
-			setDriverLocation(loc.coords);
-		};
-
-		fetchJobDetails();
-		fetchLocation();
-	}, [jobId]);
-
-	useEffect(() => {
-		const getRoute = async () => {
-			if (!driverLocation || !job) return;
-
-			try {
-				const token = await AsyncStorage.getItem("token");
-				const res = await axios.get(
-					`${API_URL}/direction/get-directions?from=${driverLocation.latitude},${driverLocation.longitude}&to=${job.pickupLocation.coordinates[1]},${job.pickupLocation.coordinates[0]}`,
-					{
-						headers: { Authorization: `Bearer ${token}` },
-					}
-				);
-				if (res.data.polyline) {
-					setRouteCoords(res.data.polyline); // Assume it's an array of lat/lng
-				}
-			} catch (err) {
-				console.log("Failed to fetch directions", err.message);
+		// Cleanup function: stop watching location when the screen is unmounted
+		return () => {
+			if (locationSubscription.current) {
+				locationSubscription.current.remove();
 			}
 		};
+	}, [jobId, token, socket]);
 
-		getRoute();
-	}, [driverLocation, job]);
-
-	const openDirections = () => {
+	const openMaps = () => {
+		if (!job) return;
 		const { coordinates } = job.pickupLocation;
-		const lat = coordinates[1];
-		const lon = coordinates[0];
+
+		const [lon, lat] = coordinates;
 		const url = Platform.select({
 			ios: `maps:?daddr=${lat},${lon}`,
 			android: `geo:0,0?q=${lat},${lon}(Customer)`,
 		});
-		Linking.openURL(url);
+		if (url) Linking.openURL(url);
 	};
 
 	const handleCompleteJob = () => {
-		Alert.alert("Complete Job", "Are you sure you have completed this service?", [
+		Alert.alert("Complete Job", "Are you sure you've completed this job?", [
 			{ text: "Not Yet", style: "cancel" },
 			{
 				text: "Yes, Job is Done",
@@ -106,14 +116,12 @@ const ActiveJobScreen = () => {
 						await axios.put(
 							`${API_URL}/driver/jobs/${jobId}/complete`,
 							{},
-							{
-								headers: { Authorization: `Bearer ${token}` },
-							}
+							{ headers: { Authorization: `Bearer ${token}` } }
 						);
 						Alert.alert("Success", "Job marked as complete!");
 						router.back();
-					} catch (error) {
-						Alert.alert("Error", "Could not complete the job. Please try again.");
+					} catch {
+						Alert.alert("Error", "Failed to mark job as complete.");
 					}
 				},
 			},
@@ -128,57 +136,54 @@ const ActiveJobScreen = () => {
 		);
 	}
 
+	const { pickupLocation, serviceType, User, notes } = job;
+
 	return (
 		<SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-			<StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} />
+			<StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
 			<ModalHeader title="Active Job" />
 
 			<MapView
 				style={styles.map}
 				initialRegion={{
-					latitude: job.pickupLocation.coordinates[1],
-					longitude: job.pickupLocation.coordinates[0],
+					latitude: pickupLocation.coordinates[1],
+					longitude: pickupLocation.coordinates[0],
 					latitudeDelta: 0.05,
 					longitudeDelta: 0.05,
 				}}
 			>
-				{/* Pickup marker */}
+				{/* Customer Location */}
 				<Marker
 					coordinate={{
-						latitude: job.pickupLocation.coordinates[1],
-						longitude: job.pickupLocation.coordinates[0],
+						latitude: pickupLocation.coordinates[1],
+						longitude: pickupLocation.coordinates[0],
 					}}
 					title="Customer Location"
 					pinColor="green"
 				/>
 
-				{/* Driver marker */}
+				{/* Driver Location */}
 				{driverLocation && (
 					<Marker coordinate={driverLocation} title="Your Location" pinColor="blue" />
-				)}
-
-				{/* Route polyline */}
-				{routeCoords.length > 0 && (
-					<Polyline coordinates={routeCoords} strokeColor="blue" strokeWidth={4} />
 				)}
 			</MapView>
 
 			<View style={[styles.detailsContainer, { backgroundColor: colors.card }]}>
 				<Text style={[styles.serviceType, { color: colors.text }]}>
-					{job.serviceType.replace("-", " ").toUpperCase()}
+					{serviceType.replace("-", " ").toUpperCase()}
 				</Text>
 				<Text style={[styles.detailText, { color: colors.text }]}>
-					Customer: {job.User.name}
+					Customer: {User.name}
 				</Text>
-				{job.notes && (
+				{notes && (
 					<Text style={[styles.detailText, { color: colors.text, fontStyle: "italic" }]}>
-						Notes:{job.notes}
+						Notes: {notes}
 					</Text>
 				)}
 
 				<TouchableOpacity
 					style={[styles.button, { backgroundColor: colors.tint }]}
-					onPress={openDirections}
+					onPress={openMaps}
 				>
 					<FontAwesome5 name="directions" size={20} color="#fff" />
 					<Text style={styles.buttonText}>Get Directions</Text>
@@ -200,7 +205,11 @@ const styles = StyleSheet.create({
 	container: { flex: 1 },
 	center: { flex: 1, justifyContent: "center", alignItems: "center" },
 	map: { flex: 1 },
-	detailsContainer: { padding: 20, borderTopWidth: 1 },
+	detailsContainer: {
+		padding: 20,
+		borderTopWidth: 1,
+		borderTopColor: "#ccc",
+	},
 	serviceType: { fontSize: 24, fontWeight: "bold", marginBottom: 10 },
 	detailText: { fontSize: 16, marginBottom: 10, lineHeight: 22 },
 	button: {

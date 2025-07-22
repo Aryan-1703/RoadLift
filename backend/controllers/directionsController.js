@@ -1,15 +1,20 @@
-const { getRouteFromGoogle } = "../services/googleMapsService";
+const { getRouteFromGoogle } = require("../services/googleMapsService");
 
 const getDirections = async (req, res) => {
 	try {
-		const { origin, destination } = req.body;
+		const { from, to } = req.query;
 
-		if (!origin || !destination) {
-			return res.status(400).json({ error: "Missing origin or destination" });
+		if (!from || !to) {
+			return res.status(400).json({ error: "Missing 'from' or 'to' query parameters" });
 		}
 
-		const routeInfo = await getRouteFromGoogle(origin, destination);
+		const [fromLat, fromLng] = from.split(",").map(Number);
+		const [toLat, toLng] = to.split(",").map(Number);
 
+		const origin = { lat: fromLat, lng: fromLng };
+		const destination = { lat: toLat, lng: toLng };
+
+		const routeInfo = await getRouteFromGoogle(origin, destination);
 		return res.json(routeInfo);
 	} catch (error) {
 		console.error("Directions Error:", error.message);
