@@ -8,6 +8,7 @@ import {
 	Switch,
 	StatusBar,
 } from "react-native";
+import { useRouter } from "expo-router";
 import { useAuth } from "../_context/AuthContext";
 import { useTheme } from "../_context/ThemeContext";
 import Colors from "../_constants/Colors";
@@ -35,12 +36,11 @@ const SettingsScreen = () => {
 	const { theme, toggleTheme } = useTheme();
 	const isDarkMode = theme === "dark";
 	const colors = Colors[theme];
+	const router = useRouter();
 
 	// --- HANDLER ---
 	const handleLogout = async () => {
-		// This single function now handles clearing state, storage, and disconnecting the socket
 		await logout();
-		// Navigation is handled automatically by the app/index.tsx gatekeeper
 	};
 
 	// --- RENDER ---
@@ -63,6 +63,13 @@ const SettingsScreen = () => {
 				</SettingsRow>
 				<SettingsRow icon="user-circle" label="Account" colors={colors}>
 					<FontAwesome5 name="chevron-right" size={16} color={colors.tabIconDefault} />
+				</SettingsRow>
+			</View>
+			<View style={[styles.settingsGroup, { backgroundColor: colors.card }]}>
+				<SettingsRow icon="wallet" label="Payment Methods" colors={colors}>
+					<TouchableOpacity onPress={() => router.push("/add-payment")}>
+						<FontAwesome5 name="chevron-right" size={16} color={colors.tabIconDefault} />
+					</TouchableOpacity>
 				</SettingsRow>
 			</View>
 

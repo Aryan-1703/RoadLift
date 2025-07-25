@@ -20,6 +20,10 @@ module.exports = sequelize => {
 			type: DataTypes.STRING,
 			allowNull: false,
 		},
+		stripeCustomerId: {
+			type: DataTypes.STRING,
+			allowNull: true,
+		},
 	});
 
 	return User;

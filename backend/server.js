@@ -2,9 +2,7 @@ require("dotenv").config();
 const express = require("express");
 const http = require("http"); // Required to attach socket.io
 const cors = require("cors");
-const { Job
-
-} = require("./models");
+const { Job } = require("./models");
 
 const db = require("./models");
 const io = require("./socket"); // Import our shared, singleton socket instance
@@ -27,12 +25,14 @@ const jobRoutes = require("./routes/jobRoutes");
 const driverRoutes = require("./routes/driverRoutes");
 const utilsRoutes = require("./routes/utils");
 const directionsRoutes = require("./routes/directionsRoutes");
+const paymentRoutes = require("./routes/paymentRoutes");
 
 app.use("/api/auth", authRoutes);
 app.use("/api/jobs", jobRoutes);
 app.use("/api/driver", driverRoutes);
 app.use("/api/utils", utilsRoutes);
 app.use("/api/direction", directionsRoutes);
+app.use("/api/payments", paymentRoutes);
 
 // --- HEALTH CHECK ROUTE ---
 app.get("/", (req, res) => {
