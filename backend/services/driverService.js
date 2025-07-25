@@ -106,8 +106,9 @@ async function createStripeOnboardingLink(driverId) {
 	// 2. Create the one-time onboarding link for the account
 	const accountLink = await stripe.accountLinks.create({
 		account: accountId,
-		refresh_url: "towlink://onboarding-failed",
-		return_url: "towlink://onboarding-success",
+		// Use a real URL format.
+		refresh_url: "https://your-towlink-app.com/stripe-onboarding/refresh",
+		return_url: "https://your-towlink-app.com/stripe-onboarding/success",
 		type: "account_onboarding",
 	});
 
@@ -119,5 +120,4 @@ module.exports = {
 	updateStatus,
 	completeJob,
 	createStripeOnboardingLink,
-	accountLink,
 };

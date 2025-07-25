@@ -12,7 +12,7 @@ export default ({ config }) => {
 		version: "1.0.0",
 		orientation: "portrait",
 		icon: "./assets/images/icon.png",
-		scheme: "TowLink",
+		scheme: "towlink", // Corrected the casing to be consistent
 		userInterfaceStyle: "automatic",
 		web: {
 			bundler: "metro",
@@ -43,7 +43,7 @@ export default ({ config }) => {
 			typedRoutes: true,
 		},
 		extra: {
-			...config.extra, // Spread any extra config from plugins etc.
+			...config.extra,
 			router: {},
 			eas: {
 				projectId: "91e4237a-aa54-4ef7-a29d-2bc0cfa3683e",
@@ -53,24 +53,41 @@ export default ({ config }) => {
 
 		// --- DYNAMICALLY CONFIGURED SECTIONS ---
 		android: {
-			...config.android, // Spread existing android properties
+			...config.android,
 			adaptiveIcon: {
 				foregroundImage: "./assets/images/adaptive-icon.png",
 				backgroundColor: "#ffffff",
 			},
+			package: "com.aryan1703.TowLink", // Recommended to add package name
 			edgeToEdgeEnabled: true,
-			// Add the config object for Google Maps API key
 			config: {
 				googleMaps: {
 					apiKey: process.env.GOOGLE_MAPS_API_KEY,
 				},
 			},
+			// --- NEW: App Links Configuration for Android ---
+			intentFilters: [
+				{
+					action: "VIEW",
+					autoVerify: true,
+					data: [
+						{
+							scheme: "https",
+							// Replace 'app.tow.link' with your actual domain
+							host: "app.tow.link",
+							pathPrefix: "/stripe-onboarding",
+						},
+					],
+					category: ["BROWSABLE", "DEFAULT"],
+				},
+			],
 		},
 		ios: {
-			...config.ios, // Spread existing ios properties
+			...config.ios,
 			bundleIdentifier: "com.aryan1703.TowLink",
 			supportsTablet: true,
-			// Add the config object for Google Maps API key
+			// --- NEW: Universal Links Configuration for iOS ---
+			associatedDomains: ["applinks:app.tow.link"], // Replace with your domain
 			config: {
 				googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY,
 			},
