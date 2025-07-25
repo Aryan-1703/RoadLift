@@ -18,9 +18,10 @@ export default function RootLayout() {
 						<Stack.Screen name="register" />
 						<Stack.Screen name="request-confirmation" />
 						<Stack.Screen name="finding-driver" />
-						<Stack.Screen name="active-job" options={{ presentation: "modal" }} />
+						<Stack.Screen name="active-job" />
 						<Stack.Screen name="tabs" />
 						<Stack.Screen name="live-tracking" />
+						<Stack.Screen name="rate-experience" />
 					</Stack>
 				</ThemeProvider>
 			</SocketProvider>

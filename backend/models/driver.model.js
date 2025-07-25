@@ -22,6 +22,14 @@ module.exports = sequelize => {
 		},
 		currentLocation: DataTypes.GEOMETRY("POINT", 4326),
 		pushToken: { type: DataTypes.STRING },
+		stripeAccountId: {
+			type: DataTypes.STRING,
+			allowNull: true,
+		},
+		stripePayoutsEnabled: {
+			type: DataTypes.BOOLEAN,
+			defaultValue: false,
+		},
 	});
 	return Driver;
 };

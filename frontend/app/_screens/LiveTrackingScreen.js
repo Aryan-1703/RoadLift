@@ -6,6 +6,7 @@ import {
 	StyleSheet,
 	ActivityIndicator,
 	Alert,
+	Linking,
 	StatusBar,
 	TouchableOpacity,
 } from "react-native";
@@ -87,19 +88,29 @@ const LiveTrackingScreen = () => {
 	// Effect to zoom map to fit both markers
 	useEffect(() => {
 		if (mapRef.current && jobDetails?.pickupLocation && driverLocation) {
-			const markers = [
+			mapRef.current.fitToCoordinates(
+				[
+					{
+						latitude: jobDetails.pickupLocation.coordinates[1],
+						longitude: jobDetails.pickupLocation.coordinates[0],
+					},
+					driverLocation,
+				],
 				{
-					latitude: jobDetails.pickupLocation.coordinates[1],
-					longitude: jobDetails.pickupLocation.coordinates[0],
-				},
-				driverLocation,
-			];
-			mapRef.current.fitToCoordinates(markers, {
-				edgePadding: { top: 100, right: 50, bottom: 250, left: 50 }, // More bottom padding for the info card
-				animated: true,
-			});
+					edgePadding: { top: 100, right: 50, bottom: 250, left: 50 },
+					animated: true,
+				}
+			);
 		}
 	}, [driverLocation, jobDetails]);
+
+	const handleCallDriver = () => {
+		if (jobDetails?.Driver?.phoneNumber) {
+			Linking.openURL(`tel:${jobDetails.Driver.phoneNumber}`);
+		} else {
+			Alert.alert("Error", "Driver's phone number is not available.");
+		}
+	};
 
 	// --- RENDER ---
 	if (isLoading) {
@@ -118,6 +129,39 @@ const LiveTrackingScreen = () => {
 		);
 	}
 
+	if (isJobComplete) {
+		return (
+			<SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+				<View style={styles.center}>
+					<FontAwesome5 name="check-circle" size={80} color="#34c759" />
+					<Text style={[styles.statusText, { color: colors.text, marginTop: 20 }]}>
+						Service Complete!
+					</Text>
+					<Text
+						style={[
+							styles.subText,
+							{ color: colors.tabIconDefault, textAlign: "center" },
+						]}
+					>
+						Thank you for using TowLink.
+					</Text>
+					<TouchableOpacity
+						style={[styles.button, { backgroundColor: colors.tint, marginTop: 30 }]}
+						onPress={() =>
+							router.replace({
+								pathname: "/rate-experience",
+								params: { jobId, driverId: jobDetails?.Driver?.id },
+							})
+						}
+					>
+						<Text style={styles.buttonText}>Rate Your Experience</Text>
+					</TouchableOpacity>
+				</View>
+			</SafeAreaView>
+		);
+	}
+
+	// Main tracking UI
 	return (
 		<SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
 			<StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} />
@@ -133,73 +177,43 @@ const LiveTrackingScreen = () => {
 				}}
 				customMapStyle={isDarkMode ? mapStyleDark : []}
 			>
-				{/* Customer Pickup Location */}
 				<Marker
-					identifier="pickup"
 					coordinate={{
 						latitude: jobDetails.pickupLocation.coordinates[1],
 						longitude: jobDetails.pickupLocation.coordinates[0],
 					}}
 					title="Pickup Location"
 				>
-					<FontAwesome5 name="user-alt" size={24} color="green" />
+					<FontAwesome5 name="map-pin" size={30} color="#34c759" />
 				</Marker>
-
-				{/* Driver's Live Location */}
 				{driverLocation && (
-					<Marker identifier="driver" coordinate={driverLocation} title="Your Driver">
-						<FontAwesome5 name="truck" size={24} color={colors.tint} />
+					<Marker coordinate={driverLocation} title="Your Driver">
+						<FontAwesome5 name="truck" size={30} color={colors.tint} />
 					</Marker>
 				)}
 			</MapView>
 
-			{isJobComplete ? (
-				<View
-					style={[
-						styles.statusContainer,
-						{ backgroundColor: colors.card, borderTopColor: colors.border },
-					]}
-				>
-					<FontAwesome5
-						name="check-circle"
-						size={32}
-						color="#34c759"
-						style={{ alignSelf: "center", marginBottom: 15 }}
-					/>
-					<Text style={[styles.statusText, { color: colors.text, textAlign: "center" }]}>
-						Service Complete!
+			<View
+				style={[
+					styles.statusContainer,
+					{ backgroundColor: colors.card, borderTopColor: colors.border },
+				]}
+			>
+				<Text style={[styles.statusText, { color: colors.text }]}>
+					{jobDetails.Driver?.name || "Your driver"} is on the way!
+				</Text>
+				<View style={styles.driverInfoRow}>
+					<Text style={[styles.subText, { color: colors.tabIconDefault }]}>
+						Black Ford F-150
 					</Text>
-					<Text
-						style={[
-							styles.subText,
-							{ color: colors.tabIconDefault, textAlign: "center", marginBottom: 20 },
-						]}
-					>
-						Thank you for using TowLink.
-					</Text>
-					<TouchableOpacity
-						style={[styles.button, { backgroundColor: colors.tint }]}
-						onPress={() => alert("Navigate to Rating Screen!")} // Later: router.push('/rate-driver')
-					>
-						<Text style={styles.buttonText}>Rate Your Driver</Text>
+					<TouchableOpacity style={styles.callButton} onPress={handleCallDriver}>
+						<FontAwesome5 name="phone-alt" size={16} color={colors.tint} />
+						<Text style={[styles.callButtonText, { color: colors.tint }]}>
+							Call Driver
+						</Text>
 					</TouchableOpacity>
 				</View>
-			) : (
-				<View
-					style={[
-						styles.statusContainer,
-						{ backgroundColor: colors.card, borderTopColor: colors.border },
-					]}
-				>
-					<Text style={[styles.statusText, { color: colors.text }]}>
-						Your driver is on the way!
-					</Text>
-					<Text style={[styles.subText, { color: colors.tabIconDefault }]}>
-						Awaiting driver arrival...
-					</Text>
-					{/* Add more info like driver name, car, etc. here */}
-				</View>
-			)}
+			</View>
 		</SafeAreaView>
 	);
 };
@@ -229,6 +243,14 @@ const styles = StyleSheet.create({
 	subText: { fontSize: 16 },
 	button: { padding: 15, borderRadius: 12, alignItems: "center" },
 	buttonText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
+	driverInfoRow: {
+		flexDirection: "row",
+		justifyContent: "space-between",
+		alignItems: "center",
+		marginTop: 8,
+	},
+	callButton: { flexDirection: "row", alignItems: "center", padding: 8 },
+	callButtonText: { fontWeight: "bold", marginLeft: 8, fontSize: 16 },
 });
 
 // --- DARK MAP STYLE ---

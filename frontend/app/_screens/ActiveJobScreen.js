@@ -15,19 +15,19 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import axios from "axios";
 import * as Location from "expo-location";
 import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
+import { FontAwesome5 } from "@expo/vector-icons";
 import ModalHeader from "../_components/ModalHeader";
 import { useTheme } from "../_context/ThemeContext";
 import Colors from "../_constants/Colors";
 import { API_URL } from "../config/constants";
 import { useAuth } from "../_context/AuthContext";
 import { useSocket } from "../_context/SocketContext";
-import { FontAwesome5 } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const ActiveJobScreen = () => {
+	// --- HOOKS & STATE ---
 	const { jobId } = useLocalSearchParams();
 	const router = useRouter();
-	const { token } = useAuth();
+	const { token } = useAuth(); // Use AuthContext for the token
 	const { socket } = useSocket();
 	const { theme } = useTheme();
 
@@ -36,13 +36,13 @@ const ActiveJobScreen = () => {
 	const [isLoading, setIsLoading] = useState(true);
 	const locationSubscription = useRef(null);
 
-	const isDark = theme === "dark";
+	const isDarkMode = theme === "dark";
 	const colors = Colors[theme];
 
-	// Effect to load job details and start location tracking
+	// --- EFFECT TO LOAD JOB AND START TRACKING ---
 	useEffect(() => {
 		const loadJobAndStartTracking = async () => {
-			if (!jobId) {
+			if (!jobId || !token) {
 				setIsLoading(false);
 				return;
 			}
@@ -57,14 +57,14 @@ const ActiveJobScreen = () => {
 				locationSubscription.current = await Location.watchPositionAsync(
 					{
 						accuracy: Location.Accuracy.BestForNavigation,
-						timeInterval: 5000,
-						distanceInterval: 10,
+						timeInterval: 5000, // 5 seconds
+						distanceInterval: 10, // 10 meters
 					},
 					loc => {
 						const newLocation = loc.coords;
 						setDriverLocation(newLocation);
 
-						// --- SEND LOCATION UPDATE TO BACKEND VIA SOCKET ---
+						// Send location update to backend via socket
 						if (socket && socket.connected) {
 							socket.emit("driver-location-update", {
 								jobId: jobId,
@@ -77,6 +77,7 @@ const ActiveJobScreen = () => {
 					}
 				);
 			} catch (error) {
+				console.error("Failed to load job details:", error);
 				Alert.alert("Error", "Failed to load job details.");
 			} finally {
 				setIsLoading(false);
@@ -85,7 +86,7 @@ const ActiveJobScreen = () => {
 
 		loadJobAndStartTracking();
 
-		// Cleanup function: stop watching location when the screen is unmounted
+		// Cleanup function to stop watching location when the screen is unmounted
 		return () => {
 			if (locationSubscription.current) {
 				locationSubscription.current.remove();
@@ -93,10 +94,10 @@ const ActiveJobScreen = () => {
 		};
 	}, [jobId, token, socket]);
 
+	// --- HANDLERS ---
 	const openMaps = () => {
 		if (!job) return;
 		const { coordinates } = job.pickupLocation;
-
 		const [lon, lat] = coordinates;
 		const url = Platform.select({
 			ios: `maps:?daddr=${lat},${lon}`,
@@ -106,13 +107,13 @@ const ActiveJobScreen = () => {
 	};
 
 	const handleCompleteJob = () => {
-		Alert.alert("Complete Job", "Are you sure you've completed this job?", [
+		Alert.alert("Complete Job", "Are you sure you have completed this service?", [
 			{ text: "Not Yet", style: "cancel" },
 			{
 				text: "Yes, Job is Done",
 				onPress: async () => {
 					try {
-						const token = await AsyncStorage.getItem("token");
+						// Use the token from AuthContext
 						await axios.put(
 							`${API_URL}/driver/jobs/${jobId}/complete`,
 							{},
@@ -120,7 +121,7 @@ const ActiveJobScreen = () => {
 						);
 						Alert.alert("Success", "Job marked as complete!");
 						router.back();
-					} catch {
+					} catch (error) {
 						Alert.alert("Error", "Failed to mark job as complete.");
 					}
 				},
@@ -128,6 +129,7 @@ const ActiveJobScreen = () => {
 		]);
 	};
 
+	// --- RENDER ---
 	if (isLoading || !job) {
 		return (
 			<View style={[styles.center, { backgroundColor: colors.background }]}>
@@ -140,35 +142,45 @@ const ActiveJobScreen = () => {
 
 	return (
 		<SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-			<StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
+			<StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} />
 			<ModalHeader title="Active Job" />
 
 			<MapView
 				style={styles.map}
+				provider={PROVIDER_GOOGLE} // Explicitly use Google Maps
 				initialRegion={{
 					latitude: pickupLocation.coordinates[1],
 					longitude: pickupLocation.coordinates[0],
 					latitudeDelta: 0.05,
 					longitudeDelta: 0.05,
 				}}
+				customMapStyle={isDarkMode ? mapStyleDark : []}
 			>
-				{/* Customer Location */}
+				{/* Customer Location Marker */}
 				<Marker
 					coordinate={{
 						latitude: pickupLocation.coordinates[1],
 						longitude: pickupLocation.coordinates[0],
 					}}
 					title="Customer Location"
-					pinColor="green"
-				/>
+				>
+					<FontAwesome5 name="map-pin" size={30} color="#34c759" />
+				</Marker>
 
-				{/* Driver Location */}
+				{/* Driver's Live Location Marker */}
 				{driverLocation && (
-					<Marker coordinate={driverLocation} title="Your Location" pinColor="blue" />
+					<Marker coordinate={driverLocation} title="Your Location">
+						<FontAwesome5 name="truck" size={30} color={colors.tint} />
+					</Marker>
 				)}
 			</MapView>
 
-			<View style={[styles.detailsContainer, { backgroundColor: colors.card }]}>
+			<View
+				style={[
+					styles.detailsContainer,
+					{ backgroundColor: colors.card, borderTopColor: colors.border },
+				]}
+			>
 				<Text style={[styles.serviceType, { color: colors.text }]}>
 					{serviceType.replace("-", " ").toUpperCase()}
 				</Text>
@@ -205,11 +217,7 @@ const styles = StyleSheet.create({
 	container: { flex: 1 },
 	center: { flex: 1, justifyContent: "center", alignItems: "center" },
 	map: { flex: 1 },
-	detailsContainer: {
-		padding: 20,
-		borderTopWidth: 1,
-		borderTopColor: "#ccc",
-	},
+	detailsContainer: { padding: 20, borderTopWidth: 1 },
 	serviceType: { fontSize: 24, fontWeight: "bold", marginBottom: 10 },
 	detailText: { fontSize: 16, marginBottom: 10, lineHeight: 22 },
 	button: {
@@ -221,5 +229,71 @@ const styles = StyleSheet.create({
 	},
 	buttonText: { color: "#fff", fontSize: 18, fontWeight: "bold", marginLeft: 10 },
 });
+
+// --- DARK MAP STYLE ---
+const mapStyleDark = [
+	{ elementType: "geometry", stylers: [{ color: "#242f3e" }] },
+	{ elementType: "labels.text.fill", stylers: [{ color: "#746855" }] },
+	{ elementType: "labels.text.stroke", stylers: [{ color: "#242f3e" }] },
+	{
+		featureType: "administrative.locality",
+		elementType: "labels.text.fill",
+		stylers: [{ color: "#d59563" }],
+	},
+	{
+		featureType: "poi",
+		elementType: "labels.text.fill",
+		stylers: [{ color: "#d59563" }],
+	},
+	{ featureType: "poi.park", elementType: "geometry", stylers: [{ color: "#263c3f" }] },
+	{
+		featureType: "poi.park",
+		elementType: "labels.text.fill",
+		stylers: [{ color: "#6b9a76" }],
+	},
+	{ featureType: "road", elementType: "geometry", stylers: [{ color: "#38414e" }] },
+	{
+		featureType: "road",
+		elementType: "geometry.stroke",
+		stylers: [{ color: "#212a37" }],
+	},
+	{
+		featureType: "road",
+		elementType: "labels.text.fill",
+		stylers: [{ color: "#9ca5b3" }],
+	},
+	{
+		featureType: "road.highway",
+		elementType: "geometry",
+		stylers: [{ color: "#746855" }],
+	},
+	{
+		featureType: "road.highway",
+		elementType: "geometry.stroke",
+		stylers: [{ color: "#1f2835" }],
+	},
+	{
+		featureType: "road.highway",
+		elementType: "labels.text.fill",
+		stylers: [{ color: "#f3d19c" }],
+	},
+	{ featureType: "transit", elementType: "geometry", stylers: [{ color: "#2f3948" }] },
+	{
+		featureType: "transit.station",
+		elementType: "labels.text.fill",
+		stylers: [{ color: "#d59563" }],
+	},
+	{ featureType: "water", elementType: "geometry", stylers: [{ color: "#17263c" }] },
+	{
+		featureType: "water",
+		elementType: "labels.text.fill",
+		stylers: [{ color: "#515c6d" }],
+	},
+	{
+		featureType: "water",
+		elementType: "labels.text.stroke",
+		stylers: [{ color: "#17263c" }],
+	},
+];
 
 export default ActiveJobScreen;

@@ -108,6 +108,16 @@ const removePushToken = async (req, res) => {
 		res.status(500).json({ message: "Failed to remove push token." });
 	}
 };
+const createStripeOnboardingLink = async (req, res) => {
+	try {
+		const driverId = req.user.id;
+		const accountLink = await driverService.createStripeOnboardingLink(driverId);
+		res.status(200).json(accountLink);
+	} catch (error) {
+		console.error("Failed to create Stripe onboarding link:", error);
+		res.status(500).json({ message: "Server error while creating onboarding link." });
+	}
+};
 
 module.exports = {
 	getAvailableJobs,
@@ -116,4 +126,5 @@ module.exports = {
 	updateStatus,
 	storePushToken,
 	removePushToken,
+	createStripeOnboardingLink,
 };

@@ -6,6 +6,7 @@ const {
 	completeJob,
 	updateStatus,
 	storePushToken,
+	createStripeOnboardingLink,
 	removePushToken,
 } = require("../controllers/driverController");
 const { protect, protectDriver } = require("../middleware/authMiddleware");
@@ -19,5 +20,6 @@ router.put("/jobs/:jobId/complete", protect, protectDriver, completeJob);
 router.put("/status", protect, protectDriver, updateStatus);
 router.post("/store-push-token", protect, protectDriver, storePushToken);
 router.delete("/remove-push-token", protect, protectDriver, removePushToken);
+router.post("/stripe-onboarding", protect, protectDriver, createStripeOnboardingLink);
 
 module.exports = router;

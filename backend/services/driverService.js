@@ -1,5 +1,6 @@
 const { Job, User, sequelize, Driver } = require("../models");
 const io = require("../socket");
+const stripe = require("../config/stripe");
 
 async function getAvailableJobs() {
 	// Find all jobs that are pending and include the name of the user who requested it.
@@ -56,8 +57,6 @@ async function updateStatus(driverId, isActive) {
 	return driver;
 }
 
-// In driverService.js
-// ...
 async function completeJob(jobId, driverId) {
 	const job = await Job.findByPk(jobId);
 	if (!job) throw new Error("Job not found.");
@@ -78,4 +77,47 @@ async function completeJob(jobId, driverId) {
 
 	return job;
 }
-module.exports = { getAvailableJobs, acceptJob, updateStatus, completeJob };
+
+async function createStripeOnboardingLink(driverId) {
+	const driver = await Driver.findByPk(driverId);
+	if (!driver) throw new Error("Driver not found.");
+
+	let accountId = driver.stripeAccountId;
+
+	// 1. Create a new Stripe Connected Account if the driver doesn't have one yet
+	if (!accountId) {
+		const account = await stripe.accounts.create({
+			type: "express", // 'express' is the easiest for marketplaces
+			email: driver.email, // Assuming you add an email field to your Driver model
+			business_type: "individual",
+			// You can pre-fill information you already have
+			individual: {
+				first_name: driver.name.split(" ")[0],
+				last_name: driver.name.split(" ").slice(1).join(" "),
+				phone: driver.phoneNumber,
+			},
+		});
+		accountId = account.id;
+		// Save the new accountId to our database
+		driver.stripeAccountId = accountId;
+		await driver.save();
+	}
+
+	// 2. Create the one-time onboarding link for the account
+	const accountLink = await stripe.accountLinks.create({
+		account: accountId,
+		refresh_url: "towlink://onboarding-failed",
+		return_url: "towlink://onboarding-success",
+		type: "account_onboarding",
+	});
+
+	return { url: accountLink.url };
+}
+module.exports = {
+	getAvailableJobs,
+	acceptJob,
+	updateStatus,
+	completeJob,
+	createStripeOnboardingLink,
+	accountLink,
+};

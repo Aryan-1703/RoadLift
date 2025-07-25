@@ -1,5 +1,5 @@
 const { Op } = require("sequelize");
-const { Job, User, Driver, sequelize } = require("../models");
+const { Job, User, Driver, sequelize, Review } = require("../models");
 const io = require("../socket");
 const { sendPushNotification } = require("../utils/sendPushNotification");
 /**
@@ -74,10 +74,13 @@ async function cancelJob(jobId, userId) {
 
 async function getJobById(jobId) {
 	const job = await Job.findByPk(jobId, {
-		// Include the User model to get the customer's name
 		include: [
 			{
-				model: User,
+				model: User, // Customer details
+				attributes: ["id", "name", "phoneNumber"],
+			},
+			{
+				model: Driver, // --- NEW: Driver details ---
 				attributes: ["id", "name", "phoneNumber"],
 			},
 		],
@@ -102,10 +105,51 @@ async function completeJob(jobId, driverId) {
 	return job;
 }
 
-// We will add findNearestDriver logic back here later
+async function submitReview(jobId, reviewData, author) {
+	const { rating, comment } = reviewData;
+	const { id: authorId, role: authorRole } = author;
+
+	const job = await Job.findByPk(jobId);
+	if (!job) throw new Error("Job not found.");
+
+	// Security check: Only the customer or the assigned driver can review this job.
+	if (job.userId !== authorId && job.driverId !== authorId) {
+		throw new Error("Forbidden");
+	}
+
+	// Check if a review already exists for this job
+	const existingReview = await Review.findOne({ where: { jobId } });
+	if (existingReview) {
+		// Update the existing review (e.g., driver adds their rating after the user)
+		if (authorRole === "driver") {
+			existingReview.userRating = rating;
+		} else {
+			existingReview.driverRating = rating;
+		}
+		existingReview.comment = existingReview.comment
+			? `${existingReview.comment}\n\n${comment}`
+			: comment; // Append comments or handle as needed
+		await existingReview.save();
+		return existingReview;
+	} else {
+		// Create a new review
+		const newReview = await Review.create({
+			jobId,
+			userId: job.userId,
+			driverId: job.driverId,
+			driverRating: authorRole === "user" ? rating : null,
+			userRating: authorRole === "driver" ? rating : null,
+			comment,
+			authorRole,
+		});
+		return newReview;
+	}
+}
+
 module.exports = {
 	createJob,
 	cancelJob,
 	completeJob,
 	getJobById,
+	submitReview,
 };

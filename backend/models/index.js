@@ -6,7 +6,8 @@ db.sequelize = sequelize;
 // Import models
 db.Driver = require("./driver.model")(sequelize);
 db.Job = require("./job.model")(sequelize);
-db.User = require("./user.model")(sequelize); // Import the new User model
+db.User = require("./user.model")(sequelize);
+db.Review = require("./review.model")(sequelize);
 
 // --- Define Relationships ---
 
@@ -17,5 +18,19 @@ db.Job.belongsTo(db.User, { foreignKey: "userId" });
 // A Job is assigned to one Driver
 db.Driver.hasMany(db.Job, { foreignKey: "driverId" });
 db.Job.belongsTo(db.Driver, { foreignKey: "driverId" });
+
+db.Review = require("./review.model")(sequelize);
+
+// A Job can have one Review
+db.Job.hasOne(db.Review, { foreignKey: "jobId" });
+db.Review.belongsTo(db.Job, { foreignKey: "jobId" });
+
+// A User can write many Reviews (as a customer)
+db.User.hasMany(db.Review, { foreignKey: "userId" });
+db.Review.belongsTo(db.User, { foreignKey: "userId" });
+
+// A Driver can write many Reviews (as a driver)
+db.Driver.hasMany(db.Review, { foreignKey: "driverId" });
+db.Review.belongsTo(db.Driver, { foreignKey: "driverId" });
 
 module.exports = db;

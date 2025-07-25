@@ -62,8 +62,27 @@ const getJobById = async (req, res) => {
 	}
 };
 
+const submitReview = async (req, res) => {
+	try {
+		const { jobId } = req.params;
+		const reviewData = req.body; // { rating, comment }
+		const author = { id: req.user.id, role: req.role };
+
+		const review = await jobService.submitReview(jobId, reviewData, author);
+		res.status(201).json(review);
+	} catch (error) {
+		if (error.message === "Forbidden") {
+			return res
+				.status(403)
+				.json({ message: "You are not authorized to review this job." });
+		}
+		res.status(500).json({ message: "Server error while submitting review." });
+	}
+};
+
 module.exports = {
 	createJob,
 	cancelJob,
+	submitReview,
 	getJobById,
 };
