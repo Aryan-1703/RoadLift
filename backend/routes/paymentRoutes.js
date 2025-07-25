@@ -1,10 +1,18 @@
 const express = require("express");
 const router = express.Router();
-const { createSetupIntent } = require("../controllers/paymentController");
+const {
+	createSetupIntent,
+	getPaymentMethods,
+} = require("../controllers/paymentController");
 const { protect } = require("../middleware/authMiddleware");
 
-// POST /api/payments/create-setup-intent
-// This is the endpoint our app will call to start the process.
+// The endpoint to initialize the Stripe Payment Sheet.
 router.post("/create-setup-intent", protect, createSetupIntent);
+// The new endpoint to get a list of a customer's saved cards.
+router.get("/methods", protect, getPaymentMethods);
+// PUT /api/payments/set-default
+router.put("/set-default", protect, setAsDefault);
+// DELETE /api/payments/methods/:paymentMethodId
+router.delete("/methods/:paymentMethodId", protect, deletePaymentMethod);
 
 module.exports = router;

@@ -6,6 +6,7 @@ import {
 	SafeAreaView,
 	TouchableOpacity,
 	Switch,
+	Pressable,
 	StatusBar,
 } from "react-native";
 import { useRouter } from "expo-router";
@@ -14,9 +15,12 @@ import { useTheme } from "../_context/ThemeContext";
 import Colors from "../_constants/Colors";
 import { FontAwesome5 } from "@expo/vector-icons";
 
-// A reusable component for each settings row, now fully themed
-const SettingsRow = ({ icon, label, children, colors }) => (
-	<View style={[styles.row, { borderBottomColor: colors.border }]}>
+const SettingsRow = ({ icon, label, children, colors, onPress }) => (
+	<TouchableOpacity
+		onPress={onPress}
+		disabled={!onPress}
+		style={[styles.row, { borderBottomColor: colors.border }]}
+	>
 		<View style={styles.labelContainer}>
 			<FontAwesome5
 				name={icon}
@@ -27,7 +31,7 @@ const SettingsRow = ({ icon, label, children, colors }) => (
 			<Text style={[styles.labelText, { color: colors.text }]}>{label}</Text>
 		</View>
 		<View>{children}</View>
-	</View>
+	</TouchableOpacity>
 );
 
 const SettingsScreen = () => {
@@ -56,20 +60,26 @@ const SettingsScreen = () => {
 					<Switch
 						trackColor={{ false: "#767577", true: colors.tint }}
 						thumbColor={isDarkMode ? colors.tint : "#f4f3f4"}
-						ios_backgroundColor="#3e3e3e"
 						onValueChange={toggleTheme}
 						value={isDarkMode}
 					/>
 				</SettingsRow>
-				<SettingsRow icon="user-circle" label="Account" colors={colors}>
+				<SettingsRow
+					icon="user-circle"
+					label="Account"
+					colors={colors}
+					onPress={() => alert("Account screen coming soon!")}
+				>
 					<FontAwesome5 name="chevron-right" size={16} color={colors.tabIconDefault} />
 				</SettingsRow>
-			</View>
-			<View style={[styles.settingsGroup, { backgroundColor: colors.card }]}>
-				<SettingsRow icon="wallet" label="Payment Methods" colors={colors}>
-					<TouchableOpacity onPress={() => router.push("/add-payment")}>
-						<FontAwesome5 name="chevron-right" size={16} color={colors.tabIconDefault} />
-					</TouchableOpacity>
+				{/* --- CORRECTED NAVIGATION --- */}
+				<SettingsRow
+					icon="wallet"
+					label="Payment Methods"
+					colors={colors}
+					onPress={() => router.push("/payment-methods")}
+				>
+					<FontAwesome5 name="chevron-right" size={16} color={colors.tabIconDefault} />
 				</SettingsRow>
 			</View>
 
@@ -80,7 +90,6 @@ const SettingsScreen = () => {
 	);
 };
 
-// --- STYLESHEET (Layout & Themed) ---
 const styles = StyleSheet.create({
 	container: { flex: 1 },
 	header: { padding: 20, borderBottomWidth: StyleSheet.hairlineWidth },

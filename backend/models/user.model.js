@@ -24,6 +24,10 @@ module.exports = sequelize => {
 			type: DataTypes.STRING,
 			allowNull: true,
 		},
+		defaultPaymentMethodId: {
+			type: DataTypes.STRING,
+			allowNull: true,
+		},
 	});
 
 	return User;

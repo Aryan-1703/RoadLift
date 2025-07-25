@@ -12,9 +12,9 @@ export default function RootLayout() {
 		<StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY}>
 			<ThemeProvider>
 				{/* 2. SocketProvider is next. It also has no internal dependencies. */}
-				<SocketProvider>
-					{/* 3. AuthProvider is LAST. It depends on useSocket(), so it MUST be inside <SocketProvider>. */}
-					<AuthProvider>
+				<AuthProvider>
+					<SocketProvider>
+						{/* 3. AuthProvider is LAST. It depends on useSocket(), so it MUST be inside <SocketProvider>. */}
 						{/* 4. The Stack navigator is the final child, so all components within it
                                can access every context (Auth, Socket, Theme). */}
 						<Stack
@@ -35,10 +35,12 @@ export default function RootLayout() {
 							<Stack.Screen name="tabs" />
 							<Stack.Screen name="driver-tabs" />
 							<Stack.Screen name="live-tracking" />
+							<Stack.Screen name="rate-experience" />
 							<Stack.Screen name="add-payment" options={{ presentation: "modal" }} />
+							<Stack.Screen name="payment-methods" />
 						</Stack>
-					</AuthProvider>
-				</SocketProvider>
+					</SocketProvider>
+				</AuthProvider>
 			</ThemeProvider>
 		</StripeProvider>
 	);

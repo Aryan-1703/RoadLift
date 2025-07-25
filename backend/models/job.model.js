@@ -41,6 +41,15 @@ module.exports = sequelize => {
 			type: DataTypes.TEXT,
 			allowNull: true,
 		},
+		paymentMethodId: {
+			type: DataTypes.STRING,
+			allowNull: true,
+		},
+		paymentIntentId: {
+			// Crucial for tracking the Stripe transaction
+			type: DataTypes.STRING,
+			allowNull: true,
+		},
 	});
 
 	return Job;
