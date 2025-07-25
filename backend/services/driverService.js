@@ -56,4 +56,26 @@ async function updateStatus(driverId, isActive) {
 	return driver;
 }
 
-module.exports = { getAvailableJobs, acceptJob, updateStatus };
+// In driverService.js
+// ...
+async function completeJob(jobId, driverId) {
+	const job = await Job.findByPk(jobId);
+	if (!job) throw new Error("Job not found.");
+	if (job.driverId !== driverId) throw new Error("Forbidden");
+	if (job.status !== "accepted") throw new Error("This job is not in an accepted state.");
+
+	job.status = "completed";
+	await job.save();
+
+	// --- THIS IS THE NEW PART ---
+	// Notify the customer that the job is officially complete.
+	io.to(String(job.userId)).emit("job-completed", {
+		jobId: job.id,
+		message: "Your service is complete!",
+	});
+	console.log(`✅ Emitted 'job-completed' event to customer room: ${job.userId}`);
+	// ---
+
+	return job;
+}
+module.exports = { getAvailableJobs, acceptJob, updateStatus, completeJob };
