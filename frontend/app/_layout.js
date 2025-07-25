@@ -32,8 +32,8 @@ export default function RootLayout() {
 							/>
 							<Stack.Screen name="finding-driver" />
 							<Stack.Screen name="active-job" options={{ presentation: "modal" }} />
-							<Stack.Screen name="(tabs)" />
-							<Stack.Screen name="(driver-tabs)" />
+							<Stack.Screen name="tabs" />
+							<Stack.Screen name="driver-tabs" />
 							<Stack.Screen name="live-tracking" />
 							<Stack.Screen name="add-payment" options={{ presentation: "modal" }} />
 						</Stack>
