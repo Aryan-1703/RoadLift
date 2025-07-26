@@ -3,6 +3,8 @@ const router = express.Router();
 const {
 	createSetupIntent,
 	getPaymentMethods,
+	setAsDefault,
+	deletePaymentMethod,
 } = require("../controllers/paymentController");
 const { protect } = require("../middleware/authMiddleware");
 

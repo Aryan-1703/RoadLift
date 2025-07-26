@@ -11,12 +11,8 @@ export default function RootLayout() {
 		// StripeProvider and ThemeProvider are self-contained.
 		<StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY}>
 			<ThemeProvider>
-				{/* 2. SocketProvider is next. It also has no internal dependencies. */}
 				<AuthProvider>
 					<SocketProvider>
-						{/* 3. AuthProvider is LAST. It depends on useSocket(), so it MUST be inside <SocketProvider>. */}
-						{/* 4. The Stack navigator is the final child, so all components within it
-                               can access every context (Auth, Socket, Theme). */}
 						<Stack
 							screenOptions={{
 								animation: "slide_from_right",
