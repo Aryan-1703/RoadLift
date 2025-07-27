@@ -3,7 +3,7 @@ import { ThemeProvider } from "./_context/ThemeContext";
 import { AuthProvider } from "./_context/AuthContext";
 import { SocketProvider } from "./_context/SocketContext";
 import { StripeProvider } from "@stripe/stripe-react-native";
-import { STRIPE_PUBLISHABLE_KEY } from "./config/constants"; 
+import { STRIPE_PUBLISHABLE_KEY } from "./config/constants";
 
 export default function RootLayout() {
 	return (
@@ -34,6 +34,8 @@ export default function RootLayout() {
 							<Stack.Screen name="rate-experience" />
 							<Stack.Screen name="add-payment" options={{ presentation: "modal" }} />
 							<Stack.Screen name="payment-methods" />
+							<Stack.Screen name="my-vehicles" options={{ presentation: "modal" }} />
+							<Stack.Screen name="add-vehicle" options={{ presentation: "modal" }} />
 						</Stack>
 					</SocketProvider>
 				</AuthProvider>

@@ -61,7 +61,7 @@ export const AuthProvider = ({ children }) => {
 		setupPushNotifications();
 	}, [token, user]);
 
-	const login = async ({ token, user, role }) => {
+	const login = async ({ token, user, role }, redirect = true) => {
 		const fullUser = { ...user, role };
 		await AsyncStorage.multiSet([
 			["token", token],
@@ -69,7 +69,10 @@ export const AuthProvider = ({ children }) => {
 		]);
 		setToken(token);
 		setUser(fullUser);
-		router.replace(role === "driver" ? "/driver-tabs" : "/tabs");
+
+		if (redirect) {
+			router.replace(role === "driver" ? "/driver-tabs" : "/tabs");
+		}
 	};
 
 	const logout = async () => {

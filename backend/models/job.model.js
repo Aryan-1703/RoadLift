@@ -50,6 +50,10 @@ module.exports = sequelize => {
 			type: DataTypes.STRING,
 			allowNull: true,
 		},
+		vehicleId: {
+			type: DataTypes.INTEGER,
+			allowNull: true,
+		},
 	});
 
 	return Job;

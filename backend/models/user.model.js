@@ -28,6 +28,10 @@ module.exports = sequelize => {
 			type: DataTypes.STRING,
 			allowNull: true,
 		},
+		defaultVehicleId: {
+			type: DataTypes.INTEGER,
+			allowNull: true,
+		},
 	});
 
 	return User;

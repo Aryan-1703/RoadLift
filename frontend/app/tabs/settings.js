@@ -81,6 +81,14 @@ const SettingsScreen = () => {
 				>
 					<FontAwesome5 name="chevron-right" size={16} color={colors.tabIconDefault} />
 				</SettingsRow>
+				<SettingsRow
+					icon="car"
+					label="My Vehicles"
+					colors={colors}
+					onPress={() => router.push("/my-vehicles")}
+				>
+					<FontAwesome5 name="chevron-right" size={16} color={colors.tabIconDefault} />
+				</SettingsRow>
 			</View>
 
 			<TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
