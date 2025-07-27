@@ -1,18 +1,16 @@
-// At the top of the file, load the environment variables from your .env file
 require("dotenv").config();
-
 // Export a function that returns your configuration object
 export default ({ config }) => {
 	// config is the existing static configuration from expo
 	return {
 		...config,
 
-		name: "TowLink",
-		slug: "TowLink",
+		name: "RoadLift",
+		slug: "roadlift",
 		version: "1.0.0",
 		orientation: "portrait",
 		icon: "./assets/images/icon.png",
-		scheme: "towlink", // Corrected the casing to be consistent
+		scheme: "roadlift", // Corrected the casing to be consistent
 		userInterfaceStyle: "automatic",
 		web: {
 			bundler: "metro",
@@ -38,6 +36,16 @@ export default ({ config }) => {
 					sounds: [],
 				},
 			],
+			[
+				"expo-payments-stripe",
+				{
+					// 2. Pass the merchantIdentifier here
+					merchantIdentifier: "merchant.ca.roadlift",
+
+					// 3. We also need to add our Stripe Publishable Key here.
+					publishableKey: process.env.STRIPE_PUBLISHABLE_KEY,
+				},
+			],
 		],
 		experiments: {
 			typedRoutes: true,
@@ -58,7 +66,7 @@ export default ({ config }) => {
 				foregroundImage: "./assets/images/adaptive-icon.png",
 				backgroundColor: "#ffffff",
 			},
-			package: "com.aryan1703.TowLink", // Recommended to add package name
+			package: "ca.roadlift.app", // Recommended to add package name
 			edgeToEdgeEnabled: true,
 			config: {
 				googleMaps: {
@@ -73,8 +81,7 @@ export default ({ config }) => {
 					data: [
 						{
 							scheme: "https",
-							// Replace 'app.tow.link' with your actual domain
-							host: "app.tow.link",
+							host: "ca.roadlift.app",
 							pathPrefix: "/stripe-onboarding",
 						},
 					],
@@ -84,10 +91,9 @@ export default ({ config }) => {
 		},
 		ios: {
 			...config.ios,
-			bundleIdentifier: "com.aryan1703.TowLink",
+			bundleIdentifier: "ca.roadlift.app",
 			supportsTablet: true,
-			// --- NEW: Universal Links Configuration for iOS ---
-			associatedDomains: ["applinks:app.tow.link"], // Replace with your domain
+			associatedDomains: ["applinks:roadlift.ca"],
 			config: {
 				googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY,
 			},
@@ -100,6 +106,9 @@ export default ({ config }) => {
 				NSLocationAlwaysAndWhenInUseUsageDescription:
 					"Location access is required to provide live updates even when the app is in background.",
 				ITSAppUsesNonExemptEncryption: false,
+				// ✅ Apple Pay usage description (optional, but recommended)
+				NSAppleMusicUsageDescription:
+					"This app uses Apple Pay to let you make fast and secure payments.",
 			},
 		},
 	};

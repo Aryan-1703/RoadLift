@@ -1,6 +1,7 @@
 const { Job, User, sequelize, Driver } = require("../models");
 const io = require("../socket");
 const stripe = require("../config/stripe");
+const paymentService = require("./paymentService");
 
 async function getAvailableJobs() {
 	// Find all jobs that are pending and include the name of the user who requested it.
@@ -17,35 +18,70 @@ async function getAvailableJobs() {
 	return jobs;
 }
 
+/**
+ * Allows a driver to accept a pending job. This function is transactional and
+ * will also create a Stripe Payment Intent to authorize the charge on the customer's card.
+ * @param {string} jobId - The ID of the job to accept.
+ * @param {number} driverId - The ID of the driver accepting the job.
+ * @returns {object} The updated job object.
+ */
 async function acceptJob(jobId, driverId) {
 	const result = await sequelize.transaction(async t => {
-		const job = await Job.findByPk(jobId, { transaction: t, lock: t.LOCK.UPDATE });
-
-		if (!job) throw new Error("Job not found.");
-		if (job.status !== "pending") throw new Error("Job is no longer available.");
-
-		job.driverId = driverId;
-		job.status = "accepted";
-		await job.save({ transaction: t });
-
-		// 1. Notify the specific customer who created the job.
-		io.to(String(job.userId)).emit("job-accepted", {
-			jobId: job.id,
-			message: "A driver has accepted your request!",
-			driverId: driverId, // Send the driver's ID too
+		// Step 1: Find the job and eager-load the customer (User) who created it.
+		// We lock the row for the duration of the transaction to prevent race conditions.
+		const job = await Job.findByPk(jobId, {
+			include: [User], // Eager-loading is more efficient than a separate query
+			transaction: t,
+			lock: t.LOCK.UPDATE,
 		});
 
-		// 2. Notify ALL other connected drivers that this job is now taken.
+		// Step 2: Perform validations
+		if (!job) {
+			throw new Error("Job not found.");
+		}
+		if (job.status !== "pending") {
+			throw new Error("Job is no longer available.");
+		}
+
+		const customer = job.User;
+		if (!customer) {
+			throw new Error("Could not find the associated customer for this job.");
+		}
+
+		// Step 3: --- NEW - Create the Stripe Payment Intent ---
+		// This attempts to authorize the payment on the customer's default card.
+		// If this fails (e.g., card declined), the entire transaction will roll back.
+		console.log(`Attempting to create Payment Intent for job ${job.id}...`);
+		const paymentIntent = await paymentService.createPaymentIntent(job, customer);
+		console.log(`✅ Payment Intent ${paymentIntent.id} created successfully.`);
+
+		// Step 4: Update our database record with the new state and Stripe info
+		job.driverId = driverId;
+		job.status = "accepted";
+		job.paymentIntentId = paymentIntent.id; // Save the transaction ID
+		job.paymentMethodId = paymentIntent.payment_method; // Save the card that was used
+		await job.save({ transaction: t });
+
+		// Step 5: Notify clients in real-time
+		// a. Notify the customer that their request was accepted.
+		io.to(String(job.userId)).emit("job-accepted", {
+			jobId: job.id,
+			message: "A driver has accepted your request and is on the way!",
+			driverId: driverId,
+		});
+
+		// b. Notify all other drivers that this job is no longer available.
 		io.to("drivers").emit("job-taken", {
 			jobId: job.id,
 		});
+
+		console.log(`📢 Emitted real-time events for job ${job.id}.`);
 
 		return job;
 	});
 
 	return result;
 }
-
 async function updateStatus(driverId, isActive) {
 	const driver = await Driver.findByPk(driverId);
 	if (!driver) {
@@ -106,9 +142,8 @@ async function createStripeOnboardingLink(driverId) {
 	// 2. Create the one-time onboarding link for the account
 	const accountLink = await stripe.accountLinks.create({
 		account: accountId,
-		// Use a real URL format.
-		refresh_url: "https://your-towlink-app.com/stripe-onboarding/refresh",
-		return_url: "https://your-towlink-app.com/stripe-onboarding/success",
+		refresh_url: "https://roadlift.ca/stripe/refresh",
+		return_url: "https://roadlift.ca/stripe/success",
 		type: "account_onboarding",
 	});
 

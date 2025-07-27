@@ -90,9 +90,40 @@ async function deletePaymentMethod(paymentMethodId) {
 	return { id: paymentMethodId, status: "detached" };
 }
 
+/**
+ * Creates a Stripe Payment Intent to authorize a charge on a customer's card.
+ * @param {object} job - The full job object from the database.
+ * @param {object} user - The full user object for the customer.
+ * @returns {object} The created PaymentIntent object from Stripe.
+ */
+// In backend/services/paymentService.js
+
+async function createPaymentIntent(jobDetails, user) {
+	if (!user.stripeCustomerId) {
+		// We can create the customer on the fly if needed
+		const customer = await stripe.customers.create({ name: user.name });
+		user.stripeCustomerId = customer.id;
+		await user.save();
+	}
+	const amountInCents = Math.round(parseFloat(jobDetails.estimatedCost) * 100);
+
+	// This creates an intent and returns a client secret that the frontend can use to
+	// collect payment details with the Payment Sheet (Apple Pay, Google Pay, Card Entry).
+	const paymentIntent = await stripe.paymentIntents.create({
+		amount: amountInCents,
+		currency: "cad",
+		customer: user.stripeCustomerId,
+		// The setup_future_usage flag tells Stripe to save this card for later if the customer agrees.
+		setup_future_usage: "off_session",
+	});
+
+	return paymentIntent;
+}
+
 module.exports = {
 	createSetupIntent,
 	getPaymentMethods,
 	setAsDefault,
 	deletePaymentMethod,
+	createPaymentIntent,
 };

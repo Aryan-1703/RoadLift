@@ -96,7 +96,7 @@ const LoginScreen = () => {
 				behavior={Platform.OS === "ios" ? "padding" : "height"}
 				style={styles.innerContainer}
 			>
-				<Text style={[styles.title, { color: colors.tint }]}>TowLink</Text>
+				<Text style={[styles.title, { color: colors.tint }]}>RoadLift</Text>
 				<Text style={[styles.subtitle, { color: colors.text, opacity: 0.7 }]}>
 					Welcome back! Please sign in.
 				</Text>

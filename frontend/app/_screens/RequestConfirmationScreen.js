@@ -14,10 +14,11 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import MapView, { PROVIDER_GOOGLE } from "react-native-maps";
-import * as Location from "expo-location"; // Import the full location library
+import * as Location from "expo-location";
 import axios from "axios";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useStripe } from "@stripe/stripe-react-native";
 import { useTheme } from "../_context/ThemeContext";
+import { useAuth } from "../_context/AuthContext";
 import Colors from "../_constants/Colors";
 import ModalHeader from "../_components/ModalHeader";
 import { API_URL } from "../config/constants";
@@ -28,6 +29,9 @@ const RequestConfirmationScreen = () => {
 	const params = useLocalSearchParams();
 	const router = useRouter();
 	const { theme } = useTheme();
+	const { token, user } = useAuth();
+	const { initPaymentSheet, presentPaymentSheet } = useStripe(); // Stripe hook
+
 	const [notes, setNotes] = useState("");
 	const [isLoading, setIsLoading] = useState(false);
 
@@ -38,14 +42,12 @@ const RequestConfirmationScreen = () => {
 
 	const [pickupLocation, setPickupLocation] = useState(initialLocation);
 	const [selectedAddress, setSelectedAddress] = useState("Loading address...");
+
 	const [isMapReady, setIsMapReady] = useState(false);
 	const mapRef = useRef(null);
 
-	// --- THEME & COLOR ---
 	const isDarkMode = theme === "dark";
 	const colors = Colors[theme];
-
-	// --- PARAMS ---
 	const serviceName = params.serviceName || "Service";
 	const price = parseFloat(params.price || "0");
 
@@ -78,42 +80,71 @@ const RequestConfirmationScreen = () => {
 		getAddressFromCoords(pickupLocation);
 	}, [pickupLocation]);
 
-	// --- HANDLERS ---
+	// --- THE NEW AND UPDATED PAYMENT + JOB CREATION HANDLER ---
 	const handleConfirmRequest = async () => {
 		setIsLoading(true);
+		if (!token) {
+			Alert.alert("Authentication Error", "You are not logged in.");
+			setIsLoading(false);
+			return;
+		}
+
 		try {
-			const token = await AsyncStorage.getItem("token");
-			if (!token) {
-				Alert.alert("Authentication Error", "You are not logged in.");
-				router.replace("/login");
-				setIsLoading(false);
-				return;
+			// Step 1: Create a Payment Intent on your backend.
+			const piResponse = await axios.post(
+				`${API_URL}/payments/create-payment-intent`,
+				{ estimatedCost: price },
+				{ headers: { Authorization: `Bearer ${token}` } }
+			);
+			const { clientSecret, paymentIntentId, customer } = piResponse.data;
+
+			// Step 2: Initialize Stripe's bottom sheet.
+			const { error: initError } = await initPaymentSheet({
+				merchantDisplayName: "RoadLift, Inc.",
+				paymentIntentClientSecret: clientSecret,
+				customerId: customer,
+				allowsDelayedPaymentMethods: true,
+				setupFutureUsage: "OffSession",
+			});
+			if (initError) {
+				throw new Error(`Could not initialize payment sheet: ${initError.message}`);
 			}
 
+			// Step 3: Present the bottom sheet.
+			// ** THIS IS WHERE APPLE PAY / GOOGLE PAY WILL APPEAR AUTOMATICALLY **
+			const { error: presentError } = await presentPaymentSheet();
+			if (presentError) {
+				if (presentError.code === "Canceled") return;
+				throw new Error(`Payment failed: ${presentError.message}`);
+			}
+
+			// Step 4: If payment was successful, create the job in your database.
 			const jobData = {
 				serviceType: params.serviceType,
 				pickupLatitude: pickupLocation.latitude,
 				pickupLongitude: pickupLocation.longitude,
 				estimatedCost: price,
 				notes: notes,
+				paymentIntentId: paymentIntentId,
 			};
-			const response = await axios.post(`${API_URL}/jobs`, jobData, {
+			const jobResponse = await axios.post(`${API_URL}/jobs`, jobData, {
 				headers: { Authorization: `Bearer ${token}` },
 			});
 
+			// Step 5: Navigate to the next screen.
 			router.replace({
 				pathname: "/finding-driver",
-				params: { jobId: response.data.job.id },
+				params: { jobId: jobResponse.data.job.id },
 			});
 		} catch (error) {
-			console.error("Job creation error:", error.response?.data || error.message);
-			Alert.alert("Request Failed", "Could not create your service request.");
+			console.error("Request flow error:", error.response?.data || error.message);
+			Alert.alert("Request Failed", "Could not complete your request. Please try again.");
 		} finally {
 			setIsLoading(false);
 		}
 	};
 
-	const handleRegionChangeComplete = async region => {
+	const onRegionChangeComplete = async region => {
 		setPickupLocation({
 			latitude: region.latitude,
 			longitude: region.longitude,
@@ -138,7 +169,6 @@ const RequestConfirmationScreen = () => {
 			setSelectedAddress("Address unavailable");
 		}
 	};
-
 	const recenterMap = () => {
 		mapRef.current?.animateToRegion(
 			{
@@ -151,6 +181,7 @@ const RequestConfirmationScreen = () => {
 	};
 
 	// --- RENDER ---
+	// The render block JSX is still perfectly fine and does not need changes.
 	return (
 		<SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
 			<StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} />
@@ -167,7 +198,7 @@ const RequestConfirmationScreen = () => {
 							latitudeDelta: 0.005,
 							longitudeDelta: 0.005,
 						}}
-						onRegionChangeComplete={handleRegionChangeComplete}
+						onRegionChangeComplete={onRegionChangeComplete}
 						onMapReady={() => setIsMapReady(true)}
 					/>
 
@@ -222,22 +253,20 @@ const RequestConfirmationScreen = () => {
 					/>
 					<TouchableOpacity
 						style={[styles.confirmButton, { backgroundColor: colors.tint }]}
-						onPress={handleConfirmRequest}
+						onPress={handleConfirmRequest} // It now calls the new handler
 						disabled={isLoading}
 					>
 						{isLoading ? (
 							<ActivityIndicator color="#ffffff" />
 						) : (
-							<Text style={styles.buttonText}>Request Help Now</Text>
+							<Text style={styles.buttonText}>Pay & Request Help</Text>
 						)}
 					</TouchableOpacity>
 				</View>
 			</KeyboardAvoidingView>
 		</SafeAreaView>
 	);
-};
-
-// --- STYLESHEET ---
+}; // --- STYLESHEET ---
 const styles = StyleSheet.create({
 	container: { flex: 1 },
 	mapContainer: { flex: 1, justifyContent: "center", alignItems: "center" },

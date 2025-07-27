@@ -43,7 +43,7 @@ const AddPaymentScreen = () => {
 
 			// 2. Initialize Payment Sheet
 			const { error: initError } = await initPaymentSheet({
-				merchantDisplayName: "TowLink, Inc.",
+				merchantDisplayName: "Pixel17, Inc.",
 				customerId: customer,
 				customerEphemeralKeySecret: ephemeralKey,
 				setupIntentClientSecret: setupIntent,

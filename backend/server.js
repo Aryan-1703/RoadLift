@@ -36,7 +36,7 @@ app.use("/api/payments", paymentRoutes);
 
 // --- HEALTH CHECK ROUTE ---
 app.get("/", (req, res) => {
-	res.send("TowLink API is running...");
+	res.send("RoadLift API is running...");
 });
 
 // --- SOCKET.IO CONNECTION LOGIC ---

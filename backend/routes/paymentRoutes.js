@@ -5,6 +5,7 @@ const {
 	getPaymentMethods,
 	setAsDefault,
 	deletePaymentMethod,
+	createPaymentIntent,
 } = require("../controllers/paymentController");
 const { protect } = require("../middleware/authMiddleware");
 
@@ -16,5 +17,7 @@ router.get("/methods", protect, getPaymentMethods);
 router.put("/set-default", protect, setAsDefault);
 // DELETE /api/payments/methods/:paymentMethodId
 router.delete("/methods/:paymentMethodId", protect, deletePaymentMethod);
+// POST /api/payments/create-payment-intent
+router.post("/create-payment-intent", protect, createPaymentIntent);
 
 module.exports = router;

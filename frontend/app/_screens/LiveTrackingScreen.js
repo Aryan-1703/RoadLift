@@ -143,7 +143,7 @@ const LiveTrackingScreen = () => {
 							{ color: colors.tabIconDefault, textAlign: "center" },
 						]}
 					>
-						Thank you for using TowLink.
+						Thank you for using RoadLift.
 					</Text>
 					<TouchableOpacity
 						style={[styles.button, { backgroundColor: colors.tint, marginTop: 30 }]}

@@ -42,7 +42,7 @@ const LoginPage = () => {
 	return (
 		<div className={styles.authContainer}>
 			<form className={styles.authForm} onSubmit={handleSubmit}>
-				<h1 className={styles.title}>TowLink</h1>
+				<h1 className={styles.title}>RoadLift</h1>
 				<p className={styles.subtitle}>Welcome back! Please sign in.</p>
 				<div className={styles.inputGroup}>
 					<input

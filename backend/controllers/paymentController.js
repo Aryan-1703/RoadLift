@@ -53,10 +53,24 @@ const deletePaymentMethod = async (req, res) => {
 		res.status(500).json({ message: "Failed to delete payment method." });
 	}
 };
-
+const createPaymentIntent = async (req, res) => {
+	try {
+		// The frontend will send the job details (like price) in the body
+		const jobDetails = req.body;
+		const paymentIntent = await paymentService.createPaymentIntent(jobDetails, req.user);
+		res.status(200).json({
+			clientSecret: paymentIntent.client_secret,
+			paymentIntentId: paymentIntent.id,
+		});
+	} catch (error) {
+		console.error("Error creating Payment Intent:", error);
+		res.status(500).json({ message: "Failed to initialize payment." });
+	}
+};
 module.exports = {
 	createSetupIntent,
 	getPaymentMethods,
 	setAsDefault,
+	createPaymentIntent,
 	deletePaymentMethod,
 };

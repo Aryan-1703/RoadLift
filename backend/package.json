@@ -1,14 +1,14 @@
 {
-  "name": "towlink-backend",
+  "name": "RoadLift-backend",
   "version": "1.0.0",
-  "description": "Backend for TowLink App",
+  "description": "Backend for RoadLift App",
   "main": "server.js",
   "scripts": {
     "start": "nodemon server.js"
   },
   "repository": {
     "type": "git",
-    "url": "TowLink"
+    "url": "RoadLift"
   },
   "author": "Aryan",
   "license": "ISC",
