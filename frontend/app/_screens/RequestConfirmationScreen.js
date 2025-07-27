@@ -13,13 +13,13 @@ import {
 	StatusBar,
 	Keyboard,
 	FlatList,
+	Modal,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import MapView, { PROVIDER_GOOGLE } from "react-native-maps";
 import axios from "axios";
 import { useStripe } from "@stripe/stripe-react-native";
 import { debounce } from "lodash";
-
 import { useTheme } from "../_context/ThemeContext";
 import { useAuth } from "../_context/AuthContext";
 import Colors from "../_constants/Colors";
@@ -28,34 +28,58 @@ import { API_URL } from "../config/constants";
 import { FontAwesome5 } from "@expo/vector-icons";
 
 const RequestConfirmationScreen = () => {
-	// --- HOOKS & STATE ---
+	// --- HOOKS & STATE (No changes here) ---
 	const params = useLocalSearchParams();
 	const router = useRouter();
 	const { theme } = useTheme();
-	const { token,user } = useAuth();
+	const { token, user } = useAuth();
 	const { initPaymentSheet, presentPaymentSheet } = useStripe();
 	const mapRef = useRef(null);
 
+	// --- YOUR EXISTING STATE (No changes needed) ---
+	const [notes, setNotes] = useState("");
+	const [isLoading, setIsLoading] = useState(false);
 	const initialLocation = {
 		latitude: parseFloat(params.userLat || "0"),
 		longitude: parseFloat(params.userLon || "0"),
 	};
-
-	const [notes, setNotes] = useState("");
-	const [isLoading, setIsLoading] = useState(false);
 	const [pickupLocation, setPickupLocation] = useState(initialLocation);
 	const [isMapReady, setIsMapReady] = useState(false);
-
-	// --- STATE FOR OUR CUSTOM AUTOCOMPLETE ---
 	const [searchQuery, setSearchQuery] = useState("");
 	const [predictions, setPredictions] = useState([]);
 	const [isTyping, setIsTyping] = useState(false);
 
-	// --- THEME & PARAMS ---
+	// --- NEW STATE FOR VEHICLES ---
+	const [vehicles, setVehicles] = useState([]);
+	const [selectedVehicle, setSelectedVehicle] = useState(null);
+	const [vehicleModalVisible, setVehicleModalVisible] = useState(false);
+	const [isVehicleLoading, setIsVehicleLoading] = useState(true);
+
 	const isDarkMode = theme === "dark";
 	const colors = Colors[theme];
 	const serviceName = params.serviceName || "Service";
 	const price = parseFloat(params.price || "0");
+
+	// --- NEW EFFECT to Fetch Vehicles on Load ---
+	useEffect(() => {
+		const fetchUserVehicles = async () => {
+			if (!token) return;
+			try {
+				const response = await axios.get(`${API_URL}/vehicles`, {
+					headers: { Authorization: `Bearer ${token}` },
+				});
+				setVehicles(response.data);
+				// Automatically select the default vehicle, or the first one as a fallback
+				const defaultVehicle = response.data.find(v => v.id === user.defaultVehicleId);
+				setSelectedVehicle(defaultVehicle || response.data[0]);
+			} catch (error) {
+				Alert.alert("Error", "Could not load your vehicle information.");
+			} finally {
+				setIsVehicleLoading(false);
+			}
+		};
+		fetchUserVehicles();
+	}, [token, user]);
 
 	// --- SECURE GEOLOCATION & AUTOCOMPLETE LOGIC ---
 	const getAddressFromCoords = useCallback(
@@ -148,8 +172,13 @@ const RequestConfirmationScreen = () => {
 	};
 
 	// --- Stripe + Job creation handler ---
-	// In screens/RequestConfirmationScreen.js
 	const handleConfirmRequest = async () => {
+		// --- ADDED VALIDATION ---
+		if (!selectedVehicle) {
+			Alert.alert("Vehicle Required", "Please add or select a vehicle to proceed.");
+			return;
+		}
+
 		setIsLoading(true);
 		if (!token) {
 			Alert.alert("Authentication Error", "Please log in.");
@@ -158,22 +187,23 @@ const RequestConfirmationScreen = () => {
 		}
 
 		try {
+			// A single jobData object for both payment paths
+			const jobDataPayload = {
+				serviceType: params.serviceType,
+				pickupLatitude: pickupLocation.latitude,
+				pickupLongitude: pickupLocation.longitude,
+				estimatedCost: price,
+				notes: notes,
+				vehicleId: selectedVehicle.id,
+			};
+
 			if (user && user.defaultPaymentMethodId) {
-				// --- PATH A: SAVED CARD FLOW (Off-Session) ---
 				console.log(
 					`Using saved card: ${user.defaultPaymentMethodId}. Creating job directly.`
 				);
 
-				const jobData = {
-					serviceType: params.serviceType,
-					pickupLatitude: pickupLocation.latitude,
-					pickupLongitude: pickupLocation.longitude,
-					estimatedCost: price,
-					notes: notes,
-					// NO paymentIntentId is sent here. The backend will create it.
-				};
-
-				const jobResponse = await axios.post(`${API_URL}/jobs`, jobData, {
+				// --- SAVED CARD FLOW ---
+				const jobResponse = await axios.post(`${API_URL}/jobs`, jobDataPayload, {
 					headers: { Authorization: `Bearer ${token}` },
 				});
 
@@ -182,17 +212,13 @@ const RequestConfirmationScreen = () => {
 					params: { jobId: jobResponse.data.job.id },
 				});
 			} else {
-				// --- PATH B: NEW CARD / APPLE PAY FLOW (On-Session) ---
-				console.log("No default card found. Initiating interactive payment sheet.");
-
-				// This is the entire interactive payment flow we already built.
+				// --- NEW CARD / APPLE PAY FLOW ---
 				const piResponse = await axios.post(
 					`${API_URL}/payments/create-payment-intent`,
 					{ estimatedCost: price },
 					{ headers: { Authorization: `Bearer ${token}` } }
 				);
 				const { clientSecret, paymentIntentId, customer } = piResponse.data;
-
 				const { error: initError } = await initPaymentSheet({
 					merchantDisplayName: "RoadLift, Inc.",
 					paymentIntentClientSecret: clientSecret,
@@ -201,7 +227,6 @@ const RequestConfirmationScreen = () => {
 					setupFutureUsage: "OffSession",
 				});
 				if (initError) throw new Error(initError.message);
-
 				const { error: presentError } = await presentPaymentSheet();
 				if (presentError) {
 					if (presentError.code === "Canceled") {
@@ -210,20 +235,17 @@ const RequestConfirmationScreen = () => {
 					}
 					throw new Error(presentError.message);
 				}
-
-				// Now create the job, including the PI from the interactive payment.
-				const jobData = {
-					serviceType: params.serviceType,
-					pickupLatitude: pickupLocation.latitude,
-					pickupLongitude: pickupLocation.longitude,
-					estimatedCost: price,
-					notes: notes,
-					paymentIntentId: paymentIntentId, // ** We include the PI here
-				};
-				const jobResponse = await axios.post(`${API_URL}/jobs`, jobData, {
-					headers: { Authorization: `Bearer ${token}` },
-				});
-
+				// Now add the paymentIntentId to our payload and create the job
+				const jobResponse = await axios.post(
+					`${API_URL}/jobs`,
+					{
+						...jobDataPayload,
+						paymentIntentId: paymentIntentId,
+					},
+					{
+						headers: { Authorization: `Bearer ${token}` },
+					}
+				);
 				router.replace({
 					pathname: "/finding-driver",
 					params: { jobId: jobResponse.data.job.id },
@@ -233,7 +255,7 @@ const RequestConfirmationScreen = () => {
 			console.error("Request flow error:", error.response?.data || error.message);
 			Alert.alert(
 				"Request Failed",
-				"Could not complete your request. Please check that you have a valid payment method."
+				"Could not complete your request. Please check your payment method."
 			);
 		} finally {
 			setIsLoading(false);
@@ -265,8 +287,6 @@ const RequestConfirmationScreen = () => {
 							Keyboard.dismiss();
 						}}
 					/>
-
-					{/* --- OUR NEW, STABLE, CUSTOM-BUILT SEARCH BAR --- */}
 					<View style={autocompleteStyles(colors).container}>
 						<TextInput
 							style={autocompleteStyles(colors).textInput}
@@ -325,6 +345,45 @@ const RequestConfirmationScreen = () => {
 							${price.toFixed(2)}
 						</Text>
 					</View>
+					<Text style={[styles.sectionHeader, { color: colors.text }]}>
+						Vehicle for Service
+					</Text>
+					<TouchableOpacity
+						style={[
+							styles.selectorBox,
+							{ backgroundColor: colors.background, borderColor: colors.border },
+						]}
+						// This onPress is now on the main box, making the whole thing tappable
+						onPress={() => {
+							if (vehicles.length === 0) {
+								router.push("/add-vehicle");
+							} else {
+								setVehicleModalVisible(true);
+							}
+						}}
+					>
+						{isVehicleLoading ? (
+							<ActivityIndicator color={colors.tint} />
+						) : selectedVehicle ? (
+							<View style={styles.selectorContent}>
+								<Text style={[styles.selectorTitle, { color: colors.text }]}>
+									{selectedVehicle.year} {selectedVehicle.make} {selectedVehicle.model}
+								</Text>
+								<Text style={[styles.selectorSubtitle, { color: colors.tabIconDefault }]}>
+									{selectedVehicle.licensePlate || "Tap to switch"}
+								</Text>
+							</View>
+						) : (
+							<Text style={[styles.selectorTitle, { color: colors.tint }]}>
+								+ Add a Vehicle for This Job
+							</Text>
+						)}
+						{/* The chevron now correctly indicates you can tap to see more */}
+						{vehicles.length > 1 && (
+							<FontAwesome5 name="chevron-down" size={16} color={colors.tabIconDefault} />
+						)}
+					</TouchableOpacity>
+
 					<TextInput
 						style={[
 							styles.notesInput,
@@ -353,6 +412,44 @@ const RequestConfirmationScreen = () => {
 					</TouchableOpacity>
 				</View>
 			</KeyboardAvoidingView>
+			<Modal transparent={true} visible={vehicleModalVisible} animationType="fade">
+				<TouchableOpacity
+					style={styles.modalBackdrop}
+					onPress={() => setVehicleModalVisible(false)}
+				>
+					<View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+						<Text style={[styles.modalTitle, { color: colors.text }]}>
+							Select a Vehicle
+						</Text>
+						<FlatList
+							data={vehicles}
+							keyExtractor={item => item.id.toString()}
+							renderItem={({ item }) => (
+								<TouchableOpacity
+									style={styles.modalItem}
+									onPress={() => {
+										setSelectedVehicle(item);
+										setVehicleModalVisible(false);
+									}}
+								>
+									<Text style={{ color: colors.text, fontSize: 16 }}>
+										{item.year} {item.make} {item.model}
+									</Text>
+								</TouchableOpacity>
+							)}
+							ItemSeparatorComponent={() => (
+								<View style={{ height: 1, backgroundColor: colors.border }} />
+							)}
+						/>
+						<TouchableOpacity
+							onPress={() => setVehicleModalVisible(false)}
+							style={styles.modalCloseButton}
+						>
+							<Text style={{ color: colors.danger, fontWeight: "600" }}>Close</Text>
+						</TouchableOpacity>
+					</View>
+				</TouchableOpacity>
+			</Modal>
 		</SafeAreaView>
 	);
 };
@@ -401,6 +498,34 @@ const styles = StyleSheet.create({
 	},
 	confirmButton: { padding: 15, borderRadius: 10, alignItems: "center" },
 	buttonText: { color: "#fff", fontSize: 18, fontWeight: "bold" },
+	sectionHeader: { fontSize: 18, fontWeight: "bold", marginBottom: 10, marginTop: 15 },
+	selectorBox: {
+		flexDirection: "row",
+		alignItems: "center",
+		padding: 15,
+		borderRadius: 10,
+		borderWidth: 1,
+		marginBottom: 15,
+	},
+	selectorContent: { flex: 1 },
+	selectorTitle: { fontSize: 16, fontWeight: "600" },
+	selectorSubtitle: { fontSize: 14, marginTop: 4 },
+	// Modal Styles
+	modalBackdrop: {
+		flex: 1,
+		justifyContent: "center",
+		alignItems: "center",
+		backgroundColor: "rgba(0,0,0,0.5)",
+	},
+	modalContent: { width: "85%", borderRadius: 12, overflow: "hidden" },
+	modalTitle: { fontSize: 20, fontWeight: "bold", padding: 20, textAlign: "center" },
+	modalItem: { padding: 20 },
+	modalCloseButton: {
+		padding: 20,
+		alignItems: "center",
+		borderTopWidth: 1,
+		borderTopColor: "#eee",
+	},
 });
 
 const autocompleteStyles = colors => ({
