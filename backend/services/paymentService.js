@@ -107,14 +107,12 @@ async function createPaymentIntent(jobDetails, user) {
 	}
 	const amountInCents = Math.round(parseFloat(jobDetails.estimatedCost) * 100);
 
-	// This creates an intent and returns a client secret that the frontend can use to
-	// collect payment details with the Payment Sheet (Apple Pay, Google Pay, Card Entry).
 	const paymentIntent = await stripe.paymentIntents.create({
 		amount: amountInCents,
 		currency: "cad",
 		customer: user.stripeCustomerId,
-		// The setup_future_usage flag tells Stripe to save this card for later if the customer agrees.
 		setup_future_usage: "off_session",
+		payment_method_types: ["card"],
 	});
 
 	return paymentIntent;

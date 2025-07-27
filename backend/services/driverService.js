@@ -28,9 +28,13 @@ async function getAvailableJobs() {
 async function acceptJob(jobId, driverId) {
 	const result = await sequelize.transaction(async t => {
 		// Step 1: Find the job and eager-load the customer (User) who created it.
-		// We lock the row for the duration of the transaction to prevent race conditions.
 		const job = await Job.findByPk(jobId, {
-			include: [User], // Eager-loading is more efficient than a separate query
+			include: [
+				{
+					model: User,
+					required: true,
+				},
+			],
 			transaction: t,
 			lock: t.LOCK.UPDATE,
 		});
@@ -44,6 +48,7 @@ async function acceptJob(jobId, driverId) {
 		}
 
 		const customer = job.User;
+		console.log(customer);
 		if (!customer) {
 			throw new Error("Could not find the associated customer for this job.");
 		}

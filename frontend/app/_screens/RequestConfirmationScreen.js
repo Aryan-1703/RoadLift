@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
 	View,
 	Text,
@@ -11,12 +11,15 @@ import {
 	KeyboardAvoidingView,
 	Platform,
 	StatusBar,
+	Keyboard,
+	FlatList,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import MapView, { PROVIDER_GOOGLE } from "react-native-maps";
-import * as Location from "expo-location";
 import axios from "axios";
 import { useStripe } from "@stripe/stripe-react-native";
+import { debounce } from "lodash";
+
 import { useTheme } from "../_context/ThemeContext";
 import { useAuth } from "../_context/AuthContext";
 import Colors from "../_constants/Colors";
@@ -29,68 +32,131 @@ const RequestConfirmationScreen = () => {
 	const params = useLocalSearchParams();
 	const router = useRouter();
 	const { theme } = useTheme();
-	const { token, user } = useAuth();
-	const { initPaymentSheet, presentPaymentSheet } = useStripe(); // Stripe hook
-
-	const [notes, setNotes] = useState("");
-	const [isLoading, setIsLoading] = useState(false);
+	const { token } = useAuth();
+	const { initPaymentSheet, presentPaymentSheet } = useStripe();
+	const mapRef = useRef(null);
 
 	const initialLocation = {
 		latitude: parseFloat(params.userLat || "0"),
 		longitude: parseFloat(params.userLon || "0"),
 	};
 
+	const [notes, setNotes] = useState("");
+	const [isLoading, setIsLoading] = useState(false);
 	const [pickupLocation, setPickupLocation] = useState(initialLocation);
-	const [selectedAddress, setSelectedAddress] = useState("Loading address...");
-
 	const [isMapReady, setIsMapReady] = useState(false);
-	const mapRef = useRef(null);
 
+	// --- STATE FOR OUR CUSTOM AUTOCOMPLETE ---
+	const [searchQuery, setSearchQuery] = useState("");
+	const [predictions, setPredictions] = useState([]);
+	const [isTyping, setIsTyping] = useState(false);
+
+	// --- THEME & PARAMS ---
 	const isDarkMode = theme === "dark";
 	const colors = Colors[theme];
 	const serviceName = params.serviceName || "Service";
 	const price = parseFloat(params.price || "0");
 
-	// --- EFFECT FOR REVERSE GEOCODING ---
-	useEffect(() => {
-		const getAddressFromCoords = async coords => {
-			// Prevent geocoding if coords are not valid
-			if (!coords || coords.latitude === 0) {
-				setSelectedAddress("Cannot determine address.");
+	// --- SECURE GEOLOCATION & AUTOCOMPLETE LOGIC ---
+	const getAddressFromCoords = useCallback(
+		debounce(async ({ latitude, longitude }) => {
+			if (!latitude || !longitude || !token) return;
+			try {
+				const response = await axios.get(`${API_URL}/geocode/reverse`, {
+					headers: { Authorization: `Bearer ${token}` },
+					params: { lat: latitude, lon: longitude },
+				});
+				if (response.data?.address) {
+					// Update our searchQuery state to match the map's pin
+					setSearchQuery(response.data.address);
+				}
+			} catch (error) {
+				console.error("Reverse geocode failed:", error);
+				setSearchQuery("Address unavailable");
+			}
+		}, 500),
+		[token]
+	);
+
+	const fetchPredictions = useCallback(
+		debounce(async text => {
+			if (text.length < 3) {
+				setPredictions([]);
 				return;
 			}
 			try {
-				const geocodeResult = await Location.reverseGeocodeAsync(coords);
-				if (geocodeResult && geocodeResult.length > 0) {
-					const addr = geocodeResult[0];
-					const formattedAddress = `${addr.streetNumber || ""} ${addr.street || ""}, ${
-						addr.city || ""
-					}`.trim();
-					setSelectedAddress(formattedAddress || "Address details unavailable");
-				} else {
-					setSelectedAddress("Could not find address");
+				const response = await axios.get(`${API_URL}/geocode/autocomplete`, {
+					headers: { Authorization: `Bearer ${token}` },
+					params: { query: text },
+				});
+				if (Array.isArray(response.data)) {
+					setPredictions(response.data);
 				}
 			} catch (error) {
-				console.error("Reverse geocoding failed:", error);
-				setSelectedAddress("Address unavailable");
+				console.error("Autocomplete fetch error:", error);
+				setPredictions([]);
 			}
-		};
+		}, 400),
+		[token]
+	);
 
-		// Get address whenever the pickupLocation changes
-		getAddressFromCoords(pickupLocation);
-	}, [pickupLocation]);
+	useEffect(() => {
+		getAddressFromCoords(initialLocation);
+	}, []);
 
-	// --- THE NEW AND UPDATED PAYMENT + JOB CREATION HANDLER ---
+	useEffect(() => {
+		if (isTyping) {
+			fetchPredictions(searchQuery);
+		}
+	}, [searchQuery, isTyping, fetchPredictions]);
+
+	// --- MAP & SEARCH HANDLERS ---
+	const handlePlaceSelected = async placeId => {
+		setIsTyping(false);
+		setPredictions([]);
+		Keyboard.dismiss();
+		try {
+			const response = await axios.get(`${API_URL}/geocode/place-details`, {
+				headers: { Authorization: `Bearer ${token}` },
+				params: { placeId },
+			});
+			const { lat, lng } = response.data.geometry.location;
+			mapRef.current?.animateToRegion({
+				latitude: lat,
+				longitude: lng,
+				latitudeDelta: 0.005,
+				longitudeDelta: 0.005,
+			});
+		} catch (error) {
+			Alert.alert("Error", "Could not get location details.");
+		}
+	};
+
+	const onRegionChangeComplete = region => {
+		if (isMapReady && !isTyping) {
+			const newCoords = { latitude: region.latitude, longitude: region.longitude };
+			setPickupLocation(newCoords);
+			getAddressFromCoords(newCoords);
+		}
+	};
+
+	const recenterMap = () => {
+		mapRef.current?.animateToRegion(
+			{ ...initialLocation, latitudeDelta: 0.005, longitudeDelta: 0.005 },
+			500
+		);
+	};
+
+	// --- Stripe + Job creation handler ---
 	const handleConfirmRequest = async () => {
 		setIsLoading(true);
 		if (!token) {
-			Alert.alert("Authentication Error", "You are not logged in.");
+			Alert.alert("Authentication Error", "Please log in.");
 			setIsLoading(false);
 			return;
 		}
 
 		try {
-			// Step 1: Create a Payment Intent on your backend.
 			const piResponse = await axios.post(
 				`${API_URL}/payments/create-payment-intent`,
 				{ estimatedCost: price },
@@ -98,7 +164,6 @@ const RequestConfirmationScreen = () => {
 			);
 			const { clientSecret, paymentIntentId, customer } = piResponse.data;
 
-			// Step 2: Initialize Stripe's bottom sheet.
 			const { error: initError } = await initPaymentSheet({
 				merchantDisplayName: "RoadLift, Inc.",
 				paymentIntentClientSecret: clientSecret,
@@ -106,82 +171,43 @@ const RequestConfirmationScreen = () => {
 				allowsDelayedPaymentMethods: true,
 				setupFutureUsage: "OffSession",
 			});
-			if (initError) {
-				throw new Error(`Could not initialize payment sheet: ${initError.message}`);
-			}
+			if (initError) throw new Error(initError.message);
 
-			// Step 3: Present the bottom sheet.
-			// ** THIS IS WHERE APPLE PAY / GOOGLE PAY WILL APPEAR AUTOMATICALLY **
 			const { error: presentError } = await presentPaymentSheet();
 			if (presentError) {
-				if (presentError.code === "Canceled") return;
-				throw new Error(`Payment failed: ${presentError.message}`);
+				if (presentError.code === "Canceled") {
+					setIsLoading(false);
+					return;
+				}
+				throw new Error(presentError.message);
 			}
 
-			// Step 4: If payment was successful, create the job in your database.
-			const jobData = {
-				serviceType: params.serviceType,
-				pickupLatitude: pickupLocation.latitude,
-				pickupLongitude: pickupLocation.longitude,
-				estimatedCost: price,
-				notes: notes,
-				paymentIntentId: paymentIntentId,
-			};
-			const jobResponse = await axios.post(`${API_URL}/jobs`, jobData, {
-				headers: { Authorization: `Bearer ${token}` },
-			});
+			const jobResponse = await axios.post(
+				`${API_URL}/jobs`,
+				{
+					serviceType: params.serviceType,
+					pickupLatitude: pickupLocation.latitude,
+					pickupLongitude: pickupLocation.longitude,
+					estimatedCost: price,
+					notes,
+					paymentIntentId,
+				},
+				{ headers: { Authorization: `Bearer ${token}` } }
+			);
 
-			// Step 5: Navigate to the next screen.
 			router.replace({
 				pathname: "/finding-driver",
 				params: { jobId: jobResponse.data.job.id },
 			});
 		} catch (error) {
-			console.error("Request flow error:", error.response?.data || error.message);
-			Alert.alert("Request Failed", "Could not complete your request. Please try again.");
+			console.error("Request error:", error.message);
+			Alert.alert("Request Failed", error.message || "Could not complete your request.");
 		} finally {
 			setIsLoading(false);
 		}
 	};
 
-	const onRegionChangeComplete = async region => {
-		setPickupLocation({
-			latitude: region.latitude,
-			longitude: region.longitude,
-		});
-
-		try {
-			const geocode = await Location.reverseGeocodeAsync({
-				latitude: region.latitude,
-				longitude: region.longitude,
-			});
-			if (geocode.length > 0) {
-				const addr = geocode[0];
-				const readable = `${addr.name || ""} ${addr.street || ""}, ${addr.city || ""}, ${
-					addr.region || ""
-				}`;
-				setSelectedAddress(readable.trim());
-			} else {
-				setSelectedAddress("Unknown location");
-			}
-		} catch (error) {
-			console.error("Reverse geocoding failed:", error);
-			setSelectedAddress("Address unavailable");
-		}
-	};
-	const recenterMap = () => {
-		mapRef.current?.animateToRegion(
-			{
-				...initialLocation,
-				latitudeDelta: 0.005,
-				longitudeDelta: 0.005,
-			},
-			500
-		);
-	};
-
 	// --- RENDER ---
-	// The render block JSX is still perfectly fine and does not need changes.
 	return (
 		<SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
 			<StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} />
@@ -192,34 +218,65 @@ const RequestConfirmationScreen = () => {
 			>
 				<View style={styles.mapContainer}>
 					<MapView
+						ref={mapRef}
 						style={styles.map}
+						provider={PROVIDER_GOOGLE}
 						initialRegion={{
 							...initialLocation,
 							latitudeDelta: 0.005,
 							longitudeDelta: 0.005,
 						}}
-						onRegionChangeComplete={onRegionChangeComplete}
 						onMapReady={() => setIsMapReady(true)}
+						onRegionChangeComplete={onRegionChangeComplete}
+						onPanDrag={() => {
+							setIsTyping(false);
+							Keyboard.dismiss();
+						}}
 					/>
+
+					{/* --- OUR NEW, STABLE, CUSTOM-BUILT SEARCH BAR --- */}
+					<View style={autocompleteStyles(colors).container}>
+						<TextInput
+							style={autocompleteStyles(colors).textInput}
+							placeholder="Search or move the map"
+							placeholderTextColor={colors.tabIconDefault}
+							value={searchQuery}
+							onChangeText={text => {
+								setSearchQuery(text);
+								setIsTyping(true); // User is typing, fetch predictions
+							}}
+							onFocus={() => setIsTyping(true)}
+						/>
+						{isTyping && predictions.length > 0 && (
+							<View style={autocompleteStyles(colors).listView}>
+								<FlatList
+									data={predictions}
+									keyExtractor={item => item.place_id}
+									renderItem={({ item }) => (
+										<TouchableOpacity
+											style={autocompleteStyles(colors).row}
+											onPress={() => handlePlaceSelected(item.place_id)}
+										>
+											<Text style={autocompleteStyles(colors).description}>
+												{item.description}
+											</Text>
+										</TouchableOpacity>
+									)}
+									ItemSeparatorComponent={() => (
+										<View style={autocompleteStyles(colors).separator} />
+									)}
+									keyboardShouldPersistTaps="handled" // Critical for FlatList inside a scrollable view
+								/>
+							</View>
+						)}
+					</View>
 
 					<View style={styles.pinContainer}>
 						<FontAwesome5 name="map-marker-alt" size={40} color={colors.danger} />
 					</View>
-
-					<View style={[styles.locationBar, { backgroundColor: colors.card }]}>
-						<FontAwesome5
-							name="map-pin"
-							size={20}
-							color={colors.text}
-							style={{ marginRight: 10 }}
-						/>
-						<Text style={[styles.addressText, { color: colors.text }]} numberOfLines={1}>
-							{selectedAddress}
-						</Text>
-						<TouchableOpacity style={styles.recenterButton} onPress={recenterMap}>
-							<FontAwesome5 name="crosshairs" size={20} color={colors.tint} />
-						</TouchableOpacity>
-					</View>
+					<TouchableOpacity style={styles.recenterButtonContainer} onPress={recenterMap}>
+						<FontAwesome5 name="crosshairs" size={24} color={colors.tint} />
+					</TouchableOpacity>
 				</View>
 
 				<View
@@ -253,7 +310,7 @@ const RequestConfirmationScreen = () => {
 					/>
 					<TouchableOpacity
 						style={[styles.confirmButton, { backgroundColor: colors.tint }]}
-						onPress={handleConfirmRequest} // It now calls the new handler
+						onPress={handleConfirmRequest}
 						disabled={isLoading}
 					>
 						{isLoading ? (
@@ -266,10 +323,10 @@ const RequestConfirmationScreen = () => {
 			</KeyboardAvoidingView>
 		</SafeAreaView>
 	);
-}; // --- STYLESHEET ---
+};
 const styles = StyleSheet.create({
 	container: { flex: 1 },
-	mapContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
+	mapContainer: { flex: 1 },
 	map: { ...StyleSheet.absoluteFillObject },
 	pinContainer: {
 		position: "absolute",
@@ -277,25 +334,21 @@ const styles = StyleSheet.create({
 		top: "50%",
 		marginLeft: -12,
 		marginTop: -40,
+		zIndex: 0,
 	},
-	locationBar: {
+	recenterButtonContainer: {
 		position: "absolute",
-		top: 15,
-		left: 15,
-		right: 15,
-		paddingVertical: 12,
-		paddingHorizontal: 15,
-		borderRadius: 12,
-		flexDirection: "row",
-		alignItems: "center",
+		bottom: 20,
+		right: 20,
+		backgroundColor: "#fff",
+		padding: 12,
+		borderRadius: 30,
 		shadowColor: "#000",
 		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.2,
-		shadowRadius: 4,
+		shadowOpacity: 0.25,
+		shadowRadius: 3.84,
 		elevation: 5,
 	},
-	addressText: { flex: 1, fontSize: 16, fontWeight: "600", marginRight: 10 },
-	recenterButton: { padding: 5 },
 	detailsContainer: { padding: 20, paddingBottom: 30, borderTopWidth: 1 },
 	serviceRow: {
 		flexDirection: "row",
@@ -318,7 +371,30 @@ const styles = StyleSheet.create({
 	buttonText: { color: "#fff", fontSize: 18, fontWeight: "bold" },
 });
 
-// --- DARK MAP STYLE ---
+const autocompleteStyles = colors => ({
+	container: { position: "absolute", top: 15, left: 15, right: 15, zIndex: 1 },
+	textInput: {
+		height: 50,
+		borderRadius: 10,
+		paddingLeft: 15,
+		backgroundColor: colors.card,
+		color: colors.text,
+		fontSize: 16,
+		borderWidth: 1,
+		borderColor: colors.border,
+	},
+	listView: {
+		borderRadius: 8,
+		backgroundColor: colors.card,
+		marginTop: 4,
+		borderWidth: 1,
+		borderColor: colors.border,
+	},
+	row: { padding: 13 },
+	separator: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
+	description: { color: colors.text, fontSize: 16 },
+});
+
 const mapStyleDark = [
 	{ elementType: "geometry", stylers: [{ color: "#242f3e" }] },
 	{ elementType: "labels.text.fill", stylers: [{ color: "#746855" }] },
