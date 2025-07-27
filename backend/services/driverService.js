@@ -38,33 +38,29 @@ async function acceptJob(jobId, driverId) {
 			transaction: t,
 			lock: t.LOCK.UPDATE,
 		});
-
-		// Step 2: Perform validations
-		if (!job) {
-			throw new Error("Job not found.");
-		}
-		if (job.status !== "pending") {
-			throw new Error("Job is no longer available.");
-		}
+		if (!job) throw new Error("Job not found.");
+		if (job.status !== "pending") throw new Error("Job is no longer available.");
 
 		const customer = job.User;
-		console.log(customer);
-		if (!customer) {
-			throw new Error("Could not find the associated customer for this job.");
+		if (!customer) throw new Error("Could not find customer for this job.");
+
+		// --- THIS IS THE CRUCIAL UPDATE ---
+		// Only create a new Payment Intent if the job doesn't already have one
+		// (i.e., if the customer used a saved card and didn't pay interactively).
+		if (!job.paymentIntentId) {
+			console.log(`Job has no PI. Creating new Payment Intent for off-session charge.`);
+			const paymentIntent = await paymentService.createPaymentIntent(job, customer);
+			job.paymentIntentId = paymentIntent.id;
+			job.paymentMethodId = paymentIntent.payment_method;
+		} else {
+			console.log(
+				`Job already has PI ${job.paymentIntentId} from on-session payment. Skipping creation.`
+			);
 		}
 
-		// Step 3: --- NEW - Create the Stripe Payment Intent ---
-		// This attempts to authorize the payment on the customer's default card.
-		// If this fails (e.g., card declined), the entire transaction will roll back.
-		console.log(`Attempting to create Payment Intent for job ${job.id}...`);
-		const paymentIntent = await paymentService.createPaymentIntent(job, customer);
-		console.log(`✅ Payment Intent ${paymentIntent.id} created successfully.`);
-
-		// Step 4: Update our database record with the new state and Stripe info
+		// The rest of the logic remains the same
 		job.driverId = driverId;
 		job.status = "accepted";
-		job.paymentIntentId = paymentIntent.id; // Save the transaction ID
-		job.paymentMethodId = paymentIntent.payment_method; // Save the card that was used
 		await job.save({ transaction: t });
 
 		// Step 5: Notify clients in real-time

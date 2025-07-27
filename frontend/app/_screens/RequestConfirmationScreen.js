@@ -32,7 +32,7 @@ const RequestConfirmationScreen = () => {
 	const params = useLocalSearchParams();
 	const router = useRouter();
 	const { theme } = useTheme();
-	const { token } = useAuth();
+	const { token,user } = useAuth();
 	const { initPaymentSheet, presentPaymentSheet } = useStripe();
 	const mapRef = useRef(null);
 
@@ -148,6 +148,7 @@ const RequestConfirmationScreen = () => {
 	};
 
 	// --- Stripe + Job creation handler ---
+	// In screens/RequestConfirmationScreen.js
 	const handleConfirmRequest = async () => {
 		setIsLoading(true);
 		if (!token) {
@@ -157,56 +158,87 @@ const RequestConfirmationScreen = () => {
 		}
 
 		try {
-			const piResponse = await axios.post(
-				`${API_URL}/payments/create-payment-intent`,
-				{ estimatedCost: price },
-				{ headers: { Authorization: `Bearer ${token}` } }
-			);
-			const { clientSecret, paymentIntentId, customer } = piResponse.data;
+			if (user && user.defaultPaymentMethodId) {
+				// --- PATH A: SAVED CARD FLOW (Off-Session) ---
+				console.log(
+					`Using saved card: ${user.defaultPaymentMethodId}. Creating job directly.`
+				);
 
-			const { error: initError } = await initPaymentSheet({
-				merchantDisplayName: "RoadLift, Inc.",
-				paymentIntentClientSecret: clientSecret,
-				customerId: customer,
-				allowsDelayedPaymentMethods: true,
-				setupFutureUsage: "OffSession",
-			});
-			if (initError) throw new Error(initError.message);
-
-			const { error: presentError } = await presentPaymentSheet();
-			if (presentError) {
-				if (presentError.code === "Canceled") {
-					setIsLoading(false);
-					return;
-				}
-				throw new Error(presentError.message);
-			}
-
-			const jobResponse = await axios.post(
-				`${API_URL}/jobs`,
-				{
+				const jobData = {
 					serviceType: params.serviceType,
 					pickupLatitude: pickupLocation.latitude,
 					pickupLongitude: pickupLocation.longitude,
 					estimatedCost: price,
-					notes,
-					paymentIntentId,
-				},
-				{ headers: { Authorization: `Bearer ${token}` } }
-			);
+					notes: notes,
+					// NO paymentIntentId is sent here. The backend will create it.
+				};
 
-			router.replace({
-				pathname: "/finding-driver",
-				params: { jobId: jobResponse.data.job.id },
-			});
+				const jobResponse = await axios.post(`${API_URL}/jobs`, jobData, {
+					headers: { Authorization: `Bearer ${token}` },
+				});
+
+				router.replace({
+					pathname: "/finding-driver",
+					params: { jobId: jobResponse.data.job.id },
+				});
+			} else {
+				// --- PATH B: NEW CARD / APPLE PAY FLOW (On-Session) ---
+				console.log("No default card found. Initiating interactive payment sheet.");
+
+				// This is the entire interactive payment flow we already built.
+				const piResponse = await axios.post(
+					`${API_URL}/payments/create-payment-intent`,
+					{ estimatedCost: price },
+					{ headers: { Authorization: `Bearer ${token}` } }
+				);
+				const { clientSecret, paymentIntentId, customer } = piResponse.data;
+
+				const { error: initError } = await initPaymentSheet({
+					merchantDisplayName: "RoadLift, Inc.",
+					paymentIntentClientSecret: clientSecret,
+					customerId: customer,
+					allowsDelayedPaymentMethods: true,
+					setupFutureUsage: "OffSession",
+				});
+				if (initError) throw new Error(initError.message);
+
+				const { error: presentError } = await presentPaymentSheet();
+				if (presentError) {
+					if (presentError.code === "Canceled") {
+						setIsLoading(false);
+						return;
+					}
+					throw new Error(presentError.message);
+				}
+
+				// Now create the job, including the PI from the interactive payment.
+				const jobData = {
+					serviceType: params.serviceType,
+					pickupLatitude: pickupLocation.latitude,
+					pickupLongitude: pickupLocation.longitude,
+					estimatedCost: price,
+					notes: notes,
+					paymentIntentId: paymentIntentId, // ** We include the PI here
+				};
+				const jobResponse = await axios.post(`${API_URL}/jobs`, jobData, {
+					headers: { Authorization: `Bearer ${token}` },
+				});
+
+				router.replace({
+					pathname: "/finding-driver",
+					params: { jobId: jobResponse.data.job.id },
+				});
+			}
 		} catch (error) {
-			console.error("Request error:", error.message);
-			Alert.alert("Request Failed", error.message || "Could not complete your request.");
+			console.error("Request flow error:", error.response?.data || error.message);
+			Alert.alert(
+				"Request Failed",
+				"Could not complete your request. Please check that you have a valid payment method."
+			);
 		} finally {
 			setIsLoading(false);
 		}
 	};
-
 	// --- RENDER ---
 	return (
 		<SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
