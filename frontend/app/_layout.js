@@ -3,7 +3,7 @@ import { ThemeProvider } from "./_context/ThemeContext";
 import { AuthProvider } from "./_context/AuthContext";
 import { SocketProvider } from "./_context/SocketContext";
 import { StripeProvider } from "@stripe/stripe-react-native";
-import { STRIPE_PUBLISHABLE_KEY } from "./config/constants"; // Use your constants file
+import { STRIPE_PUBLISHABLE_KEY } from "./config/constants"; 
 
 export default function RootLayout() {
 	return (

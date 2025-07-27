@@ -1,8 +1,9 @@
 require("dotenv").config();
+
 // Export a function that returns your configuration object
 export default ({ config }) => {
-	// config is the existing static configuration from expo
 	return {
+		// Spread the base config to inherit properties like sdkVersion
 		...config,
 
 		name: "RoadLift",
@@ -10,105 +11,80 @@ export default ({ config }) => {
 		version: "1.0.0",
 		orientation: "portrait",
 		icon: "./assets/images/icon.png",
-		scheme: "roadlift", // Corrected the casing to be consistent
+		scheme: "roadlift",
 		userInterfaceStyle: "automatic",
-		web: {
-			bundler: "metro",
-			output: "static",
-			favicon: "./assets/images/favicon.png",
+		owner: "aryan1703",
+
+		splash: {
+			image: "./assets/images/splash-icon.png", // Correct place for splash config
+			resizeMode: "contain",
+			backgroundColor: "#ffffff",
 		},
+
+		assetBundlePatterns: ["**/*"],
+
+		// --- EAS BUILD CONFIG ---
+		extra: {
+			eas: {
+				projectId: "3412f98a-3504-4fd8-a389-7e6c658f0744", // Your project ID
+			},
+		},
+
+		// --- PLUGINS SECTION ---
+		// This is where all native module configurations go.
 		plugins: [
 			"expo-router",
-			[
-				"expo-splash-screen",
-				{
-					image: "./assets/images/splash-icon.png",
-					imageWidth: 200,
-					resizeMode: "contain",
-					backgroundColor: "#ffffff",
-				},
-			],
 			[
 				"expo-notifications",
 				{
 					icon: "./assets/images/notification-icon.png",
 					color: "#ffffff",
-					sounds: [],
+					sounds: [], // Correctly added to prevent build errors
 				},
 			],
+			// Best practice to include expo-location here too
 			[
-				"expo-payments-stripe",
+				"expo-location",
 				{
-					// 2. Pass the merchantIdentifier here
-					merchantIdentifier: "merchant.ca.roadlift",
-
-					// 3. We also need to add our Stripe Publishable Key here.
-					publishableKey: process.env.STRIPE_PUBLISHABLE_KEY,
+					locationAlwaysAndWhenInUsePermission:
+						"RoadLift needs your location to connect you with nearby drivers.",
 				},
 			],
+			// [
+			// 	"expo-payments-stripe",
+			// 	{
+			// 		merchantIdentifier: "merchant.ca.roadlift",
+			// 		publishableKey: process.env.STRIPE_PUBLISHABLE_KEY,
+			// 		urlScheme: "roadlift",
+			// 	},
+			// ],
 		],
-		experiments: {
-			typedRoutes: true,
-		},
-		extra: {
-			...config.extra,
-			router: {},
-			eas: {
-				projectId: "91e4237a-aa54-4ef7-a29d-2bc0cfa3683e",
-			},
-		},
-		owner: "aryan1703",
 
-		// --- DYNAMICALLY CONFIGURED SECTIONS ---
-		android: {
-			...config.android,
-			adaptiveIcon: {
-				foregroundImage: "./assets/images/adaptive-icon.png",
-				backgroundColor: "#ffffff",
-			},
-			package: "ca.roadlift.app", // Recommended to add package name
-			edgeToEdgeEnabled: true,
-			config: {
-				googleMaps: {
-					apiKey: process.env.GOOGLE_MAPS_API_KEY,
-				},
-			},
-			// --- NEW: App Links Configuration for Android ---
-			intentFilters: [
-				{
-					action: "VIEW",
-					autoVerify: true,
-					data: [
-						{
-							scheme: "https",
-							host: "ca.roadlift.app",
-							pathPrefix: "/stripe-onboarding",
-						},
-					],
-					category: ["BROWSABLE", "DEFAULT"],
-				},
-			],
-		},
+		// --- PLATFORM-SPECIFIC CONFIGURATIONS ---
 		ios: {
-			...config.ios,
 			bundleIdentifier: "ca.roadlift.app",
 			supportsTablet: true,
-			associatedDomains: ["applinks:roadlift.ca"],
 			config: {
 				googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY,
 			},
 			infoPlist: {
-				UIBackgroundModes: ["remote-notification", "fetch"],
-				NSUserTrackingUsageDescription:
-					"We use notifications to keep you updated about towing jobs and services.",
 				NSLocationWhenInUseUsageDescription:
-					"This app needs access to your location to track towing jobs in real-time.",
+					"RoadLift needs your location to find nearby help and for drivers to navigate to you.",
 				NSLocationAlwaysAndWhenInUseUsageDescription:
-					"Location access is required to provide live updates even when the app is in background.",
-				ITSAppUsesNonExemptEncryption: false,
-				// ✅ Apple Pay usage description (optional, but recommended)
-				NSAppleMusicUsageDescription:
-					"This app uses Apple Pay to let you make fast and secure payments.",
+					"Location access allows drivers to update you with their live position, even when the app is in the background.",
+				ITSAppUsesNonExemptEncryption: false, // ← ✅ ADD THIS LINE
+			},
+		},
+		android: {
+			adaptiveIcon: {
+				foregroundImage: "./assets/images/adaptive-icon.png",
+				backgroundColor: "#ffffff",
+			},
+			package: "ca.roadlift.app",
+			config: {
+				googleMaps: {
+					apiKey: process.env.GOOGLE_MAPS_API_KEY,
+				},
 			},
 		},
 	};
