@@ -15,7 +15,7 @@ import {
 	FlatList,
 	Modal,
 } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import MapView, { PROVIDER_GOOGLE } from "react-native-maps";
 import axios from "axios";
 import { useStripe } from "@stripe/stripe-react-native";
@@ -60,28 +60,35 @@ const RequestConfirmationScreen = () => {
 	const serviceName = params.serviceName || "Service";
 	const price = parseFloat(params.price || "0");
 
-	// --- NEW EFFECT to Fetch Vehicles on Load ---
-	useEffect(() => {
-		const fetchUserVehicles = async () => {
-			if (!token) return;
-			try {
-				const response = await axios.get(`${API_URL}/vehicles`, {
-					headers: { Authorization: `Bearer ${token}` },
-				});
-				setVehicles(response.data);
-				// Automatically select the default vehicle, or the first one as a fallback
-				const defaultVehicle = response.data.find(v => v.id === user.defaultVehicleId);
-				setSelectedVehicle(defaultVehicle || response.data[0]);
-			} catch (error) {
-				Alert.alert("Error", "Could not load your vehicle information.");
-			} finally {
-				setIsVehicleLoading(false);
-			}
-		};
-		fetchUserVehicles();
-	}, [token, user]);
+	useFocusEffect(
+		React.useCallback(() => {
+			const fetchUserVehicles = async () => {
+				if (!token) return;
 
-	// --- SECURE GEOLOCATION & AUTOCOMPLETE LOGIC ---
+				setIsVehicleLoading(true);
+				try {
+					const response = await axios.get(`${API_URL}/vehicles`, {
+						headers: { Authorization: `Bearer ${token}` },
+					});
+					const fetchedVehicles = response.data;
+					setVehicles(fetchedVehicles);
+					const defaultVehicle = fetchedVehicles.find(
+						v => v.id === user.defaultVehicleId
+					);
+					if (!selectedVehicle) {
+						setSelectedVehicle(defaultVehicle || fetchedVehicles[0]);
+					}
+				} catch (error) {
+					Alert.alert("Error", "Could not load your vehicle information.");
+				} finally {
+					setIsVehicleLoading(false);
+				}
+			};
+
+			fetchUserVehicles();
+		}, [token, user, selectedVehicle])
+	);
+
 	const getAddressFromCoords = useCallback(
 		debounce(async ({ latitude, longitude }) => {
 			if (!latitude || !longitude || !token) return;
