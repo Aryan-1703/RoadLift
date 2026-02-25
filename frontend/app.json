@@ -8,16 +8,17 @@
 		"android": {
 			"package": "com.aryan1703.RoadLift"
 		},
-		"extra": {
-			"eas": {
-				"projectId": "eac43876-eb24-4640-be5f-385358026bbc"
-			}
-		},
 		"ios": {
 			"bundleIdentifier": "com.aryan1703.RoadLift",
 			"infoPlist": {
 				"ITSAppUsesNonExemptEncryption": false
 			}
-		}
+		},
+		"extra": {
+			"eas": {
+				"projectId": "ad2db119-04d3-4517-be8a-4b4de6194806"
+			}
+		},
+		"owner": "aryan1703"
 	}
 }
