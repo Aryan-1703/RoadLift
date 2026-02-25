@@ -1,7 +1,5 @@
 {
-  "name": "RoadLift",
-  "description": "A web-based prototype of the RoadLift mobile application featuring authentication, service selection, and real-time tracking simulations.",
-  "requestFramePermissions": [
-    "geolocation"
-  ]
+	"name": "RoadLift",
+	"description": "A web-based prototype of the RoadLift mobile application featuring authentication, service selection, and real-time tracking simulations.",
+	"requestFramePermissions": ["geolocation"]
 }

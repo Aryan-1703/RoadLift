@@ -44,7 +44,7 @@ if (getRNMinorVersion() >= 75) {
   }
 }
 
-rootProject.name = 'roadlift-customer'
+rootProject.name = 'RoadLift'
 
 dependencyResolutionManagement {
   versionCatalogs {
