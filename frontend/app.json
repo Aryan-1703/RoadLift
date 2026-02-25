@@ -1,0 +1,26 @@
+{
+  "expo": {
+    "name": "roadlift-customer",
+    "slug": "roadlift-customer",
+    "version": "1.0.0",
+    "sdkVersion": "51.0.0",
+    "platforms": [
+      "ios",
+      "android"
+    ],
+    "android": {
+      "package": "com.aryan1703.roadliftcustomer"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "eac43876-eb24-4640-be5f-385358026bbc"
+      }
+    },
+    "ios": {
+      "bundleIdentifier": "com.aryan1703.RoadLift",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    }
+  }
+}

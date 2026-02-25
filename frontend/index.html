@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>RoadLift</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      /* Ensure full height and prevent overscroll on mobile */
+      body, html {
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+        background-color: #f3f4f6; /* gray-100 */
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      }
+      #root {
+        height: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+      /* Custom scrollbar for inner scrollable areas */
+      ::-webkit-scrollbar {
+        width: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 4px;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.2.4",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "react-router-dom": "https://esm.sh/react-router-dom@^7.13.1",
+    "react-native": "https://esm.sh/react-native@^0.84.0",
+    "@react-native-async-storage/async-storage": "https://esm.sh/@react-native-async-storage/async-storage@^3.0.1",
+    "@expo/vector-icons": "https://esm.sh/@expo/vector-icons@^15.1.1",
+    "@react-navigation/native-stack": "https://esm.sh/@react-navigation/native-stack@^7.13.0",
+    "@react-navigation/native": "https://esm.sh/@react-navigation/native@^7.1.28",
+    "expo": "https://esm.sh/expo@^54.0.33"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body>
+    <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>
