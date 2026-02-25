@@ -10,7 +10,7 @@ const sequelize = new Sequelize(
 		dialect: "postgres",
 		// logging: console.log,
 		logging: false,
-	}
+	},
 );
 
 module.exports = sequelize;
