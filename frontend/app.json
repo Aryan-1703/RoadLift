@@ -3,7 +3,7 @@
 		"name": "RoadLift",
 		"slug": "RoadLift",
 		"version": "1.0.0",
-		"sdkVersion": "51.0.0",
+		"sdkVersion": "54.0.0",
 		"platforms": ["ios", "android"],
 		"android": {
 			"package": "com.aryan1703.RoadLift"
