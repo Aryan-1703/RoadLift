@@ -1,4 +1,4 @@
-package com.aryan1703.roadliftcustomer
+package com.roadlift
 
 import android.os.Build
 import android.os.Bundle
