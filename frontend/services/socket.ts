@@ -1,89 +1,59 @@
-import { Location, Provider } from '../types';
+import { io, Socket as IOSocket } from "socket.io-client";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { BACKEND_URL } from "../config";
 
-// Mocked Socket.IO client
-type EventHandler = (data: any) => void;
+class SocketClient {
+	public ioSocket: IOSocket | null = null;
 
-class MockSocket {
-  private handlers: Record<string, EventHandler[]> = {};
-  private trackingInterval: ReturnType<typeof setInterval> | null = null;
+	async connect() {
+		if (this.ioSocket?.connected) return;
 
-  on(event: string, handler: EventHandler) {
-    if (!this.handlers[event]) {
-      this.handlers[event] = [];
-    }
-    this.handlers[event].push(handler);
-  }
+		try {
+			const storedUser = await AsyncStorage.getItem("@roadlift_user");
+			const token = storedUser ? JSON.parse(storedUser).token : null;
 
-  off(event: string, handler: EventHandler) {
-    if (!this.handlers[event]) return;
-    this.handlers[event] = this.handlers[event].filter(h => h !== handler);
-  }
+			if (!token) return;
 
-  emit(event: string, data: any) {
-    console.log(`[Socket Emit] ${event}`, data);
+			this.ioSocket = io(BACKEND_URL, {
+				auth: { token },
+				transports: ["websocket"],
+			});
 
-    if (event === 'request-service') {
-      // Simulate backend finding a provider after 3 seconds
-      setTimeout(() => {
-        const mockProvider: Provider = {
-          id: 'prov_456',
-          name: 'Mike Towing',
-          rating: 4.8,
-          vehicle: 'Flatbed Tow Truck - XYZ 123',
-          location: {
-            latitude: data.lat + 0.015, // Start slightly away
-            longitude: data.lng + 0.015,
-          }
-        };
-        this.trigger('provider-assigned', mockProvider);
-        this.startMockTracking(data.lat, data.lng, mockProvider);
-      }, 3000);
-    }
+			this.ioSocket.on("connect", () => {
+				console.log("[Socket] Connected to backend");
+			});
 
-    if (event === 'cancel-request') {
-      this.stopTracking();
-    }
-  }
+			this.ioSocket.on("connect_error", err => {
+				console.warn("[Socket] Connection Error:", err.message);
+			});
+		} catch (e) {
+			console.error("[Socket] Init Error:", e);
+		}
+	}
 
-  private trigger(event: string, data: any) {
-    console.log(`[Socket Receive] ${event}`, data);
-    if (this.handlers[event]) {
-      this.handlers[event].forEach(handler => handler(data));
-    }
-  }
+	disconnect() {
+		if (this.ioSocket) {
+			this.ioSocket.disconnect();
+			this.ioSocket = null;
+		}
+	}
 
-  private startMockTracking(targetLat: number, targetLng: number, provider: Provider) {
-    let currentLat = provider.location.latitude;
-    let currentLng = provider.location.longitude;
-    let steps = 0;
-    const maxSteps = 10; // Arrives in 10 steps
+	on(event: string, handler: (data: any) => void) {
+		this.ioSocket?.on(event, handler);
+	}
 
-    this.trackingInterval = setInterval(() => {
-      steps++;
-      if (steps >= maxSteps) {
-        this.stopTracking();
-        this.trigger('job-completed', { finalPrice: 85.00 });
-        return;
-      }
+	off(event: string, handler?: (data: any) => void) {
+		if (handler) {
+			this.ioSocket?.off(event, handler);
+		} else {
+			this.ioSocket?.off(event);
+		}
+	}
 
-      // Move closer
-      currentLat -= (provider.location.latitude - targetLat) / maxSteps;
-      currentLng -= (provider.location.longitude - targetLng) / maxSteps;
-
-      this.trigger('provider-location-update', {
-        latitude: currentLat,
-        longitude: currentLng,
-        eta: maxSteps - steps // Mock ETA in minutes
-      });
-    }, 2000); // Update every 2 seconds
-  }
-
-  private stopTracking() {
-    if (this.trackingInterval) {
-      clearInterval(this.trackingInterval);
-      this.trackingInterval = null;
-    }
-  }
+	emit(event: string, data?: any) {
+		this.ioSocket?.emit(event, data);
+	}
 }
 
-export const socket = new MockSocket();
+const socketClient = new SocketClient();
+export default socketClient;

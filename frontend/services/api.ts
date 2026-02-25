@@ -1,103 +1,84 @@
-import { User, NotificationPreferences, ActiveSession, Vehicle, PaymentMethod } from '../types';
+import axios from "axios";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { API_URL } from "../config";
 
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+export const apiClient = axios.create({
+	baseURL: API_URL,
+	headers: {
+		"Content-Type": "application/json",
+	},
+});
 
+// Automatically inject JWT Token
+apiClient.interceptors.request.use(
+	async config => {
+		try {
+			const storedUser = await AsyncStorage.getItem("@roadlift_user");
+			if (storedUser) {
+				const user = JSON.parse(storedUser);
+				if (user.token) {
+					config.headers.Authorization = `Bearer ${user.token}`;
+				}
+			}
+		} catch (e) {
+			console.warn("Failed to fetch token for request");
+		}
+		return config;
+	},
+	error => Promise.reject(error),
+);
+
+// Fallback interceptor for endpoints that aren't built on the backend yet
+apiClient.interceptors.response.use(
+	response => response,
+	async error => {
+		const config = error.config;
+		if (!config || !config.url) return Promise.reject(error);
+
+		const endpoint = config.url.replace(API_URL, "");
+
+		// Temporary mocks to prevent UI crashes while backend is being finished
+		if (endpoint === "/users/preferences" && config.method === "get") {
+			return Promise.resolve({
+				data: { push: true, sms: true, emailReceipts: true, promotions: false },
+			});
+		}
+		if (endpoint === "/users/sessions" && config.method === "get") {
+			return Promise.resolve({
+				data: [
+					{
+						id: "sess_1",
+						device: "Current Device",
+						location: "Local",
+						lastActive: "Now",
+						isCurrent: true,
+					},
+				],
+			});
+		}
+		if (endpoint === "/users/vehicles" && config.method === "get") {
+			return Promise.resolve({ data: [] });
+		}
+		if (endpoint === "/users/payments" && config.method === "get") {
+			return Promise.resolve({ data: [] });
+		}
+		if (endpoint === "/payment/charge" && config.method === "post") {
+			return new Promise(resolve =>
+				setTimeout(() => resolve({ data: { success: true } }), 1000),
+			);
+		}
+		if (endpoint === "/jobs/complete" && config.method === "post") {
+			return Promise.resolve({ data: { success: true } });
+		}
+
+		return Promise.reject(error);
+	},
+);
+
+// Map the old api mock structure to the new Axios instance
 export const api = {
-  get: async <T,>(endpoint: string): Promise<{ data: T }> => {
-    await delay(600);
-    
-    if (endpoint === '/users/preferences') {
-      return {
-        data: {
-          push: true,
-          sms: true,
-          emailReceipts: true,
-          promotions: false
-        } as unknown as T
-      };
-    }
-
-    if (endpoint === '/users/sessions') {
-      return {
-        data: [
-          { id: 'sess_1', device: 'iPhone 13 Pro', location: 'Toronto, ON', lastActive: 'Active now', isCurrent: true },
-          { id: 'sess_2', device: 'MacBook Pro', location: 'Toronto, ON', lastActive: '2 days ago', isCurrent: false }
-        ] as unknown as T
-      };
-    }
-
-    if (endpoint === '/users/vehicles') {
-      return {
-        data: [
-          { id: 'veh_1', make: 'Toyota', model: 'Camry', year: '2020', color: 'Silver', licensePlate: 'ABCD 123', isDefault: true },
-          { id: 'veh_2', make: 'Honda', model: 'Civic', year: '2018', color: 'Black', licensePlate: 'WXYZ 987', isDefault: false }
-        ] as unknown as T
-      };
-    }
-
-    if (endpoint === '/users/payments') {
-      return {
-        data: [
-          { id: 'pm_1', brand: 'Visa', last4: '4242', expMonth: 12, expYear: 2025, isDefault: true },
-          { id: 'pm_2', brand: 'Mastercard', last4: '5555', expMonth: 8, expYear: 2024, isDefault: false }
-        ] as unknown as T
-      };
-    }
-
-    throw new Error(`Endpoint GET ${endpoint} not mocked`);
-  },
-
-  post: async <T,>(endpoint: string, data?: any): Promise<{ data: T }> => {
-    await delay(800);
-
-    if (endpoint === '/auth/login') {
-      if (data.email && data.password) {
-        return {
-          data: {
-            id: 'usr_123',
-            email: data.email,
-            name: 'Alex Customer',
-            token: 'mock_jwt_token_898989'
-          } as unknown as T
-        };
-      }
-      throw new Error('Invalid credentials');
-    }
-
-    if (endpoint === '/users/password/change') {
-      if (data.currentPassword === 'wrong') throw new Error('Incorrect current password');
-      return { data: { success: true } as unknown as T };
-    }
-
-    if (endpoint === '/users/sessions/logout-all') {
-      return { data: { success: true } as unknown as T };
-    }
-
-    if (endpoint === '/users/delete') {
-      if (data.password === 'wrong') throw new Error('Incorrect password');
-      return { data: { success: true } as unknown as T };
-    }
-
-    if (endpoint === '/users/vehicles') {
-      return { data: { id: `veh_${Math.random()}`, ...data } as unknown as T };
-    }
-
-    throw new Error(`Endpoint POST ${endpoint} not mocked`);
-  },
-
-  put: async <T,>(endpoint: string, data: any): Promise<{ data: T }> => {
-    await delay(600);
-    if (endpoint === '/users/preferences') {
-      return { data: data as T };
-    }
-    throw new Error(`Endpoint PUT ${endpoint} not mocked`);
-  },
-
-  delete: async <T,>(endpoint: string): Promise<{ data: T }> => {
-    await delay(600);
-    if (endpoint.startsWith('/users/vehicles/')) {
-      return { data: { success: true } as unknown as T };
-    }
-    throw new Error(`Endpoint DELETE ${endpoint} not mocked`);
-  }
+	get: async <T>(endpoint: string) => apiClient.get<T>(endpoint),
+	post: async <T>(endpoint: string, data?: any) => apiClient.post<T>(endpoint, data),
+	put: async <T>(endpoint: string, data: any) => apiClient.put<T>(endpoint, data),
+	delete: async <T>(endpoint: string) => apiClient.delete<T>(endpoint),
 };

@@ -7,7 +7,8 @@ import React, {
 	useEffect,
 } from "react";
 import { Job, JobStatus, ServiceTypeId, Provider, Location } from "../types";
-import { socket } from "../services/socket";
+import socketClient from "../services/socket";
+import { api } from "../services/api";
 import { useAuth } from "./AuthContext";
 
 interface JobContextType {
@@ -16,7 +17,7 @@ interface JobContextType {
 	selectService: (type: ServiceTypeId, price: number) => void;
 	setCustomerLocation: (loc: Location) => void;
 	setNotes: (notes: string) => void;
-	requestService: () => void;
+	requestService: () => Promise<void>;
 	cancelJob: () => void;
 	resetJob: () => void;
 	providerLocation: Location | null;
@@ -45,9 +46,15 @@ export const JobProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
 	useEffect(() => {
 		// Socket Listeners
-		const handleProviderAssigned = (provider: Provider) => {
-			setJob(prev => ({ ...prev, status: "tracking", provider }));
-			setProviderLocation(provider.location);
+		const handleProviderAssigned = (data: { jobId: string; provider: Provider }) => {
+			socketClient.emit("join-job", data.jobId); // Join the room to track driver location updates
+			setJob(prev => ({
+				...prev,
+				status: "tracking",
+				provider: data.provider,
+				id: data.jobId,
+			}));
+			setProviderLocation(data.provider.location);
 		};
 
 		const handleLocationUpdate = (data: {
@@ -63,14 +70,14 @@ export const JobProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 			setJob(prev => ({ ...prev, status: "payment", finalPrice: data.finalPrice }));
 		};
 
-		socket.on("provider-assigned", handleProviderAssigned);
-		socket.on("provider-location-update", handleLocationUpdate);
-		socket.on("job-completed", handleJobCompleted);
+		socketClient.on("provider-assigned", handleProviderAssigned);
+		socketClient.on("provider-location-update", handleLocationUpdate);
+		socketClient.on("job-completed", handleJobCompleted);
 
 		return () => {
-			socket.off("provider-assigned", handleProviderAssigned);
-			socket.off("provider-location-update", handleLocationUpdate);
-			socket.off("job-completed", handleJobCompleted);
+			socketClient.off("provider-assigned", handleProviderAssigned);
+			socketClient.off("provider-location-update", handleLocationUpdate);
+			socketClient.off("job-completed", handleJobCompleted);
 		};
 	}, []);
 
@@ -95,24 +102,32 @@ export const JobProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 		setJob(prev => ({ ...prev, notes }));
 	}, []);
 
-	const requestService = useCallback(() => {
+	const requestService = useCallback(async () => {
 		if (!job.customerLocation || !job.serviceType || !user) return;
 
 		setJob(prev => ({ ...prev, status: "searching" }));
 
-		socket.emit("request-service", {
-			userId: user.id,
-			serviceType: job.serviceType,
-			lat: job.customerLocation.latitude,
-			lng: job.customerLocation.longitude,
-			notes: job.notes,
-		});
-	}, [job.customerLocation, job.serviceType, job.notes, user]);
+		try {
+			// Backend expects upper-cased Enums like 'TOWING'
+			const response = await api.post<any>("/jobs", {
+				serviceType: job.serviceType.toUpperCase(),
+				pickupLat: job.customerLocation.latitude,
+				pickupLng: job.customerLocation.longitude,
+				notes: job.notes,
+			});
+
+			const createdJob = response.data.data;
+			setJob(prev => ({ ...prev, id: createdJob.id }));
+		} catch (err) {
+			console.error("Failed to request job:", err);
+			setJobStatus("idle"); // Rollback on failure
+		}
+	}, [job.customerLocation, job.serviceType, job.notes, user, setJobStatus]);
 
 	const cancelJob = useCallback(() => {
-		socket.emit("cancel-request", { userId: user?.id });
+		// Local state reset (cancellation route to be added later to backend)
 		resetJob();
-	}, [user, resetJob]);
+	}, [resetJob]);
 
 	return (
 		<JobContext.Provider
