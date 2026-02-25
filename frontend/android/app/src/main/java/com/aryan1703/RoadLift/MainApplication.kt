@@ -1,4 +1,4 @@
-package com.roadlift
+package com.aryan1703.RoadLift
 
 import android.app.Application
 import android.content.res.Configuration
