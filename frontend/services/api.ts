@@ -37,6 +37,30 @@ apiClient.interceptors.response.use(
 
 		const endpoint = config.url.replace(API_URL, "");
 
+		// MOCK: User Registration (simulate 1.2s network delay)
+		if (endpoint === "/auth/register" && config.method === "post") {
+			const body = JSON.parse(config.data);
+			return new Promise(resolve =>
+				setTimeout(
+					() =>
+						resolve({
+							data: {
+								data: {
+									user: {
+										id: `usr_${Math.random().toString(36).substring(7)}`,
+										email: body.email,
+										name: body.name,
+										role: "CUSTOMER",
+									},
+									token: "mock_jwt_token_register_999",
+								},
+							},
+						}),
+					1200,
+				),
+			);
+		}
+
 		// Temporary mocks to prevent UI crashes while backend is being finished
 		if (endpoint === "/users/preferences" && config.method === "get") {
 			return Promise.resolve({

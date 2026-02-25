@@ -4,10 +4,11 @@ import {
 	Text,
 	TextInput,
 	StyleSheet,
-	SafeAreaView,
 	KeyboardAvoidingView,
 	Platform,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useNavigation } from "@react-navigation/native";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { PrimaryButton } from "../components/PrimaryButton";
@@ -18,6 +19,7 @@ import { API_URL } from "../config";
 export const LoginScreen = () => {
 	const { colors } = useTheme();
 	const { login } = useAuth();
+	const navigation = useNavigation<any>();
 
 	const [email, setEmail] = useState("user@roadlift.com");
 	const [password, setPassword] = useState("password123");
@@ -30,9 +32,7 @@ export const LoginScreen = () => {
 		try {
 			await login(email, password);
 		} catch (err: any) {
-			// Unwrap backend errors vs generic Axios errors
 			const backendError = err.response?.data?.error || err.response?.data?.message;
-
 			const fallbackError =
 				err.message === "Network Error"
 					? `Network Error: Cannot reach backend at ${API_URL}.\n\nIf you are testing on a physical phone, you MUST enter your computer's Wi-Fi IP address in frontend/config.ts!`
@@ -102,6 +102,14 @@ export const LoginScreen = () => {
 						isLoading={isSubmitting}
 						style={styles.button}
 					/>
+
+					<PrimaryButton
+						title="Create an Account"
+						variant="secondary"
+						onPress={() => navigation.navigate("Register")}
+						disabled={isSubmitting}
+						style={styles.registerButton}
+					/>
 				</Card>
 			</KeyboardAvoidingView>
 		</SafeAreaView>
@@ -125,4 +133,5 @@ const styles = StyleSheet.create({
 	input: { borderWidth: 1, borderRadius: 12, padding: 14, fontSize: 16 },
 	error: { color: "#DC2626", marginTop: 12, textAlign: "center", lineHeight: 20 },
 	button: { marginTop: 24 },
+	registerButton: { marginTop: 12 },
 });

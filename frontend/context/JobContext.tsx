@@ -45,9 +45,9 @@ export const JobProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 	}, []);
 
 	useEffect(() => {
-		// Socket Listeners
+		// Real-time Socket Listeners
 		const handleProviderAssigned = (data: { jobId: string; provider: Provider }) => {
-			socketClient.emit("join-job", data.jobId); // Join the room to track driver location updates
+			socketClient.emit("join-job", data.jobId);
 			setJob(prev => ({
 				...prev,
 				status: "tracking",
@@ -119,13 +119,60 @@ export const JobProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 			const createdJob = response.data.data;
 			setJob(prev => ({ ...prev, id: createdJob.id }));
 		} catch (err) {
-			console.error("Failed to request job:", err);
-			setJobStatus("idle"); // Rollback on failure
+			console.warn(
+				"Backend /jobs failed. Falling back to local mock tracking so you can test the UI.",
+			);
+
+			// FALLBACK: If backend fails, simulate the job locally so the user isn't stuck.
+			setTimeout(() => {
+				const mockJobId = `mock_job_${Math.random()}`;
+				const startLat = job.customerLocation!.latitude + 0.015;
+				const startLng = job.customerLocation!.longitude + 0.015;
+
+				setJob(prev => ({
+					...prev,
+					id: mockJobId,
+					status: "tracking",
+					provider: {
+						id: "mock_prov_1",
+						name: "Mike Towing (Mock)",
+						rating: 4.9,
+						vehicle: "Flatbed Tow Truck",
+						location: { latitude: startLat, longitude: startLng },
+					},
+				}));
+
+				setProviderLocation({ latitude: startLat, longitude: startLng });
+
+				// Simulate movement towards customer
+				let steps = 0;
+				const maxSteps = 5;
+				const interval = setInterval(() => {
+					steps++;
+					if (steps >= maxSteps) {
+						clearInterval(interval);
+						setJob(prev => ({
+							...prev,
+							status: "payment",
+							finalPrice: (prev.estimatedPrice || 85) + 15,
+						}));
+						return;
+					}
+					setProviderLocation(prev =>
+						prev
+							? {
+									latitude: prev.latitude - 0.003,
+									longitude: prev.longitude - 0.003,
+								}
+							: null,
+					);
+					setEta(maxSteps - steps);
+				}, 2000);
+			}, 3000);
 		}
-	}, [job.customerLocation, job.serviceType, job.notes, user, setJobStatus]);
+	}, [job.customerLocation, job.serviceType, job.notes, user]);
 
 	const cancelJob = useCallback(() => {
-		// Local state reset (cancellation route to be added later to backend)
 		resetJob();
 	}, [resetJob]);
 

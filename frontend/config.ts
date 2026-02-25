@@ -3,7 +3,9 @@ import { Platform } from "react-native";
 // For Android Emulators, '10.0.2.2' points to your host machine's localhost.
 // For iOS Simulators, 'localhost' works perfectly.
 // If you are testing on a PHYSICAL device, change this to your computer's local Wi-Fi IP (e.g., '192.168.1.100')
+// export const BACKEND_URL =
+// 	Platform.OS === "android" ? "http://10.0.2.2:3000" : "http://localhost:3000";
 export const BACKEND_URL =
-	Platform.OS === "android" ? "http://10.0.2.2:3000" : "http://localhost:3000";
+	Platform.OS === "android" ? "http://10.0.2.2:3000" : "http://172.20.10.2:3000"; // <-- CHANGE THIS FOR PHYSICAL DEVICE TESTING!
 
 export const API_URL = `${BACKEND_URL}/api`;
