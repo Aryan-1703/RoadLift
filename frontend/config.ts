@@ -4,6 +4,6 @@ import { Platform } from "react-native";
 // For iOS Simulators, 'localhost' works perfectly.
 // If you are testing on a PHYSICAL device, change this to your computer's local Wi-Fi IP (e.g., '192.168.1.100')
 export const BACKEND_URL =
-	Platform.OS === "android" ? "http://10.0.2.2:3000" : "http://localhost:6000";
+	Platform.OS === "android" ? "http://10.0.2.2:3000" : "http://localhost:3000";
 
 export const API_URL = `${BACKEND_URL}/api`;
