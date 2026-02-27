@@ -35,9 +35,13 @@ const RootNavigator = () => {
 					<Stack.Screen name="Login" component={LoginScreen} />
 					<Stack.Screen name="Register" component={RegisterScreen} />
 				</>
-			) : (
+			) : user.role === "CUSTOMER" ? (
 				<>
 					<Stack.Screen name="JobFlow" component={JobFlowScreen} />
+					<Stack.Screen name="SettingsNav" component={SettingsNavigator} />
+				</>
+			) : (
+				<>
 					<Stack.Screen name="SettingsNav" component={SettingsNavigator} />
 				</>
 			)}

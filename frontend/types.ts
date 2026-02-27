@@ -6,13 +6,22 @@ export interface Vehicle {
 	color?: string;
 }
 
+export interface DriverProfile {
+	companyName: string;
+	serviceArea: string;
+	licenseNumber: string;
+	vehicleType: string;
+	insuranceNumber?: string;
+}
+
 export interface User {
 	id: string;
 	name: string;
 	email: string;
 	phone: string;
 	role: "CUSTOMER" | "DRIVER";
-	vehicle: Vehicle;
+	vehicle?: Vehicle;
+	driverProfile?: DriverProfile;
 	token: string;
 }
 
@@ -21,12 +30,20 @@ export interface RegisterDTO {
 	phone: string;
 	email: string;
 	password: string;
-	vehicle: {
+	role: "CUSTOMER" | "DRIVER";
+	vehicle?: {
 		year: string;
 		make: string;
 		model: string;
 		plate: string;
 		color?: string;
+	};
+	driverProfile?: {
+		companyName: string;
+		serviceArea: string;
+		licenseNumber: string;
+		vehicleType: string;
+		insuranceNumber?: string;
 	};
 }
 

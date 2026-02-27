@@ -59,43 +59,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 	};
 
 	const login = async (phoneNumber: string, pass: string, rememberEmail: boolean) => {
-		let payload;
-
-		try {
-			const response = await api.post<any>("/auth/login/user", {
-				phoneNumber,
-				password: pass,
-			});
-			payload = response.data;
-		} catch (err: any) {
-			console.log("Login failed. Attempting to auto-register for testing purposes...");
-			try {
-				const regResponse = await api.post<any>("/auth/register/user", {
-					email: "user@roadlift.com",
-					password: pass,
-					name: "Alex Customer",
-					phoneNumber: phoneNumber,
-					role: "CUSTOMER",
-				});
-				payload = regResponse.data;
-			} catch (regErr: any) {
-				console.warn(
-					"Auto-register also failed! Bypassing backend so you can test the UI.",
-					regErr.message,
-				);
-				payload = {
-					user: {
-						id: "mock_usr_123",
-						email: "user@roadlift.com",
-						name: "Alex Customer (Mocked)",
-						phone: phoneNumber,
-						role: "CUSTOMER",
-						vehicle: { year: "2020", make: "Toyota", model: "Camry", plate: "ABC-123" },
-					},
-					token: "mock_jwt_token",
-				};
-			}
-		}
+		const response = await api.post<any>("/auth/login/user", {
+			phoneNumber,
+			password: pass,
+		});
+		const payload = response.data;
 
 		const loggedInUser: User = {
 			id: payload.user.id,
@@ -103,7 +71,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 			name: payload.user.name,
 			phone: payload.user.phoneNumber || payload.user.phone || phoneNumber,
 			role: payload.user.role || "CUSTOMER",
-			vehicle: payload.user.vehicle || { year: "", make: "", model: "", plate: "" },
+			vehicle: payload.user.vehicle,
+			driverProfile: payload.user.driverProfile,
 			token: payload.token,
 		};
 
@@ -119,21 +88,30 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 	};
 
 	const registerUser = async (data: RegisterDTO) => {
-		const response = await api.post<any>("/auth/register/user", {
+		const endpoint =
+			data.role === "DRIVER" ? "/auth/register/driver" : "/auth/register/user";
+		const response = await api.post<any>(endpoint, {
 			name: data.name,
 			phoneNumber: data.phone,
 			email: data.email,
 			password: data.password,
+			vehicle: data.vehicle,
+			driverProfile: data.driverProfile,
 		});
 		const payload = response.data;
 
 		const loggedInUser: User = {
-			id: payload.user.id,
-			email: payload.user.email,
-			name: payload.user.name,
-			phone: payload.user.phoneNumber || data.phone,
-			role: payload.user.role || "CUSTOMER",
-			vehicle: payload.user.vehicle || { year: "", make: "", model: "", plate: "" },
+			id: payload.user?.id || payload.createdRecord?.id,
+			email: payload.user?.email || payload.createdRecord?.email,
+			name: payload.user?.name || payload.createdRecord?.name,
+			phone:
+				payload.user?.phoneNumber || payload.createdRecord?.phoneNumber || data.phone,
+			role: data.role,
+			vehicle: payload.user?.vehicle || payload.createdRecord?.vehicle || data.vehicle,
+			driverProfile:
+				payload.user?.driverProfile ||
+				payload.createdRecord?.driverProfile ||
+				data.driverProfile,
 			token: payload.token,
 		};
 

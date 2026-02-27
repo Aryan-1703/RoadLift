@@ -72,11 +72,17 @@ export const EditProfileScreen = () => {
 		name: !form.name ? "Full Name is required" : "",
 		phone: !form.phone || !/^\d+$/.test(form.phone) ? "Valid numeric phone required" : "",
 		email: !form.email || !/\S+@\S+\.\S+/.test(form.email) ? "Valid email required" : "",
-		vYear:
-			!form.vYear || !/^\d{4}$/.test(form.vYear) ? "Valid 4-digit year required" : "",
-		vMake: !form.vMake ? "Vehicle Make is required" : "",
-		vModel: !form.vModel ? "Vehicle Model is required" : "",
-		vPlate: !form.vPlate ? "License Plate is required" : "",
+		...(user?.role === "CUSTOMER"
+			? {
+					vYear:
+						!form.vYear || !/^\d{4}$/.test(form.vYear)
+							? "Valid 4-digit year required"
+							: "",
+					vMake: !form.vMake ? "Vehicle Make is required" : "",
+					vModel: !form.vModel ? "Vehicle Model is required" : "",
+					vPlate: !form.vPlate ? "License Plate is required" : "",
+				}
+			: {}),
 	};
 
 	const isFormValid = Object.values(errors).every(err => err === "");
@@ -95,13 +101,17 @@ export const EditProfileScreen = () => {
 				name: form.name,
 				phone: form.phone,
 				email: form.email,
-				vehicle: {
-					year: form.vYear,
-					make: form.vMake,
-					model: form.vModel,
-					plate: form.vPlate,
-					color: form.vColor || undefined,
-				},
+				...(user?.role === "CUSTOMER"
+					? {
+							vehicle: {
+								year: form.vYear,
+								make: form.vMake,
+								model: form.vModel,
+								plate: form.vPlate,
+								color: form.vColor || undefined,
+							},
+						}
+					: {}),
 			};
 
 			const response = await api.put<any>("/users/profile", updatedUser);
@@ -151,6 +161,9 @@ export const EditProfileScreen = () => {
 					autoCapitalize={autoCapitalize}
 					editable={editable}
 				/>
+				{hasError && form[field] !== "" ? (
+					<Text style={[styles.errorText, { color: colors.danger }]}>{errorMsg}</Text>
+				) : null}
 			</View>
 		);
 	};
@@ -174,25 +187,27 @@ export const EditProfileScreen = () => {
 						</Text>
 						{renderInput("Full Name *", "name")}
 						{renderInput("Phone Number *", "phone", "phone-pad")}
-						{renderInput("Email Address *", "email", "email-address", "none", false)}
+						{renderInput("Email Address *", "email", "email-address", "none", true)}
 					</Card>
 
-					<Card style={styles.card}>
-						<Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
-							VEHICLE INFO
-						</Text>
-						<View style={styles.row}>
-							<View style={styles.halfWidth}>
-								{renderInput("Year *", "vYear", "numeric")}
+					{user?.role === "CUSTOMER" && (
+						<Card style={styles.card}>
+							<Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
+								VEHICLE INFO
+							</Text>
+							<View style={styles.row}>
+								<View style={styles.halfWidth}>
+									{renderInput("Year *", "vYear", "numeric")}
+								</View>
+								<View style={styles.halfWidth}>{renderInput("Make *", "vMake")}</View>
 							</View>
-							<View style={styles.halfWidth}>{renderInput("Make *", "vMake")}</View>
-						</View>
-						<View style={styles.row}>
-							<View style={styles.halfWidth}>{renderInput("Model *", "vModel")}</View>
-							<View style={styles.halfWidth}>{renderInput("Color", "vColor")}</View>
-						</View>
-						{renderInput("License Plate *", "vPlate", "default", "characters")}
-					</Card>
+							<View style={styles.row}>
+								<View style={styles.halfWidth}>{renderInput("Model *", "vModel")}</View>
+								<View style={styles.halfWidth}>{renderInput("Color", "vColor")}</View>
+							</View>
+							{renderInput("License Plate *", "vPlate", "default", "characters")}
+						</Card>
+					)}
 
 					<View style={styles.footer}>
 						<PrimaryButton
@@ -216,6 +231,7 @@ const styles = StyleSheet.create({
 	inputContainer: { marginBottom: 16 },
 	label: { fontSize: 14, fontWeight: "bold", marginBottom: 8 },
 	input: { borderWidth: 1, borderRadius: 12, padding: 14, fontSize: 16 },
+	errorText: { fontSize: 12, marginTop: 4, marginLeft: 4 },
 	row: { flexDirection: "row", justifyContent: "space-between" },
 	halfWidth: { width: "48%" },
 	footer: { marginTop: 8 },

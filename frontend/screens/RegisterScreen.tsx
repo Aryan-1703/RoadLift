@@ -25,6 +25,8 @@ export const RegisterScreen = () => {
 	const { showToast } = useToast();
 	const navigation = useNavigation<any>();
 
+	const [role, setRole] = useState<"CUSTOMER" | "DRIVER">("CUSTOMER");
+
 	const [form, setForm] = useState({
 		name: "",
 		phone: "",
@@ -36,6 +38,11 @@ export const RegisterScreen = () => {
 		vModel: "",
 		vPlate: "",
 		vColor: "",
+		companyName: "",
+		serviceArea: "",
+		licenseNumber: "",
+		vehicleType: "",
+		insuranceNumber: "",
 	});
 
 	const [touched, setTouched] = useState<Record<string, boolean>>({});
@@ -52,11 +59,22 @@ export const RegisterScreen = () => {
 				: "",
 		confirmPassword:
 			form.password !== form.confirmPassword ? "Passwords do not match" : "",
-		vYear:
-			!form.vYear || !/^\d{4}$/.test(form.vYear) ? "Valid 4-digit year required" : "",
-		vMake: !form.vMake ? "Vehicle Make is required" : "",
-		vModel: !form.vModel ? "Vehicle Model is required" : "",
-		vPlate: !form.vPlate ? "License Plate is required" : "",
+		...(role === "CUSTOMER"
+			? {
+					vYear:
+						!form.vYear || !/^\d{4}$/.test(form.vYear)
+							? "Valid 4-digit year required"
+							: "",
+					vMake: !form.vMake ? "Vehicle Make is required" : "",
+					vModel: !form.vModel ? "Vehicle Model is required" : "",
+					vPlate: !form.vPlate ? "License Plate is required" : "",
+				}
+			: {
+					companyName: !form.companyName ? "Company Name is required" : "",
+					serviceArea: !form.serviceArea ? "Service Area is required" : "",
+					licenseNumber: !form.licenseNumber ? "Driver License Number is required" : "",
+					vehicleType: !form.vehicleType ? "Vehicle Type is required" : "",
+				}),
 	};
 
 	const isFormValid = Object.values(errors).every(err => err === "");
@@ -78,19 +96,31 @@ export const RegisterScreen = () => {
 			phone: form.phone,
 			email: form.email,
 			password: form.password,
-			vehicle: {
-				year: form.vYear,
-				make: form.vMake,
-				model: form.vModel,
-				plate: form.vPlate,
-				color: form.vColor || undefined,
-			},
+			role,
+			...(role === "CUSTOMER"
+				? {
+						vehicle: {
+							year: form.vYear,
+							make: form.vMake,
+							model: form.vModel,
+							plate: form.vPlate,
+							color: form.vColor || undefined,
+						},
+					}
+				: {
+						driverProfile: {
+							companyName: form.companyName,
+							serviceArea: form.serviceArea,
+							licenseNumber: form.licenseNumber,
+							vehicleType: form.vehicleType,
+							insuranceNumber: form.insuranceNumber || undefined,
+						},
+					}),
 		};
 
 		try {
 			await register(payload);
 			showToast("Registration successful! Logging you in...", "success");
-			// AuthContext will automatically redirect to App stack since 'user' is populated
 		} catch (err: any) {
 			const backendError =
 				err.response?.data?.error || err.response?.data?.message || err.message;
@@ -100,7 +130,6 @@ export const RegisterScreen = () => {
 		}
 	};
 
-	// Helper function instead of a Component to prevent React from re-mounting inputs on state change
 	const renderInput = (
 		label: string,
 		field: keyof typeof form,
@@ -164,6 +193,64 @@ export const RegisterScreen = () => {
 				>
 					<Card style={styles.card}>
 						<Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
+							I AM A...
+						</Text>
+						<View style={styles.roleContainer}>
+							<TouchableOpacity
+								style={[
+									styles.roleCard,
+									{
+										backgroundColor:
+											role === "CUSTOMER" ? colors.primary + "20" : colors.background,
+										borderColor: role === "CUSTOMER" ? colors.primary : colors.border,
+									},
+								]}
+								onPress={() => setRole("CUSTOMER")}
+							>
+								<Ionicons
+									name="person"
+									size={24}
+									color={role === "CUSTOMER" ? colors.primary : colors.textMuted}
+								/>
+								<Text
+									style={[
+										styles.roleText,
+										{ color: role === "CUSTOMER" ? colors.primary : colors.textMuted },
+									]}
+								>
+									Customer
+								</Text>
+							</TouchableOpacity>
+							<TouchableOpacity
+								style={[
+									styles.roleCard,
+									{
+										backgroundColor:
+											role === "DRIVER" ? colors.primary + "20" : colors.background,
+										borderColor: role === "DRIVER" ? colors.primary : colors.border,
+									},
+								]}
+								onPress={() => setRole("DRIVER")}
+							>
+								<Ionicons
+									name="car"
+									size={24}
+									color={role === "DRIVER" ? colors.primary : colors.textMuted}
+								/>
+								<Text
+									style={[
+										styles.roleText,
+										{ color: role === "DRIVER" ? colors.primary : colors.textMuted },
+									]}
+								>
+									Driver
+								</Text>
+							</TouchableOpacity>
+						</View>
+					</Card>
+
+					<Card style={styles.card}>
+						<Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
 							PERSONAL INFO
 						</Text>
 						{renderInput("Full Name *", "name")}
@@ -173,22 +260,37 @@ export const RegisterScreen = () => {
 						{renderInput("Confirm Password *", "confirmPassword", "default", true)}
 					</Card>
 
-					<Card style={styles.card}>
-						<Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
-							VEHICLE INFO
-						</Text>
-						<View style={styles.row}>
-							<View style={styles.halfWidth}>
-								{renderInput("Year *", "vYear", "numeric")}
+					{role === "CUSTOMER" && (
+						<Card style={styles.card}>
+							<Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
+								VEHICLE INFO
+							</Text>
+							<View style={styles.row}>
+								<View style={styles.halfWidth}>
+									{renderInput("Year *", "vYear", "numeric")}
+								</View>
+								<View style={styles.halfWidth}>{renderInput("Make *", "vMake")}</View>
 							</View>
-							<View style={styles.halfWidth}>{renderInput("Make *", "vMake")}</View>
-						</View>
-						<View style={styles.row}>
-							<View style={styles.halfWidth}>{renderInput("Model *", "vModel")}</View>
-							<View style={styles.halfWidth}>{renderInput("Color", "vColor")}</View>
-						</View>
-						{renderInput("License Plate *", "vPlate", "default", false, "characters")}
-					</Card>
+							<View style={styles.row}>
+								<View style={styles.halfWidth}>{renderInput("Model *", "vModel")}</View>
+								<View style={styles.halfWidth}>{renderInput("Color", "vColor")}</View>
+							</View>
+							{renderInput("License Plate *", "vPlate", "default", false, "characters")}
+						</Card>
+					)}
+
+					{role === "DRIVER" && (
+						<Card style={styles.card}>
+							<Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
+								DRIVER PROFILE
+							</Text>
+							{renderInput("Company Name *", "companyName")}
+							{renderInput("Service Area *", "serviceArea")}
+							{renderInput("Driver License Number *", "licenseNumber")}
+							{renderInput("Vehicle Type *", "vehicleType")}
+							{renderInput("Insurance Number (Optional)", "insuranceNumber")}
+						</Card>
+					)}
 
 					<View style={styles.footer}>
 						<PrimaryButton
@@ -213,6 +315,16 @@ const styles = StyleSheet.create({
 	scrollContent: { padding: 16, paddingBottom: 40 },
 	card: { padding: 20, marginBottom: 16 },
 	sectionTitle: { fontSize: 12, fontWeight: "bold", marginBottom: 16, letterSpacing: 1 },
+	roleContainer: { flexDirection: "row", justifyContent: "space-between" },
+	roleCard: {
+		flex: 1,
+		borderWidth: 1,
+		borderRadius: 12,
+		padding: 16,
+		alignItems: "center",
+		marginHorizontal: 4,
+	},
+	roleText: { marginTop: 8, fontWeight: "bold" },
 	inputContainer: { marginBottom: 16 },
 	label: { fontSize: 14, fontWeight: "bold", marginBottom: 8 },
 	input: { borderWidth: 1, borderRadius: 12, padding: 14, fontSize: 16 },

@@ -74,7 +74,7 @@ export const LoginScreen = () => {
 			>
 				<View style={styles.header}>
 					<View style={[styles.iconContainer, { backgroundColor: colors.primary }]}>
-						<Ionicons name="car-sport" size={40} color="#FFF" />
+						<Ionicons name="car-sport" size={48} color="#FFF" />
 					</View>
 					<Text style={[styles.title, { color: colors.text }]}>RoadLift</Text>
 					<Text style={[styles.subtitle, { color: colors.textMuted }]}>
@@ -97,9 +97,11 @@ export const LoginScreen = () => {
 						onChangeText={setPhoneNumber}
 						keyboardType="phone-pad"
 						autoCapitalize="none"
+						placeholder="Enter your phone number"
+						placeholderTextColor={colors.textMuted}
 					/>
 
-					<Text style={[styles.label, { color: colors.text, marginTop: 16 }]}>
+					<Text style={[styles.label, { color: colors.text, marginTop: 20 }]}>
 						Password
 					</Text>
 					<TextInput
@@ -114,11 +116,14 @@ export const LoginScreen = () => {
 						value={password}
 						onChangeText={setPassword}
 						secureTextEntry
+						placeholder="Enter your password"
+						placeholderTextColor={colors.textMuted}
 					/>
 
 					<TouchableOpacity
 						style={styles.checkboxContainer}
 						onPress={() => setRememberEmail(!rememberEmail)}
+						activeOpacity={0.7}
 					>
 						<Ionicons
 							name={rememberEmail ? "checkbox" : "square-outline"}
@@ -126,7 +131,7 @@ export const LoginScreen = () => {
 							color={rememberEmail ? colors.primary : colors.textMuted}
 						/>
 						<Text style={[styles.checkboxLabel, { color: colors.text }]}>
-							Remember Email
+							Remember Phone Number
 						</Text>
 					</TouchableOpacity>
 
@@ -156,28 +161,40 @@ export const LoginScreen = () => {
 const styles = StyleSheet.create({
 	container: { flex: 1 },
 	keyboardView: { flex: 1, justifyContent: "center", padding: 24 },
-	header: { alignItems: "center", marginBottom: 40 },
+	header: { alignItems: "center", marginBottom: 48 },
 	iconContainer: {
-		padding: 16,
-		borderRadius: 20,
-		marginBottom: 16,
+		padding: 20,
+		borderRadius: 24,
+		marginBottom: 20,
 		transform: [{ rotate: "-5deg" }],
+		shadowColor: "#000",
+		shadowOffset: { width: 0, height: 8 },
+		shadowOpacity: 0.15,
+		shadowRadius: 12,
+		elevation: 5,
 	},
-	title: { fontSize: 32, fontWeight: "bold" },
-	subtitle: { fontSize: 16, marginTop: 8 },
-	form: { padding: 20 },
-	label: { fontSize: 14, fontWeight: "bold", marginBottom: 8 },
-	input: { borderWidth: 1, borderRadius: 12, padding: 14, fontSize: 16 },
+	title: { fontSize: 36, fontWeight: "800", letterSpacing: -0.5 },
+	subtitle: { fontSize: 16, marginTop: 8, letterSpacing: 0.2 },
+	form: { padding: 24 },
+	label: { fontSize: 14, fontWeight: "600", marginBottom: 8, letterSpacing: 0.5 },
+	input: { borderWidth: 1, borderRadius: 16, padding: 16, fontSize: 16 },
 	checkboxContainer: {
 		flexDirection: "row",
 		alignItems: "center",
-		marginTop: 16,
+		marginTop: 20,
 	},
 	checkboxLabel: {
-		marginLeft: 8,
-		fontSize: 14,
+		marginLeft: 10,
+		fontSize: 15,
+		fontWeight: "500",
 	},
-	error: { color: "#DC2626", marginTop: 12, textAlign: "center", lineHeight: 20 },
-	button: { marginTop: 24 },
-	registerButton: { marginTop: 12 },
+	error: {
+		color: "#DC2626",
+		marginTop: 16,
+		textAlign: "center",
+		lineHeight: 20,
+		fontWeight: "500",
+	},
+	button: { marginTop: 32 },
+	registerButton: { marginTop: 16 },
 });
