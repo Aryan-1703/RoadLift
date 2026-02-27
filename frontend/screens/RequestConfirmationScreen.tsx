@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, SafeAreaView } from 'react-native';
 import { useJob } from '../context/JobContext';
 import { useTheme } from '../context/ThemeContext';
+import { useToast } from '../context/ToastContext';
 import { SERVICES } from '../constants';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { Card } from '../components/Card';
@@ -10,14 +11,28 @@ import { Ionicons } from '@expo/vector-icons';
 export const RequestConfirmationScreen = () => {
   const { job, setJobStatus, setNotes, requestService } = useJob();
   const { colors } = useTheme();
+  const { showToast } = useToast();
   const [localNotes, setLocalNotes] = useState(job.notes || '');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const service = SERVICES.find(s => s.id === job.serviceType);
+
+  const handleConfirm = async () => {
+    setIsSubmitting(true);
+    setNotes(localNotes);
+    try {
+      await requestService();
+    } catch (err: any) {
+      showToast(err.response?.data?.error || err.message || "Failed to request service", "error");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { borderBottomColor: colors.border, backgroundColor: colors.card }]}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => setJobStatus('selecting')}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => setJobStatus('selecting')} disabled={isSubmitting}>
           <Ionicons name="chevron-back" size={24} color={colors.text} />
           <Text style={[styles.backText, { color: colors.text }]}>Back</Text>
         </TouchableOpacity>
@@ -53,6 +68,7 @@ export const RequestConfirmationScreen = () => {
             placeholderTextColor={colors.textMuted}
             value={localNotes}
             onChangeText={setLocalNotes}
+            editable={!isSubmitting}
           />
         </Card>
       </ScrollView>
@@ -63,7 +79,9 @@ export const RequestConfirmationScreen = () => {
         </Text>
         <PrimaryButton 
           title="Confirm Request"
-          onPress={() => { setNotes(localNotes); requestService(); }}
+          onPress={handleConfirm}
+          isLoading={isSubmitting}
+          disabled={isSubmitting}
         />
       </View>
     </SafeAreaView>

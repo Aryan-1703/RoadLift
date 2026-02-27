@@ -167,7 +167,7 @@ const styles = StyleSheet.create({
 		borderRadius: 24,
 		marginBottom: 20,
 		transform: [{ rotate: "-5deg" }],
-		shadowColor: "#000",
+		shadowColor: '#000',
 		shadowOffset: { width: 0, height: 8 },
 		shadowOpacity: 0.15,
 		shadowRadius: 12,
@@ -188,13 +188,7 @@ const styles = StyleSheet.create({
 		fontSize: 15,
 		fontWeight: "500",
 	},
-	error: {
-		color: "#DC2626",
-		marginTop: 16,
-		textAlign: "center",
-		lineHeight: 20,
-		fontWeight: "500",
-	},
+	error: { color: "#DC2626", marginTop: 16, textAlign: "center", lineHeight: 20, fontWeight: "500" },
 	button: { marginTop: 32 },
 	registerButton: { marginTop: 16 },
 });

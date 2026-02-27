@@ -18,6 +18,8 @@ import { Card } from "../components/Card";
 import { api } from "../services/api";
 import { User } from "../types";
 
+import { Ionicons } from "@expo/vector-icons";
+
 export const EditProfileScreen = () => {
 	const { colors } = useTheme();
 	const { user, setUser } = useAuth();
@@ -33,10 +35,33 @@ export const EditProfileScreen = () => {
 		vModel: "",
 		vPlate: "",
 		vColor: "",
+		companyName: "",
+		serviceArea: "",
+		licenseNumber: "",
+		vehicleType: "",
+		insuranceNumber: "",
 	});
 
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [hasChanges, setHasChanges] = useState(false);
+	const [isLoading, setIsLoading] = useState(true);
+	const [showSuccess, setShowSuccess] = useState(false);
+
+	useEffect(() => {
+		const fetchProfile = async () => {
+			try {
+				const res = await api.get('/users/profile');
+				if (res.data.user) {
+					setUser(prev => prev ? { ...prev, ...res.data.user } : res.data.user);
+				}
+			} catch (e) {
+				console.error("Failed to fetch latest profile", e);
+			} finally {
+				setIsLoading(false);
+			}
+		};
+		fetchProfile();
+	}, []);
 
 	useEffect(() => {
 		if (user) {
@@ -49,6 +74,11 @@ export const EditProfileScreen = () => {
 				vModel: user.vehicle?.model || "",
 				vPlate: user.vehicle?.plate || "",
 				vColor: user.vehicle?.color || "",
+				companyName: user.driverProfile?.companyName || "",
+				serviceArea: user.driverProfile?.serviceArea || "",
+				licenseNumber: user.driverProfile?.licenseNumber || "",
+				vehicleType: user.driverProfile?.vehicleType || "",
+				insuranceNumber: user.driverProfile?.insuranceNumber || "",
 			});
 		}
 	}, [user]);
@@ -63,7 +93,12 @@ export const EditProfileScreen = () => {
 			form.vMake !== (user.vehicle?.make || "") ||
 			form.vModel !== (user.vehicle?.model || "") ||
 			form.vPlate !== (user.vehicle?.plate || "") ||
-			form.vColor !== (user.vehicle?.color || "");
+			form.vColor !== (user.vehicle?.color || "") ||
+			form.companyName !== (user.driverProfile?.companyName || "") ||
+			form.serviceArea !== (user.driverProfile?.serviceArea || "") ||
+			form.licenseNumber !== (user.driverProfile?.licenseNumber || "") ||
+			form.vehicleType !== (user.driverProfile?.vehicleType || "") ||
+			form.insuranceNumber !== (user.driverProfile?.insuranceNumber || "");
 		setHasChanges(isChanged);
 	}, [form, user]);
 
@@ -72,17 +107,18 @@ export const EditProfileScreen = () => {
 		name: !form.name ? "Full Name is required" : "",
 		phone: !form.phone || !/^\d+$/.test(form.phone) ? "Valid numeric phone required" : "",
 		email: !form.email || !/\S+@\S+\.\S+/.test(form.email) ? "Valid email required" : "",
-		...(user?.role === "CUSTOMER"
-			? {
-					vYear:
-						!form.vYear || !/^\d{4}$/.test(form.vYear)
-							? "Valid 4-digit year required"
-							: "",
-					vMake: !form.vMake ? "Vehicle Make is required" : "",
-					vModel: !form.vModel ? "Vehicle Model is required" : "",
-					vPlate: !form.vPlate ? "License Plate is required" : "",
-				}
-			: {}),
+		...(user?.role === "CUSTOMER" ? {
+			vYear: !form.vYear || !/^\d{4}$/.test(form.vYear) ? "Valid 4-digit year required" : "",
+			vMake: !form.vMake ? "Vehicle Make is required" : "",
+			vModel: !form.vModel ? "Vehicle Model is required" : "",
+			vPlate: !form.vPlate ? "License Plate is required" : "",
+		} : {}),
+		...(user?.role === "DRIVER" ? {
+			companyName: !form.companyName ? "Company Name is required" : "",
+			serviceArea: !form.serviceArea ? "Service Area is required" : "",
+			licenseNumber: !form.licenseNumber ? "License Number is required" : "",
+			vehicleType: !form.vehicleType ? "Vehicle Type is required" : "",
+		} : {}),
 	};
 
 	const isFormValid = Object.values(errors).every(err => err === "");
@@ -101,25 +137,35 @@ export const EditProfileScreen = () => {
 				name: form.name,
 				phone: form.phone,
 				email: form.email,
-				...(user?.role === "CUSTOMER"
-					? {
-							vehicle: {
-								year: form.vYear,
-								make: form.vMake,
-								model: form.vModel,
-								plate: form.vPlate,
-								color: form.vColor || undefined,
-							},
-						}
-					: {}),
+				...(user?.role === "CUSTOMER" ? {
+					vehicle: {
+						year: form.vYear,
+						make: form.vMake,
+						model: form.vModel,
+						plate: form.vPlate,
+						color: form.vColor || undefined,
+					}
+				} : {}),
+				...(user?.role === "DRIVER" ? {
+					driverProfile: {
+						companyName: form.companyName,
+						serviceArea: form.serviceArea,
+						licenseNumber: form.licenseNumber,
+						vehicleType: form.vehicleType,
+						insuranceNumber: form.insuranceNumber || undefined,
+					}
+				} : {}),
 			};
 
 			const response = await api.put<any>("/users/profile", updatedUser);
-
+			
 			if (response.data.success) {
 				setUser(updatedUser);
-				showToast("Profile updated successfully!", "success");
-				navigation.goBack();
+				setShowSuccess(true);
+				setTimeout(() => {
+					setShowSuccess(false);
+					navigation.goBack();
+				}, 1500);
 			} else {
 				throw new Error("Failed to update profile");
 			}
@@ -137,7 +183,7 @@ export const EditProfileScreen = () => {
 		field: keyof typeof form,
 		keyboardType: any = "default",
 		autoCapitalize: any = field === "email" ? "none" : "words",
-		editable: boolean = true,
+		editable: boolean = true
 	) => {
 		const errorMsg = errors[field];
 		const hasError = errorMsg !== "";
@@ -168,11 +214,36 @@ export const EditProfileScreen = () => {
 		);
 	};
 
+	if (isLoading) {
+		return (
+			<SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom', 'left', 'right']}>
+				<ScrollView contentContainerStyle={styles.scrollContent}>
+					<Card style={styles.card}>
+						<View style={[styles.skeletonTitle, { backgroundColor: colors.border }]} />
+						<View style={[styles.skeletonInput, { backgroundColor: colors.border }]} />
+						<View style={[styles.skeletonInput, { backgroundColor: colors.border }]} />
+						<View style={[styles.skeletonInput, { backgroundColor: colors.border }]} />
+					</Card>
+					<Card style={styles.card}>
+						<View style={[styles.skeletonTitle, { backgroundColor: colors.border }]} />
+						<View style={[styles.skeletonInput, { backgroundColor: colors.border }]} />
+						<View style={[styles.skeletonInput, { backgroundColor: colors.border }]} />
+					</Card>
+				</ScrollView>
+			</SafeAreaView>
+		);
+	}
+
 	return (
-		<SafeAreaView
-			style={[styles.container, { backgroundColor: colors.background }]}
-			edges={["bottom", "left", "right"]}
-		>
+		<SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom', 'left', 'right']}>
+			{showSuccess && (
+				<View style={[StyleSheet.absoluteFill, styles.successOverlay, { backgroundColor: colors.background + 'E6' }]}>
+					<View style={[styles.successCircle, { backgroundColor: colors.primary }]}>
+						<Ionicons name="checkmark" size={48} color="#FFF" />
+					</View>
+					<Text style={[styles.successText, { color: colors.text }]}>Profile Saved!</Text>
+				</View>
+			)}
 			<KeyboardAvoidingView
 				behavior={Platform.OS === "ios" ? "padding" : "height"}
 				style={{ flex: 1 }}
@@ -209,6 +280,19 @@ export const EditProfileScreen = () => {
 						</Card>
 					)}
 
+					{user?.role === "DRIVER" && (
+						<Card style={styles.card}>
+							<Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
+								DRIVER PROFILE
+							</Text>
+							{renderInput("Company Name *", "companyName")}
+							{renderInput("Service Area *", "serviceArea")}
+							{renderInput("License Number *", "licenseNumber", "default", "characters")}
+							{renderInput("Vehicle Type *", "vehicleType")}
+							{renderInput("Insurance Number (Optional)", "insuranceNumber", "default", "characters")}
+						</Card>
+					)}
+
 					<View style={styles.footer}>
 						<PrimaryButton
 							title="Save Changes"
@@ -235,4 +319,9 @@ const styles = StyleSheet.create({
 	row: { flexDirection: "row", justifyContent: "space-between" },
 	halfWidth: { width: "48%" },
 	footer: { marginTop: 8 },
+	skeletonTitle: { width: 100, height: 16, borderRadius: 4, marginBottom: 24 },
+	skeletonInput: { width: '100%', height: 50, borderRadius: 12, marginBottom: 16 },
+	successOverlay: { zIndex: 100, alignItems: 'center', justifyContent: 'center' },
+	successCircle: { width: 80, height: 80, borderRadius: 40, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+	successText: { fontSize: 24, fontWeight: 'bold' },
 });

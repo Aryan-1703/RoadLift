@@ -50,7 +50,7 @@ io.on("connection", socket => {
 
 	socket.on("join-room", ({ userId, role }) => {
 		console.log(
-			`--- JOIN-ROOM EVENT RECEIVED from socket ${socket.id} for User ID: ${userId}, Role: ${role} ---`,
+			`--- JOIN-ROOM EVENT RECEIVED from socket ${socket.id} for User ID: ${userId}, Role: ${role} ---`
 		);
 		if (userId) {
 			socket.join(String(userId)); // Join private room for customer/driver

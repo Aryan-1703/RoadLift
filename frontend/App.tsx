@@ -6,6 +6,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { JobProvider } from "./context/JobContext";
+import { DriverProvider } from "./context/DriverContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import { ToastProvider } from "./context/ToastContext";
 
@@ -14,6 +15,7 @@ import { LoginScreen } from "./screens/LoginScreen";
 import { RegisterScreen } from "./screens/RegisterScreen";
 import { JobFlowScreen } from "./screens/JobFlowScreen";
 import { SettingsNavigator } from "./navigation/SettingsNavigator";
+import { DriverFlowScreen } from "./screens/DriverFlowScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -22,8 +24,8 @@ const RootNavigator = () => {
 
 	if (isLoading) {
 		return (
-			<View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-				<ActivityIndicator size="large" color="#2563EB" />
+			<View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#111827" }}>
+				<ActivityIndicator size="large" color="#3B82F6" style={{ transform: [{ scale: 1.5 }] }} />
 			</View>
 		);
 	}
@@ -42,6 +44,7 @@ const RootNavigator = () => {
 				</>
 			) : (
 				<>
+					<Stack.Screen name="DriverFlow" component={DriverFlowScreen} />
 					<Stack.Screen name="SettingsNav" component={SettingsNavigator} />
 				</>
 			)}
@@ -53,15 +56,17 @@ export default function App() {
 	return (
 		<SafeAreaProvider>
 			<ThemeProvider>
-				<AuthProvider>
-					<JobProvider>
-						<ToastProvider>
-							<NavigationContainer>
-								<RootNavigator />
-							</NavigationContainer>
-						</ToastProvider>
-					</JobProvider>
-				</AuthProvider>
+				<ToastProvider>
+					<AuthProvider>
+						<JobProvider>
+							<DriverProvider>
+								<NavigationContainer>
+									<RootNavigator />
+								</NavigationContainer>
+							</DriverProvider>
+						</JobProvider>
+					</AuthProvider>
+				</ToastProvider>
 			</ThemeProvider>
 		</SafeAreaProvider>
 	);

@@ -59,22 +59,17 @@ export const RegisterScreen = () => {
 				: "",
 		confirmPassword:
 			form.password !== form.confirmPassword ? "Passwords do not match" : "",
-		...(role === "CUSTOMER"
-			? {
-					vYear:
-						!form.vYear || !/^\d{4}$/.test(form.vYear)
-							? "Valid 4-digit year required"
-							: "",
-					vMake: !form.vMake ? "Vehicle Make is required" : "",
-					vModel: !form.vModel ? "Vehicle Model is required" : "",
-					vPlate: !form.vPlate ? "License Plate is required" : "",
-				}
-			: {
-					companyName: !form.companyName ? "Company Name is required" : "",
-					serviceArea: !form.serviceArea ? "Service Area is required" : "",
-					licenseNumber: !form.licenseNumber ? "Driver License Number is required" : "",
-					vehicleType: !form.vehicleType ? "Vehicle Type is required" : "",
-				}),
+		...(role === "CUSTOMER" ? {
+			vYear: !form.vYear || !/^\d{4}$/.test(form.vYear) ? "Valid 4-digit year required" : "",
+			vMake: !form.vMake ? "Vehicle Make is required" : "",
+			vModel: !form.vModel ? "Vehicle Model is required" : "",
+			vPlate: !form.vPlate ? "License Plate is required" : "",
+		} : {
+			companyName: !form.companyName ? "Company Name is required" : "",
+			serviceArea: !form.serviceArea ? "Service Area is required" : "",
+			licenseNumber: !form.licenseNumber ? "Driver License Number is required" : "",
+			vehicleType: !form.vehicleType ? "Vehicle Type is required" : "",
+		}),
 	};
 
 	const isFormValid = Object.values(errors).every(err => err === "");
@@ -97,25 +92,23 @@ export const RegisterScreen = () => {
 			email: form.email,
 			password: form.password,
 			role,
-			...(role === "CUSTOMER"
-				? {
-						vehicle: {
-							year: form.vYear,
-							make: form.vMake,
-							model: form.vModel,
-							plate: form.vPlate,
-							color: form.vColor || undefined,
-						},
-					}
-				: {
-						driverProfile: {
-							companyName: form.companyName,
-							serviceArea: form.serviceArea,
-							licenseNumber: form.licenseNumber,
-							vehicleType: form.vehicleType,
-							insuranceNumber: form.insuranceNumber || undefined,
-						},
-					}),
+			...(role === "CUSTOMER" ? {
+				vehicle: {
+					year: form.vYear,
+					make: form.vMake,
+					model: form.vModel,
+					plate: form.vPlate,
+					color: form.vColor || undefined,
+				}
+			} : {
+				driverProfile: {
+					companyName: form.companyName,
+					serviceArea: form.serviceArea,
+					licenseNumber: form.licenseNumber,
+					vehicleType: form.vehicleType,
+					insuranceNumber: form.insuranceNumber || undefined,
+				}
+			}),
 		};
 
 		try {
@@ -200,24 +193,14 @@ export const RegisterScreen = () => {
 								style={[
 									styles.roleCard,
 									{
-										backgroundColor:
-											role === "CUSTOMER" ? colors.primary + "20" : colors.background,
+										backgroundColor: role === "CUSTOMER" ? colors.primary + "20" : colors.background,
 										borderColor: role === "CUSTOMER" ? colors.primary : colors.border,
 									},
 								]}
 								onPress={() => setRole("CUSTOMER")}
 							>
-								<Ionicons
-									name="person"
-									size={24}
-									color={role === "CUSTOMER" ? colors.primary : colors.textMuted}
-								/>
-								<Text
-									style={[
-										styles.roleText,
-										{ color: role === "CUSTOMER" ? colors.primary : colors.textMuted },
-									]}
-								>
+								<Ionicons name="person" size={24} color={role === "CUSTOMER" ? colors.primary : colors.textMuted} />
+								<Text style={[styles.roleText, { color: role === "CUSTOMER" ? colors.primary : colors.textMuted }]}>
 									Customer
 								</Text>
 							</TouchableOpacity>
@@ -225,24 +208,14 @@ export const RegisterScreen = () => {
 								style={[
 									styles.roleCard,
 									{
-										backgroundColor:
-											role === "DRIVER" ? colors.primary + "20" : colors.background,
+										backgroundColor: role === "DRIVER" ? colors.primary + "20" : colors.background,
 										borderColor: role === "DRIVER" ? colors.primary : colors.border,
 									},
 								]}
 								onPress={() => setRole("DRIVER")}
 							>
-								<Ionicons
-									name="car"
-									size={24}
-									color={role === "DRIVER" ? colors.primary : colors.textMuted}
-								/>
-								<Text
-									style={[
-										styles.roleText,
-										{ color: role === "DRIVER" ? colors.primary : colors.textMuted },
-									]}
-								>
+								<Ionicons name="car" size={24} color={role === "DRIVER" ? colors.primary : colors.textMuted} />
+								<Text style={[styles.roleText, { color: role === "DRIVER" ? colors.primary : colors.textMuted }]}>
 									Driver
 								</Text>
 							</TouchableOpacity>

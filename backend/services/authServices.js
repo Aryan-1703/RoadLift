@@ -36,7 +36,7 @@ async function register(data, Model) {
 	const token = jwt.sign(
 		{ id: newRecord.id, role: Model.name.toLowerCase() },
 		process.env.JWT_SECRET,
-		{ expiresIn: "30d" },
+		{ expiresIn: "30d" }
 	);
 
 	// Remove password from the returned object
@@ -72,7 +72,7 @@ async function login(credentials, Model) {
 	const token = jwt.sign(
 		{ id: record.id, role: Model.name.toLowerCase() }, // Payload includes role
 		process.env.JWT_SECRET,
-		{ expiresIn: "30d" },
+		{ expiresIn: "30d" }
 	);
 
 	// Remove password from the returned object

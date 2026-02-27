@@ -1,10 +1,13 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, Dimensions } from 'react-native';
 import { useJob } from '../context/JobContext';
 import { useTheme } from '../context/ThemeContext';
 import { SERVICES } from '../constants';
 import { Card } from '../components/Card';
 import { Ionicons } from '@expo/vector-icons';
+
+const { width } = Dimensions.get('window');
+const cardWidth = (width - 48) / 2; // 16px padding on sides, 16px gap
 
 export const ServiceSelectionScreen = () => {
   const { setJobStatus, selectService } = useJob();
@@ -34,21 +37,21 @@ export const ServiceSelectionScreen = () => {
       </View>
 
       <ScrollView contentContainerStyle={styles.list}>
-        {SERVICES.map((service) => (
-          <Card key={service.id} onPress={() => selectService(service.id, service.basePrice)} style={styles.card}>
-            <View style={[styles.iconBox, { backgroundColor: colors.primary + '20' }]}>
-              <Ionicons name={getIcon(service.id)} size={24} color={colors.primary} />
-            </View>
-            <View style={styles.info}>
-              <Text style={[styles.serviceTitle, { color: colors.text }]}>{service.title}</Text>
-              <Text style={[styles.serviceDesc, { color: colors.textMuted }]}>{service.description}</Text>
-            </View>
-            <View style={styles.price}>
-              <Text style={[styles.priceLabel, { color: colors.textMuted }]}>Est. base</Text>
-              <Text style={[styles.priceValue, { color: colors.text }]}>${service.basePrice}</Text>
-            </View>
-          </Card>
-        ))}
+        <View style={styles.grid}>
+          {SERVICES.map((service) => (
+            <Card key={service.id} onPress={() => selectService(service.id, service.basePrice)} style={[styles.card, { width: cardWidth }]}>
+              <View style={[styles.iconBox, { backgroundColor: colors.primary + '20' }]}>
+                <Ionicons name={getIcon(service.id)} size={32} color={colors.primary} />
+              </View>
+              <Text style={[styles.serviceTitle, { color: colors.text }]} numberOfLines={1}>{service.title}</Text>
+              <Text style={[styles.serviceDesc, { color: colors.textMuted }]} numberOfLines={2}>{service.description}</Text>
+              <View style={styles.priceContainer}>
+                <Text style={[styles.priceLabel, { color: colors.textMuted }]}>Est.</Text>
+                <Text style={[styles.priceValue, { color: colors.text }]}>${service.basePrice}</Text>
+              </View>
+            </Card>
+          ))}
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -62,12 +65,12 @@ const styles = StyleSheet.create({
   title: { fontSize: 28, fontWeight: 'bold', marginBottom: 4 },
   subtitle: { fontSize: 14 },
   list: { padding: 16 },
-  card: { flexDirection: 'row', alignItems: 'center', padding: 16 },
-  iconBox: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginRight: 16 },
-  info: { flex: 1 },
-  serviceTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 4 },
-  serviceDesc: { fontSize: 12 },
-  price: { alignItems: 'flex-end' },
-  priceLabel: { fontSize: 10, fontWeight: 'bold', marginBottom: 4 },
-  priceValue: { fontSize: 16, fontWeight: 'bold' },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 16 },
+  card: { padding: 16, alignItems: 'center', marginBottom: 0 },
+  iconBox: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+  serviceTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 8, textAlign: 'center' },
+  serviceDesc: { fontSize: 12, textAlign: 'center', marginBottom: 16, minHeight: 30 },
+  priceContainer: { flexDirection: 'row', alignItems: 'baseline', marginTop: 'auto' },
+  priceLabel: { fontSize: 12, fontWeight: 'bold', marginRight: 4 },
+  priceValue: { fontSize: 18, fontWeight: 'bold' },
 });

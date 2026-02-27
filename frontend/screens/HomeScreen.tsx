@@ -37,7 +37,7 @@ export const HomeScreen = () => {
 						onPress={() => navigation.navigate("SettingsNav")}
 					>
 						<Text style={[styles.profileInitial, { color: colors.text }]}>
-							{user?.name.charAt(0)}
+							{user?.name?.charAt(0) || "?"}
 						</Text>
 					</TouchableOpacity>
 				</View>

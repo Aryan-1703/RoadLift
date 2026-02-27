@@ -40,10 +40,7 @@ apiClient.interceptors.response.use(
 		// Temporary mocks to prevent UI crashes while backend is being finished
 		if (endpoint === "/users/profile" && config.method === "put") {
 			return new Promise(resolve =>
-				setTimeout(
-					() => resolve({ data: { success: true, user: JSON.parse(config.data) } }),
-					1000,
-				),
+				setTimeout(() => resolve({ data: { success: true, user: JSON.parse(config.data) } }), 1000)
 			);
 		}
 		if (endpoint === "/users/preferences" && config.method === "get") {
