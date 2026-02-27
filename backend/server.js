@@ -50,7 +50,7 @@ io.on("connection", socket => {
 
 	socket.on("join-room", ({ userId, role }) => {
 		console.log(
-			`--- JOIN-ROOM EVENT RECEIVED from socket ${socket.id} for User ID: ${userId}, Role: ${role} ---`
+			`--- JOIN-ROOM EVENT RECEIVED from socket ${socket.id} for User ID: ${userId}, Role: ${role} ---`,
 		);
 		if (userId) {
 			socket.join(String(userId)); // Join private room for customer/driver
@@ -94,7 +94,7 @@ const startServer = async () => {
 
 		// IMPORTANT: { force: true } deletes all your tables on every restart.
 		// Good for dev, but switch to { alter: true } soon to preserve data.
-		await db.sequelize.sync({ force: true });
+		await db.sequelize.sync({ alter: true });
 		console.log("Database synchronized.");
 
 		// Start the combined HTTP/Socket.IO server

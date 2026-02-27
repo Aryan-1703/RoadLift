@@ -7,7 +7,7 @@ import socketClient from "../services/socket";
 interface AuthContextType {
 	user: User | null;
 	isLoading: boolean;
-	login: (email: string, pass: string) => Promise<void>;
+	login: (phoneNumber: string, pass: string) => Promise<void>;
 	register: (data: RegisterDTO) => Promise<void>;
 	logout: () => Promise<void>;
 }
@@ -35,30 +35,37 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 		restoreSession();
 	}, []);
 
-	const login = async (email: string, pass: string) => {
+	const login = async (phoneNumber: string, pass: string) => {
 		let payload;
 
 		try {
-			const response = await api.post<any>("/auth/login", { email, password: pass });
-			payload = response.data.data;
+			const response = await api.post<any>("/auth/login/user", {
+				phoneNumber,
+				password: pass,
+			});
+			payload = response.data;
 		} catch (err: any) {
 			console.log("Login failed. Attempting to auto-register for testing purposes...");
 			try {
-				const regResponse = await api.post<any>("/auth/register", {
-					email,
+				const regResponse = await api.post<any>("/auth/register/user", {
+					email: "user@roadlift.com",
 					password: pass,
 					name: "Alex Customer",
-					phone: "555-0199",
+					phoneNumber: phoneNumber,
 					role: "CUSTOMER",
 				});
-				payload = regResponse.data.data;
+				payload = regResponse.data;
 			} catch (regErr: any) {
 				console.warn(
 					"Auto-register also failed! Bypassing backend so you can test the UI.",
 					regErr.message,
 				);
 				payload = {
-					user: { id: "mock_usr_123", email: email, name: "Alex Customer (Mocked)" },
+					user: {
+						id: "mock_usr_123",
+						email: "user@roadlift.com",
+						name: "Alex Customer (Mocked)",
+					},
 					token: "mock_jwt_token",
 				};
 			}
@@ -77,8 +84,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 	};
 
 	const registerUser = async (data: RegisterDTO) => {
-		const response = await api.post<any>("/auth/register", data);
-		const payload = response.data.data;
+		const response = await api.post<any>("/auth/register/user", {
+			name: data.name,
+			phoneNumber: data.phone,
+			email: data.email,
+			password: data.password,
+		});
+		const payload = response.data;
 
 		const loggedInUser: User = {
 			id: payload.user.id,

@@ -9,7 +9,7 @@ const { User, Driver } = require("../models");
  * @returns {object} - { record, token }
  */
 async function register(data, Model) {
-	const { name, phoneNumber, password } = data;
+	const { name, phoneNumber, email, password } = data;
 
 	// 1. Validate input
 	if (!name || !phoneNumber || !password) {
@@ -30,12 +30,13 @@ async function register(data, Model) {
 	const newRecord = await Model.create({
 		name,
 		phoneNumber,
+		email,
 		password: hashedPassword, // Store the hashed password
 	});
 	const token = jwt.sign(
 		{ id: newRecord.id, role: Model.name.toLowerCase() },
 		process.env.JWT_SECRET,
-		{ expiresIn: "30d" }
+		{ expiresIn: "30d" },
 	);
 
 	// Remove password from the returned object
@@ -71,7 +72,7 @@ async function login(credentials, Model) {
 	const token = jwt.sign(
 		{ id: record.id, role: Model.name.toLowerCase() }, // Payload includes role
 		process.env.JWT_SECRET,
-		{ expiresIn: "30d" }
+		{ expiresIn: "30d" },
 	);
 
 	// Remove password from the returned object

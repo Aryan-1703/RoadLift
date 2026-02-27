@@ -21,7 +21,7 @@ export const LoginScreen = () => {
 	const { login } = useAuth();
 	const navigation = useNavigation<any>();
 
-	const [email, setEmail] = useState("user@roadlift.com");
+	const [phoneNumber, setPhoneNumber] = useState("5550199");
 	const [password, setPassword] = useState("password123");
 	const [error, setError] = useState("");
 	const [isSubmitting, setIsSubmitting] = useState(false);
@@ -30,7 +30,7 @@ export const LoginScreen = () => {
 		setError("");
 		setIsSubmitting(true);
 		try {
-			await login(email, password);
+			await login(phoneNumber, password);
 		} catch (err: any) {
 			const backendError = err.response?.data?.error || err.response?.data?.message;
 			const fallbackError =
@@ -61,7 +61,7 @@ export const LoginScreen = () => {
 				</View>
 
 				<Card style={styles.form}>
-					<Text style={[styles.label, { color: colors.text }]}>Email</Text>
+					<Text style={[styles.label, { color: colors.text }]}>Phone Number</Text>
 					<TextInput
 						style={[
 							styles.input,
@@ -71,9 +71,9 @@ export const LoginScreen = () => {
 								backgroundColor: colors.background,
 							},
 						]}
-						value={email}
-						onChangeText={setEmail}
-						keyboardType="email-address"
+						value={phoneNumber}
+						onChangeText={setPhoneNumber}
+						keyboardType="phone-pad"
 						autoCapitalize="none"
 					/>
 
