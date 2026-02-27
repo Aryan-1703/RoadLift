@@ -1,7 +1,18 @@
+export interface Vehicle {
+	year: string;
+	make: string;
+	model: string;
+	plate: string;
+	color?: string;
+}
+
 export interface User {
 	id: string;
-	email: string;
 	name: string;
+	email: string;
+	phone: string;
+	role: "CUSTOMER" | "DRIVER";
+	vehicle: Vehicle;
 	token: string;
 }
 
@@ -86,16 +97,6 @@ export interface ActiveSession {
 	location: string;
 	lastActive: string;
 	isCurrent: boolean;
-}
-
-export interface Vehicle {
-	id: string;
-	make: string;
-	model: string;
-	year: string;
-	color: string;
-	licensePlate: string;
-	isDefault: boolean;
 }
 
 export interface PaymentMethod {

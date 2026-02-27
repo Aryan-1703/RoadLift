@@ -38,6 +38,14 @@ apiClient.interceptors.response.use(
 		const endpoint = config.url.replace(API_URL, "");
 
 		// Temporary mocks to prevent UI crashes while backend is being finished
+		if (endpoint === "/users/profile" && config.method === "put") {
+			return new Promise(resolve =>
+				setTimeout(
+					() => resolve({ data: { success: true, user: JSON.parse(config.data) } }),
+					1000,
+				),
+			);
+		}
 		if (endpoint === "/users/preferences" && config.method === "get") {
 			return Promise.resolve({
 				data: { push: true, sms: true, emailReceipts: true, promotions: false },

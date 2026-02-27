@@ -7,9 +7,12 @@ import socketClient from "../services/socket";
 interface AuthContextType {
 	user: User | null;
 	isLoading: boolean;
-	login: (phoneNumber: string, pass: string) => Promise<void>;
+	login: (phoneNumber: string, pass: string, rememberEmail: boolean) => Promise<void>;
 	register: (data: RegisterDTO) => Promise<void>;
 	logout: () => Promise<void>;
+	getRememberedEmail: () => Promise<string | null>;
+	setRememberedEmail: (email: string | null) => Promise<void>;
+	setUser: React.Dispatch<React.SetStateAction<User | null>>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -35,7 +38,27 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 		restoreSession();
 	}, []);
 
-	const login = async (phoneNumber: string, pass: string) => {
+	const getRememberedEmail = async () => {
+		try {
+			return await AsyncStorage.getItem("@roadlift_remembered_email");
+		} catch (e) {
+			return null;
+		}
+	};
+
+	const setRememberedEmail = async (email: string | null) => {
+		try {
+			if (email) {
+				await AsyncStorage.setItem("@roadlift_remembered_email", email);
+			} else {
+				await AsyncStorage.removeItem("@roadlift_remembered_email");
+			}
+		} catch (e) {
+			console.error("Failed to set remembered email", e);
+		}
+	};
+
+	const login = async (phoneNumber: string, pass: string, rememberEmail: boolean) => {
 		let payload;
 
 		try {
@@ -65,6 +88,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 						id: "mock_usr_123",
 						email: "user@roadlift.com",
 						name: "Alex Customer (Mocked)",
+						phone: phoneNumber,
+						role: "CUSTOMER",
+						vehicle: { year: "2020", make: "Toyota", model: "Camry", plate: "ABC-123" },
 					},
 					token: "mock_jwt_token",
 				};
@@ -75,8 +101,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 			id: payload.user.id,
 			email: payload.user.email,
 			name: payload.user.name,
+			phone: payload.user.phoneNumber || payload.user.phone || phoneNumber,
+			role: payload.user.role || "CUSTOMER",
+			vehicle: payload.user.vehicle || { year: "", make: "", model: "", plate: "" },
 			token: payload.token,
 		};
+
+		if (rememberEmail) {
+			await setRememberedEmail(phoneNumber);
+		} else {
+			await setRememberedEmail(null);
+		}
 
 		setUser(loggedInUser);
 		await AsyncStorage.setItem("@roadlift_user", JSON.stringify(loggedInUser));
@@ -96,6 +131,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 			id: payload.user.id,
 			email: payload.user.email,
 			name: payload.user.name,
+			phone: payload.user.phoneNumber || data.phone,
+			role: payload.user.role || "CUSTOMER",
+			vehicle: payload.user.vehicle || { year: "", make: "", model: "", plate: "" },
 			token: payload.token,
 		};
 
@@ -112,7 +150,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
 	return (
 		<AuthContext.Provider
-			value={{ user, isLoading, login, register: registerUser, logout }}
+			value={{
+				user,
+				isLoading,
+				login,
+				register: registerUser,
+				logout,
+				getRememberedEmail,
+				setRememberedEmail,
+				setUser,
+			}}
 		>
 			{children}
 		</AuthContext.Provider>

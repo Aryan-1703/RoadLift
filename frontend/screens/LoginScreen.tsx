@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
 	View,
 	Text,
@@ -6,6 +6,7 @@ import {
 	StyleSheet,
 	KeyboardAvoidingView,
 	Platform,
+	TouchableOpacity,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
@@ -18,19 +19,40 @@ import { API_URL } from "../config";
 
 export const LoginScreen = () => {
 	const { colors } = useTheme();
-	const { login } = useAuth();
+	const { login, getRememberedEmail } = useAuth();
 	const navigation = useNavigation<any>();
 
-	const [phoneNumber, setPhoneNumber] = useState("5550199");
-	const [password, setPassword] = useState("password123");
+	const [phoneNumber, setPhoneNumber] = useState("");
+	const [password, setPassword] = useState("");
+	const [rememberEmail, setRememberEmail] = useState(false);
 	const [error, setError] = useState("");
 	const [isSubmitting, setIsSubmitting] = useState(false);
 
+	useEffect(() => {
+		const loadRememberedEmail = async () => {
+			const remembered = await getRememberedEmail();
+			if (remembered) {
+				setPhoneNumber(remembered);
+				setRememberEmail(true);
+			}
+		};
+		loadRememberedEmail();
+	}, [getRememberedEmail]);
+
 	const handleLogin = async () => {
+		if (!phoneNumber) {
+			setError("Phone Number is required");
+			return;
+		}
+		if (!password) {
+			setError("Password is required");
+			return;
+		}
+
 		setError("");
 		setIsSubmitting(true);
 		try {
-			await login(phoneNumber, password);
+			await login(phoneNumber, password, rememberEmail);
 		} catch (err: any) {
 			const backendError = err.response?.data?.error || err.response?.data?.message;
 			const fallbackError =
@@ -94,12 +116,27 @@ export const LoginScreen = () => {
 						secureTextEntry
 					/>
 
+					<TouchableOpacity
+						style={styles.checkboxContainer}
+						onPress={() => setRememberEmail(!rememberEmail)}
+					>
+						<Ionicons
+							name={rememberEmail ? "checkbox" : "square-outline"}
+							size={24}
+							color={rememberEmail ? colors.primary : colors.textMuted}
+						/>
+						<Text style={[styles.checkboxLabel, { color: colors.text }]}>
+							Remember Email
+						</Text>
+					</TouchableOpacity>
+
 					{error ? <Text style={styles.error}>{error}</Text> : null}
 
 					<PrimaryButton
 						title="Sign In"
 						onPress={handleLogin}
 						isLoading={isSubmitting}
+						disabled={isSubmitting}
 						style={styles.button}
 					/>
 
@@ -131,6 +168,15 @@ const styles = StyleSheet.create({
 	form: { padding: 20 },
 	label: { fontSize: 14, fontWeight: "bold", marginBottom: 8 },
 	input: { borderWidth: 1, borderRadius: 12, padding: 14, fontSize: 16 },
+	checkboxContainer: {
+		flexDirection: "row",
+		alignItems: "center",
+		marginTop: 16,
+	},
+	checkboxLabel: {
+		marginLeft: 8,
+		fontSize: 14,
+	},
 	error: { color: "#DC2626", marginTop: 12, textAlign: "center", lineHeight: 20 },
 	button: { marginTop: 24 },
 	registerButton: { marginTop: 12 },
