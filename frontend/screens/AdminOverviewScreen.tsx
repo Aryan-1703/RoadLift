@@ -63,11 +63,13 @@ export const AdminOverviewScreen = ({ navigation }: any) => {
 				<View style={styles.profileContainer}>
 					<View style={[styles.avatar, { backgroundColor: colors.primary + "20" }]}>
 						<Text style={[styles.avatarText, { color: colors.primary }]}>
-							{user?.name.charAt(0)}
+							{user?.name?.charAt(0) || "?"}
 						</Text>
 					</View>
 					<View style={styles.profileInfo}>
-						<Text style={[styles.name, { color: colors.text }]}>{user?.name}</Text>
+						<Text style={[styles.name, { color: colors.text }]}>
+							{user?.name || "User"}
+						</Text>
 						<Text style={[styles.email, { color: colors.textMuted }]}>{user?.email}</Text>
 						<View style={[styles.roleBadge, { backgroundColor: colors.primary + "20" }]}>
 							<Text style={[styles.roleText, { color: colors.primary }]}>

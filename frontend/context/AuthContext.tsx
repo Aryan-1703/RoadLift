@@ -101,16 +101,33 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 		const payload = response.data;
 
 		const loggedInUser: User = {
-			id: payload.user?.id || payload.createdRecord?.id,
-			email: payload.user?.email || payload.createdRecord?.email,
-			name: payload.user?.name || payload.createdRecord?.name,
+			id:
+				payload.user?.id || payload.createdRecord?.id || payload.driver?.id || "temp_id",
+			email:
+				payload.user?.email ||
+				payload.createdRecord?.email ||
+				payload.driver?.email ||
+				data.email,
+			name:
+				payload.user?.name ||
+				payload.createdRecord?.name ||
+				payload.driver?.name ||
+				data.name,
 			phone:
-				payload.user?.phoneNumber || payload.createdRecord?.phoneNumber || data.phone,
+				payload.user?.phoneNumber ||
+				payload.createdRecord?.phoneNumber ||
+				payload.driver?.phoneNumber ||
+				data.phone,
 			role: data.role,
-			vehicle: payload.user?.vehicle || payload.createdRecord?.vehicle || data.vehicle,
+			vehicle:
+				payload.user?.vehicle ||
+				payload.createdRecord?.vehicle ||
+				payload.driver?.vehicle ||
+				data.vehicle,
 			driverProfile:
 				payload.user?.driverProfile ||
 				payload.createdRecord?.driverProfile ||
+				payload.driver?.driverProfile ||
 				data.driverProfile,
 			token: payload.token,
 		};
