@@ -64,12 +64,15 @@ export const JobProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 		};
 
 		const handleLocationUpdate = (data: {
-			latitude: number;
-			longitude: number;
-			eta: number;
+			jobId: string;
+			location: { latitude: number; longitude: number };
+			eta?: number;
 		}) => {
-			setProviderLocation({ latitude: data.latitude, longitude: data.longitude });
-			setEta(data.eta);
+			setProviderLocation({
+				latitude: data.location.latitude,
+				longitude: data.location.longitude,
+			});
+			if (data.eta) setEta(data.eta);
 		};
 
 		const handleJobCompleted = (data: { finalPrice: number }) => {
@@ -77,12 +80,12 @@ export const JobProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 		};
 
 		socketClient.on("provider-assigned", handleProviderAssigned);
-		socketClient.on("provider-location-update", handleLocationUpdate);
+		socketClient.on("driver-location-updated", handleLocationUpdate);
 		socketClient.on("job-completed", handleJobCompleted);
 
 		return () => {
 			socketClient.off("provider-assigned", handleProviderAssigned);
-			socketClient.off("provider-location-update", handleLocationUpdate);
+			socketClient.off("driver-location-updated", handleLocationUpdate);
 			socketClient.off("job-completed", handleJobCompleted);
 		};
 	}, []);

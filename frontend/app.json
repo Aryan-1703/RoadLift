@@ -7,12 +7,15 @@
 		"sdkVersion": "54.0.0",
 		"platforms": ["ios", "android"],
 		"android": {
-			"package": "com.aryan1703.RoadLift"
+			"package": "com.aryan1703.RoadLift",
+			"permissions": ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"]
 		},
 		"ios": {
 			"bundleIdentifier": "com.aryan1703.RoadLift",
 			"infoPlist": {
-				"ITSAppUsesNonExemptEncryption": false
+				"ITSAppUsesNonExemptEncryption": false,
+				"NSLocationWhenInUseUsageDescription": "We need your location to show the driver where you are and to track your route.",
+				"NSLocationAlwaysAndWhenInUseUsageDescription": "We need your location to show the driver where you are and to track your route."
 			}
 		},
 		"extra": {
