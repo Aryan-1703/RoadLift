@@ -40,7 +40,10 @@ apiClient.interceptors.response.use(
 		// Temporary mocks to prevent UI crashes while backend is being finished
 		if (endpoint === "/users/profile" && config.method === "put") {
 			return new Promise(resolve =>
-				setTimeout(() => resolve({ data: { success: true, user: JSON.parse(config.data) } }), 1000)
+				setTimeout(
+					() => resolve({ data: { success: true, user: JSON.parse(config.data) } }),
+					1000,
+				),
 			);
 		}
 		if (endpoint === "/users/preferences" && config.method === "get") {
@@ -82,8 +85,11 @@ apiClient.interceptors.response.use(
 
 // Map the old api mock structure to the new Axios instance
 export const api = {
-	get: async <T>(endpoint: string) => apiClient.get<T>(endpoint),
-	post: async <T>(endpoint: string, data?: any) => apiClient.post<T>(endpoint, data),
-	put: async <T>(endpoint: string, data: any) => apiClient.put<T>(endpoint, data),
-	delete: async <T>(endpoint: string) => apiClient.delete<T>(endpoint),
+	get: async <T>(endpoint: string, config?: any) => apiClient.get<T>(endpoint, config),
+	post: async <T>(endpoint: string, data?: any, config?: any) =>
+		apiClient.post<T>(endpoint, data, config),
+	put: async <T>(endpoint: string, data: any, config?: any) =>
+		apiClient.put<T>(endpoint, data, config),
+	delete: async <T>(endpoint: string, config?: any) =>
+		apiClient.delete<T>(endpoint, config),
 };

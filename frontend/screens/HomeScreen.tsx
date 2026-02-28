@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
 	View,
 	Text,
@@ -21,6 +21,14 @@ import { Ionicons } from "@expo/vector-icons";
 
 const { width, height } = Dimensions.get("window");
 
+// Default fallback region (Toronto)
+const FALLBACK_REGION: Region = {
+	latitude: 43.6532,
+	longitude: -79.3832,
+	latitudeDelta: 0.05,
+	longitudeDelta: 0.05,
+};
+
 export const HomeScreen = () => {
 	const { setCustomerLocation, setJobStatus } = useJob();
 	const { user } = useAuth();
@@ -32,108 +40,89 @@ export const HomeScreen = () => {
 	const [isLoading, setIsLoading] = useState<boolean>(true);
 	const [permissionDenied, setPermissionDenied] = useState<boolean>(false);
 
-	useEffect(() => {
-		let isMounted = true;
+	const initializeLocation = useCallback(async () => {
+		try {
+			setIsLoading(true);
+			setPermissionDenied(false);
 
-		const initializeLocation = async () => {
-			try {
-				if (isMounted) {
-					setIsLoading(true);
-					setPermissionDenied(false);
-				}
+			const { status } = await Location.requestForegroundPermissionsAsync();
 
-				const { status } = await Location.requestForegroundPermissionsAsync();
+			if (status !== "granted") {
+				setPermissionDenied(true);
+				setIsLoading(false);
+				return;
+			}
 
-				if (status !== "granted") {
-					if (isMounted) {
-						setPermissionDenied(true);
-						setIsLoading(false);
-					}
-					return;
-				}
+			let location = await Location.getLastKnownPositionAsync({});
 
-				let location = await Location.getLastKnownPositionAsync({});
+			if (!location) {
+				const locationPromise = Location.getCurrentPositionAsync({
+					accuracy: Location.Accuracy.Balanced,
+				});
 
-				if (!location) {
-					const locationPromise = Location.getCurrentPositionAsync({
-						accuracy: Location.Accuracy.Balanced,
-					});
+				const timeoutPromise = new Promise<null>(resolve =>
+					setTimeout(() => resolve(null), 8000),
+				);
 
-					const timeoutPromise = new Promise<null>(resolve =>
-						setTimeout(() => resolve(null), 8000),
-					);
+				const result = await Promise.race([locationPromise, timeoutPromise]);
 
-					const result = await Promise.race([locationPromise, timeoutPromise]);
-
-					if (result) {
-						location = result as Location.LocationObject;
-					}
-				}
-
-				if (!location) {
-					throw new Error("Could not fetch location in time");
-				}
-
-				const region: Region = {
-					latitude: location.coords.latitude,
-					longitude: location.coords.longitude,
-					latitudeDelta: 0.01,
-					longitudeDelta: 0.01,
-				};
-
-				let currentAddress = "Current Location";
-				try {
-					const [geocode] = await Location.reverseGeocodeAsync({
-						latitude: location.coords.latitude,
-						longitude: location.coords.longitude,
-					});
-
-					if (geocode && geocode.length > 0) {
-						const g = geocode[0];
-						currentAddress =
-							`${g.streetNumber || ""} ${g.street || ""}, ${g.city || ""}`.trim();
-					}
-				} catch (geocodeError) {
-					console.warn("Reverse geocoding failed:", geocodeError);
-				}
-
-				if (isMounted) {
-					setInitialRegion(region);
-					setAddress(currentAddress);
-					setCustomerLocation({
-						latitude: region.latitude,
-						longitude: region.longitude,
-						address: currentAddress,
-					});
-					setIsLoading(false);
-				}
-			} catch (error) {
-				console.error("Error fetching location:", error);
-				if (isMounted) {
-					const fallbackRegion: Region = {
-						latitude: 43.6532,
-						longitude: -79.3832,
-						latitudeDelta: 0.05,
-						longitudeDelta: 0.05,
-					};
-					setInitialRegion(fallbackRegion);
-					setAddress("Location Unavailable");
-					setCustomerLocation({
-						latitude: fallbackRegion.latitude,
-						longitude: fallbackRegion.longitude,
-						address: "Location Unavailable",
-					});
-					setIsLoading(false);
+				if (result) {
+					location = result as Location.LocationObject;
 				}
 			}
-		};
 
-		initializeLocation();
+			if (!location) {
+				throw new Error("Could not fetch location in time");
+			}
 
-		return () => {
-			isMounted = false;
-		};
+			const region: Region = {
+				latitude: location.coords.latitude,
+				longitude: location.coords.longitude,
+				latitudeDelta: 0.01,
+				longitudeDelta: 0.01,
+			};
+
+			let currentAddress = "Current Location";
+			try {
+				const [geocode] = await Location.reverseGeocodeAsync({
+					latitude: location.coords.latitude,
+					longitude: location.coords.longitude,
+				});
+
+				if (geocode && geocode.length > 0) {
+					const g = geocode[0];
+					currentAddress =
+						`${g.streetNumber || ""} ${g.street || ""}, ${g.city || ""}`.trim();
+				}
+			} catch (geocodeError) {
+				console.warn("Reverse geocoding failed:", geocodeError);
+			}
+
+			setInitialRegion(region);
+			setAddress(currentAddress);
+			setCustomerLocation({
+				latitude: region.latitude,
+				longitude: region.longitude,
+				address: currentAddress,
+			});
+			setIsLoading(false);
+		} catch (error) {
+			console.error("Error fetching location:", error);
+			// Apply fallback region so map ALWAYS renders
+			setInitialRegion(FALLBACK_REGION);
+			setAddress("Location Unavailable");
+			setCustomerLocation({
+				latitude: FALLBACK_REGION.latitude,
+				longitude: FALLBACK_REGION.longitude,
+				address: "Location Unavailable",
+			});
+			setIsLoading(false);
+		}
 	}, [setCustomerLocation]);
+
+	useEffect(() => {
+		initializeLocation();
+	}, [initializeLocation]);
 
 	return (
 		<View style={styles.container}>
@@ -180,6 +169,11 @@ export const HomeScreen = () => {
 						onPress={() => Linking.openSettings()}
 						style={styles.permissionBtn}
 					/>
+					<TouchableOpacity style={styles.retryBtn} onPress={initializeLocation}>
+						<Text style={[styles.retryText, { color: colors.primary }]}>
+							I've enabled it, retry
+						</Text>
+					</TouchableOpacity>
 				</View>
 			)}
 
@@ -234,6 +228,9 @@ export const HomeScreen = () => {
 								{address}
 							</Text>
 						</View>
+						<TouchableOpacity onPress={initializeLocation} style={styles.refreshBtn}>
+							<Ionicons name="refresh" size={20} color={colors.primary} />
+						</TouchableOpacity>
 					</View>
 
 					<PrimaryButton
@@ -288,6 +285,14 @@ const styles = StyleSheet.create({
 	},
 	permissionBtn: {
 		width: "100%",
+	},
+	retryBtn: {
+		marginTop: 16,
+		padding: 12,
+	},
+	retryText: {
+		fontSize: 16,
+		fontWeight: "600",
 	},
 	headerSafeArea: {
 		position: "absolute",
@@ -380,4 +385,7 @@ const styles = StyleSheet.create({
 	},
 	locationLabel: { fontSize: 12, fontWeight: "bold", marginBottom: 4 },
 	locationText: { fontSize: 14, fontWeight: "bold" },
+	refreshBtn: {
+		padding: 8,
+	},
 });

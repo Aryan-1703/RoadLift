@@ -5,7 +5,7 @@ export const getRouteCoordinates = async (
 	destination: { latitude: number; longitude: number },
 ) => {
 	try {
-		const apiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
+		const apiKey = process.env.GOOGLE_MAPS_API_KEY;
 		if (!apiKey) {
 			console.warn("Google Maps API key is missing");
 			return [];

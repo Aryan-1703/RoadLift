@@ -8,12 +8,7 @@
 		"platforms": ["ios", "android"],
 		"android": {
 			"package": "com.aryan1703.RoadLift",
-			"permissions": ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"],
-			"config": {
-				"googleMaps": {
-					"apiKey": "YOUR_ANDROID_GOOGLE_MAPS_API_KEY"
-				}
-			}
+			"permissions": ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"]
 		},
 		"ios": {
 			"bundleIdentifier": "com.aryan1703.RoadLift",
@@ -21,9 +16,6 @@
 				"ITSAppUsesNonExemptEncryption": false,
 				"NSLocationWhenInUseUsageDescription": "We need your location to show the driver where you are and to track your route.",
 				"NSLocationAlwaysAndWhenInUseUsageDescription": "We need your location to show the driver where you are and to track your route."
-			},
-			"config": {
-				"googleMapsApiKey": "AIzaSyC79bKdxHn4qjaEw7DAlbQcKrw21tlvqUw"
 			}
 		},
 		"extra": {

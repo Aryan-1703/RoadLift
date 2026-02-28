@@ -28,6 +28,7 @@ const directionsRoutes = require("./routes/directionsRoutes");
 const paymentRoutes = require("./routes/paymentRoutes");
 const geocodingRoutes = require("./routes/geocodingRoutes");
 const vehicleRoutes = require("./routes/vehicleRoutes");
+const mapsRoutes = require("./routes/mapsRoutes");
 
 app.use("/api/auth", authRoutes);
 app.use("/api/jobs", jobRoutes);
@@ -37,6 +38,7 @@ app.use("/api/direction", directionsRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/geocode", geocodingRoutes);
 app.use("/api/vehicles", vehicleRoutes);
+app.use("/api/maps", mapsRoutes);
 
 // --- HEALTH CHECK ROUTE ---
 app.get("/", (req, res) => {
@@ -50,7 +52,7 @@ io.on("connection", socket => {
 
 	socket.on("join-room", ({ userId, role }) => {
 		console.log(
-			`--- JOIN-ROOM EVENT RECEIVED from socket ${socket.id} for User ID: ${userId}, Role: ${role} ---`
+			`--- JOIN-ROOM EVENT RECEIVED from socket ${socket.id} for User ID: ${userId}, Role: ${role} ---`,
 		);
 		if (userId) {
 			socket.join(String(userId)); // Join private room for customer/driver
@@ -92,8 +94,6 @@ const startServer = async () => {
 		await db.sequelize.authenticate();
 		console.log("Database connected...");
 
-		// IMPORTANT: { force: true } deletes all your tables on every restart.
-		// Good for dev, but switch to { alter: true } soon to preserve data.
 		await db.sequelize.sync({ alter: true });
 		console.log("Database synchronized.");
 
