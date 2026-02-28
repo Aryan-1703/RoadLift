@@ -1,66 +1,141 @@
 import React, { useEffect, useState, useRef } from "react";
-import { StyleSheet, View, StyleProp, ViewStyle, ActivityIndicator } from "react-native";
+import {
+	StyleSheet,
+	View,
+	StyleProp,
+	ViewStyle,
+	ActivityIndicator,
+	Text,
+	Alert,
+	Linking,
+} from "react-native";
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from "react-native-maps";
-import { Location } from "../types";
+import * as Location from "expo-location";
+import { Location as LocationType } from "../types";
 import { useTheme } from "../context/ThemeContext";
 import { getRouteCoordinates } from "../utils/mapUtils";
+import { PrimaryButton } from "./PrimaryButton";
 
 interface LiveMapProps {
-	userLocation: Location | null;
-	providerLocation?: Location | null;
+	userLocation?: LocationType | null;
+	providerLocation?: LocationType | null;
 	style?: StyleProp<ViewStyle>;
 	userTitle?: string;
 	providerTitle?: string;
+	onLocationUpdate?: (location: LocationType) => void;
 }
 
 export const LiveMap: React.FC<LiveMapProps> = ({
-	userLocation,
+	userLocation: externalUserLocation,
 	providerLocation,
 	style,
 	userTitle = "You",
 	providerTitle = "Provider",
+	onLocationUpdate,
 }) => {
 	const { colors, isDarkMode } = useTheme();
 	const mapRef = useRef<MapView>(null);
 	const [routeCoords, setRouteCoords] = useState<
 		{ latitude: number; longitude: number }[]
 	>([]);
+	const [internalLocation, setInternalLocation] = useState<LocationType | null>(null);
+	const [permissionDenied, setPermissionDenied] = useState(false);
+	const [isLoading, setIsLoading] = useState(!externalUserLocation);
+
+	const activeLocation = externalUserLocation || internalLocation;
+
+	const requestLocation = async () => {
+		setIsLoading(true);
+		setPermissionDenied(false);
+		try {
+			let { status } = await Location.requestForegroundPermissionsAsync();
+			if (status !== "granted") {
+				setPermissionDenied(true);
+				setIsLoading(false);
+				return;
+			}
+
+			const location = await Location.getCurrentPositionAsync({});
+			const newLocation = {
+				latitude: location.coords.latitude,
+				longitude: location.coords.longitude,
+			};
+			setInternalLocation(newLocation);
+			if (onLocationUpdate) {
+				onLocationUpdate(newLocation);
+			}
+		} catch (error) {
+			console.error("Error fetching location:", error);
+			setPermissionDenied(true);
+		} finally {
+			setIsLoading(false);
+		}
+	};
+
+	useEffect(() => {
+		if (!externalUserLocation) {
+			requestLocation();
+		} else {
+			setIsLoading(false);
+		}
+	}, [externalUserLocation]);
 
 	useEffect(() => {
 		const fetchRoute = async () => {
-			if (userLocation && providerLocation) {
-				const coords = await getRouteCoordinates(providerLocation, userLocation);
+			if (activeLocation && providerLocation) {
+				const coords = await getRouteCoordinates(providerLocation, activeLocation);
 				setRouteCoords(coords);
 			}
 		};
 
 		fetchRoute();
-	}, [userLocation, providerLocation]);
+	}, [activeLocation, providerLocation]);
 
 	useEffect(() => {
-		if (userLocation && providerLocation && mapRef.current) {
-			mapRef.current.fitToCoordinates([userLocation, providerLocation], {
+		if (activeLocation && providerLocation && mapRef.current) {
+			mapRef.current.fitToCoordinates([activeLocation, providerLocation], {
 				edgePadding: { top: 100, right: 50, bottom: 250, left: 50 },
 				animated: true,
 			});
-		} else if (userLocation && mapRef.current) {
+		} else if (activeLocation && mapRef.current) {
 			mapRef.current.animateToRegion({
-				latitude: userLocation.latitude,
-				longitude: userLocation.longitude,
+				latitude: activeLocation.latitude,
+				longitude: activeLocation.longitude,
 				latitudeDelta: 0.01,
 				longitudeDelta: 0.01,
 			});
 		}
-	}, [userLocation, providerLocation]);
+	}, [activeLocation, providerLocation]);
 
-	if (!userLocation) {
+	if (isLoading) {
 		return (
 			<View
-				style={[styles.loadingContainer, style, { backgroundColor: colors.background }]}
+				style={[styles.centerContainer, style, { backgroundColor: colors.background }]}
 			>
 				<ActivityIndicator size="large" color={colors.primary} />
 			</View>
 		);
+	}
+
+	if (permissionDenied && !externalUserLocation) {
+		return (
+			<View
+				style={[styles.centerContainer, style, { backgroundColor: colors.background }]}
+			>
+				<Text style={[styles.errorText, { color: colors.text }]}>
+					Location permission is required to show the map.
+				</Text>
+				<PrimaryButton
+					title="Enable Location"
+					onPress={() => Linking.openSettings()}
+					style={styles.permissionBtn}
+				/>
+			</View>
+		);
+	}
+
+	if (!activeLocation) {
+		return null;
 	}
 
 	const mapStyle = isDarkMode
@@ -128,14 +203,14 @@ export const LiveMap: React.FC<LiveMapProps> = ({
 			provider={PROVIDER_GOOGLE}
 			customMapStyle={mapStyle}
 			initialRegion={{
-				latitude: userLocation.latitude,
-				longitude: userLocation.longitude,
+				latitude: activeLocation.latitude,
+				longitude: activeLocation.longitude,
 				latitudeDelta: 0.01,
 				longitudeDelta: 0.01,
 			}}
-			showsUserLocation={false}
+			showsUserLocation={true}
+			showsMyLocationButton={false}
 		>
-			<Marker coordinate={userLocation} title={userTitle} pinColor={colors.primary} />
 			{providerLocation && (
 				<Marker coordinate={providerLocation} title={providerTitle} pinColor="#111827" />
 			)}
@@ -154,9 +229,19 @@ const styles = StyleSheet.create({
 	map: {
 		flex: 1,
 	},
-	loadingContainer: {
+	centerContainer: {
 		flex: 1,
 		justifyContent: "center",
 		alignItems: "center",
+		padding: 20,
+	},
+	errorText: {
+		fontSize: 16,
+		textAlign: "center",
+		marginBottom: 20,
+	},
+	permissionBtn: {
+		width: "100%",
+		maxWidth: 300,
 	},
 });
