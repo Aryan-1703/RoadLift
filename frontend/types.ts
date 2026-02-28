@@ -48,7 +48,13 @@ export interface RegisterDTO {
 	};
 }
 
-export type ServiceTypeId = "towing" | "tire" | "lockout" | "fuel" | "accident";
+export type ServiceTypeId =
+	| "towing"
+	| "tire-change"
+	| "car-lockout"
+	| "fuel-delivery"
+	| "battery-boost"
+	| "accident";
 
 export interface ServiceOption {
 	id: ServiceTypeId;

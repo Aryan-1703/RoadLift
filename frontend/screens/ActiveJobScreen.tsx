@@ -159,7 +159,10 @@ export const ActiveJobScreen = () => {
 					<View style={styles.detailRow}>
 						<Ionicons name="car-outline" size={20} color={colors.textMuted} />
 						<Text style={[styles.detailText, { color: colors.text }]}>
-							{activeJob.serviceType}
+							{activeJob.serviceType
+								?.split("-")
+								.map(word => word.charAt(0).toUpperCase() + word.slice(1))
+								.join(" ")}
 						</Text>
 					</View>
 					<View style={styles.detailRow}>

@@ -10,10 +10,37 @@ const { sendPushNotification } = require("../utils/sendPushNotification");
  */
 async function createJob(jobData, userId) {
 	// 1. Create the job in the database
-	const { serviceType, pickupLatitude, pickupLongitude, estimatedCost, notes } = jobData;
+	let { serviceType, pickupLatitude, pickupLongitude, estimatedCost, notes } = jobData;
 	if (!serviceType || !pickupLatitude || !pickupLongitude || !userId) {
 		throw new Error("Missing required job data.");
 	}
+
+	// Map incoming serviceType to match the database ENUM exactly
+	const typeMap = {
+		TOWING: "towing",
+		towing: "towing",
+		TIRE: "tire-change",
+		tire: "tire-change",
+		"tire-change": "tire-change",
+		"TIRE-CHANGE": "tire-change",
+		LOCKOUT: "car-lockout",
+		lockout: "car-lockout",
+		"car-lockout": "car-lockout",
+		"CAR-LOCKOUT": "car-lockout",
+		FUEL: "fuel-delivery",
+		fuel: "fuel-delivery",
+		"fuel-delivery": "fuel-delivery",
+		"FUEL-DELIVERY": "fuel-delivery",
+		ACCIDENT: "towing",
+		accident: "towing",
+		BATTERY: "battery-boost",
+		battery: "battery-boost",
+		"battery-boost": "battery-boost",
+		"BATTERY-BOOST": "battery-boost",
+	};
+
+	serviceType = typeMap[serviceType] || typeMap[serviceType.toUpperCase()] || "towing";
+
 	const pickupLocation = {
 		type: "Point",
 		coordinates: [pickupLongitude, pickupLatitude],
@@ -48,7 +75,7 @@ async function createJob(jobData, userId) {
 		// Log the error but don't let it crash the job creation process
 		console.error(
 			"⚠️ Error during post-job-creation broadcast/notification:",
-			error.message
+			error.message,
 		);
 	}
 

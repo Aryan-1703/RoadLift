@@ -117,16 +117,15 @@ export const JobProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 		setJob(prev => ({ ...prev, status: "searching" }));
 
 		try {
-			// Backend expects upper-cased Enums like 'TOWING'
 			const response = await api.post<any>("/jobs", {
-				serviceType: job.serviceType.toUpperCase(),
-				pickupLat: job.customerLocation.latitude,
-				pickupLng: job.customerLocation.longitude,
+				serviceType: job.serviceType,
+				pickupLatitude: job.customerLocation.latitude,
+				pickupLongitude: job.customerLocation.longitude,
 				notes: job.notes,
 			});
 
 			const createdJob = response.data.data;
-			setJob(prev => ({ ...prev, id: createdJob.id }));
+			setJob(prev => ({ ...prev, id: createdJob?.id || response.data.job?.id }));
 		} catch (err) {
 			console.error("Failed to request service", err);
 			setJob(prev => ({ ...prev, status: "idle" }));

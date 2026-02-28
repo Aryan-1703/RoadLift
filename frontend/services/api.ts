@@ -88,7 +88,7 @@ export const api = {
 	get: async <T>(endpoint: string, config?: any) => apiClient.get<T>(endpoint, config),
 	post: async <T>(endpoint: string, data?: any, config?: any) =>
 		apiClient.post<T>(endpoint, data, config),
-	put: async <T>(endpoint: string, data: any, config?: any) =>
+	put: async <T>(endpoint: string, data?: any, config?: any) =>
 		apiClient.put<T>(endpoint, data, config),
 	delete: async <T>(endpoint: string, config?: any) =>
 		apiClient.delete<T>(endpoint, config),
