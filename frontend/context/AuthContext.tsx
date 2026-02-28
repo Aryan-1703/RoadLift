@@ -59,7 +59,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 	};
 
 	const login = async (phoneNumber: string, pass: string, rememberEmail: boolean) => {
-		const response = await api.post<any>("/auth/login/user", { phoneNumber, password: pass });
+		const response = await api.post<any>("/auth/login/user", {
+			phoneNumber,
+			password: pass,
+		});
 		const payload = response.data;
 
 		const loggedInUser: User = {
@@ -71,6 +74,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 			vehicle: payload.user.vehicle,
 			driverProfile: payload.user.driverProfile,
 			token: payload.token,
+			defaultVehicleId: payload.user.defaultVehicleId,
 		};
 
 		if (rememberEmail) {
@@ -85,7 +89,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 	};
 
 	const registerUser = async (data: RegisterDTO) => {
-		const endpoint = data.role === "DRIVER" ? "/auth/register/driver" : "/auth/register/user";
+		const endpoint =
+			data.role === "DRIVER" ? "/auth/register/driver" : "/auth/register/user";
 		const response = await api.post<any>(endpoint, {
 			name: data.name,
 			phoneNumber: data.phone,
@@ -97,13 +102,34 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 		const payload = response.data;
 
 		const loggedInUser: User = {
-			id: payload.user?.id || payload.createdRecord?.id || payload.driver?.id || "temp_id",
-			email: payload.user?.email || payload.createdRecord?.email || payload.driver?.email || data.email,
-			name: payload.user?.name || payload.createdRecord?.name || payload.driver?.name || data.name,
-			phone: payload.user?.phoneNumber || payload.createdRecord?.phoneNumber || payload.driver?.phoneNumber || data.phone,
+			id:
+				payload.user?.id || payload.createdRecord?.id || payload.driver?.id || "temp_id",
+			email:
+				payload.user?.email ||
+				payload.createdRecord?.email ||
+				payload.driver?.email ||
+				data.email,
+			name:
+				payload.user?.name ||
+				payload.createdRecord?.name ||
+				payload.driver?.name ||
+				data.name,
+			phone:
+				payload.user?.phoneNumber ||
+				payload.createdRecord?.phoneNumber ||
+				payload.driver?.phoneNumber ||
+				data.phone,
 			role: data.role,
-			vehicle: payload.user?.vehicle || payload.createdRecord?.vehicle || payload.driver?.vehicle || data.vehicle,
-			driverProfile: payload.user?.driverProfile || payload.createdRecord?.driverProfile || payload.driver?.driverProfile || data.driverProfile,
+			vehicle:
+				payload.user?.vehicle ||
+				payload.createdRecord?.vehicle ||
+				payload.driver?.vehicle ||
+				data.vehicle,
+			driverProfile:
+				payload.user?.driverProfile ||
+				payload.createdRecord?.driverProfile ||
+				payload.driver?.driverProfile ||
+				data.driverProfile,
 			token: payload.token,
 		};
 
@@ -120,7 +146,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
 	return (
 		<AuthContext.Provider
-			value={{ user, isLoading, login, register: registerUser, logout, getRememberedEmail, setRememberedEmail, setUser }}
+			value={{
+				user,
+				isLoading,
+				login,
+				register: registerUser,
+				logout,
+				getRememberedEmail,
+				setRememberedEmail,
+				setUser,
+			}}
 		>
 			{children}
 		</AuthContext.Provider>

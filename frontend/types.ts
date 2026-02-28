@@ -23,6 +23,7 @@ export interface User {
 	vehicle?: Vehicle;
 	driverProfile?: DriverProfile;
 	token: string;
+	defaultVehicleId?: string | number;
 }
 
 export interface RegisterDTO {
