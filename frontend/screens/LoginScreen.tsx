@@ -9,6 +9,7 @@ import {
 	TouchableOpacity,
 	Animated,
 	StatusBar,
+	ScrollView,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
@@ -32,39 +33,55 @@ export const LoginScreen = () => {
 	const [phoneFocused, setPhoneFocused] = useState(false);
 	const [passFocused, setPassFocused] = useState(false);
 
-	// Entrance animation
+	// Entrance animations
 	const fadeAnim = useRef(new Animated.Value(0)).current;
 	const slideAnim = useRef(new Animated.Value(32)).current;
 	const logoAnim = useRef(new Animated.Value(0)).current;
-	const logoScale = useRef(new Animated.Value(0.8)).current;
+	const logoScale = useRef(new Animated.Value(0.85)).current;
 
 	useEffect(() => {
 		Animated.sequence([
 			Animated.parallel([
-				Animated.spring(logoScale, { toValue: 1, tension: 60, friction: 8, useNativeDriver: true }),
+				Animated.spring(logoScale, {
+					toValue: 1,
+					tension: 60,
+					friction: 8,
+					useNativeDriver: true,
+				}),
 				Animated.timing(logoAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
 			]),
 			Animated.parallel([
-				Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
-				Animated.spring(slideAnim, { toValue: 0, tension: 50, friction: 10, useNativeDriver: true }),
+				Animated.timing(fadeAnim, { toValue: 1, duration: 380, useNativeDriver: true }),
+				Animated.spring(slideAnim, {
+					toValue: 0,
+					tension: 50,
+					friction: 10,
+					useNativeDriver: true,
+				}),
 			]),
 		]).start();
 	}, []);
 
 	useEffect(() => {
-		const loadRememberedEmail = async () => {
+		const load = async () => {
 			const remembered = await getRememberedEmail();
 			if (remembered) {
 				setPhoneNumber(remembered);
 				setRememberEmail(true);
 			}
 		};
-		loadRememberedEmail();
+		load();
 	}, [getRememberedEmail]);
 
 	const handleLogin = async () => {
-		if (!phoneNumber) { setError("Phone number is required"); return; }
-		if (!password) { setError("Password is required"); return; }
+		if (!phoneNumber) {
+			setError("Phone number is required");
+			return;
+		}
+		if (!password) {
+			setError("Password is required");
+			return;
+		}
 		setError("");
 		setIsSubmitting(true);
 		try {
@@ -81,7 +98,7 @@ export const LoginScreen = () => {
 		}
 	};
 
-	// Theme-aware colors
+	// Theme tokens
 	const screenBg = isDarkMode ? "#060b18" : "#F0EDE7";
 	const cardBg = isDarkMode ? "#0d1424" : "#FFFFFF";
 	const cardBorder = isDarkMode ? "rgba(255,255,255,0.07)" : "#E2DDD6";
@@ -91,6 +108,7 @@ export const LoginScreen = () => {
 	const logoRing = isDarkMode ? "rgba(26,107,255,0.30)" : "rgba(26,107,255,0.18)";
 	const dividerColor = isDarkMode ? "rgba(255,255,255,0.07)" : "#E2DDD6";
 	const taglineBg = isDarkMode ? "rgba(26,107,255,0.12)" : "rgba(26,107,255,0.07)";
+	const bgShapeColor = isDarkMode ? "rgba(26,107,255,0.04)" : "rgba(26,107,255,0.045)";
 
 	return (
 		<View style={[styles.root, { backgroundColor: screenBg }]}>
@@ -99,27 +117,37 @@ export const LoginScreen = () => {
 				backgroundColor={screenBg}
 			/>
 
-			{/* Decorative background shape */}
+			{/* Decorative circle — behind everything */}
 			<View
-				style={[
-					styles.bgShape,
-					{
-						backgroundColor: isDarkMode
-							? "rgba(26,107,255,0.04)"
-							: "rgba(26,107,255,0.045)",
-					},
-				]}
+				style={[styles.bgShape, { backgroundColor: bgShapeColor }]}
 				pointerEvents="none"
 			/>
 
 			<SafeAreaView style={styles.safeArea}>
 				<KeyboardAvoidingView
-					behavior={Platform.OS === "ios" ? "padding" : "height"}
 					style={styles.kav}
+					behavior={Platform.OS === "ios" ? "padding" : "height"}
+					keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
 				>
-					<View style={styles.inner}>
-
-						{/* ── Logo block ── */}
+					{/*
+					 * FIX: Use ScrollView + contentContainerStyle flexGrow/justifyCenter
+					 * instead of a plain View with justifyContent: "center".
+					 *
+					 * When the keyboard opens, a plain centered View collapses its height
+					 * which steals focus from the TextInput. A ScrollView grows to fit
+					 * the content and scrolls instead, keeping inputs mounted & focused.
+					 *
+					 * keyboardShouldPersistTaps="handled" ensures taps on buttons inside
+					 * the scroll view work without first dismissing the keyboard.
+					 */}
+					<ScrollView
+						style={styles.scroll}
+						contentContainerStyle={styles.scrollContent}
+						keyboardShouldPersistTaps="handled"
+						showsVerticalScrollIndicator={false}
+						bounces={false}
+					>
+						{/* ── Logo ── */}
 						<Animated.View
 							style={[
 								styles.logoSection,
@@ -150,22 +178,20 @@ export const LoginScreen = () => {
 									opacity: fadeAnim,
 									transform: [{ translateY: slideAnim }],
 									shadowColor: isDarkMode ? "#000" : "#5C4A3A",
-									shadowOpacity: isDarkMode ? 0.3 : 0.10,
+									shadowOpacity: isDarkMode ? 0.3 : 0.1,
 								},
 							]}
 						>
-							<Text style={[styles.cardTitle, { color: colors.text }]}>
-								Welcome back
-							</Text>
+							<Text style={[styles.cardTitle, { color: colors.text }]}>Welcome back</Text>
 							<Text style={[styles.cardSubtitle, { color: colors.textMuted }]}>
 								Sign in to your account
 							</Text>
 
 							<View style={[styles.divider, { backgroundColor: dividerColor }]} />
 
-							{/* Phone input */}
+							{/* Phone */}
 							<View style={styles.fieldGroup}>
-								<Text style={[styles.label, { color: colors.textMuted }]}>
+								<Text style={[styles.fieldLabel, { color: colors.textMuted }]}>
 									PHONE NUMBER
 								</Text>
 								<View
@@ -174,7 +200,7 @@ export const LoginScreen = () => {
 										{
 											backgroundColor: inputBg,
 											borderColor: phoneFocused ? colors.primary : inputBorder,
-											shadowColor: phoneFocused ? colors.primary : "transparent",
+											shadowColor: colors.primary,
 											shadowOpacity: phoneFocused ? 0.15 : 0,
 										},
 									]}
@@ -195,13 +221,14 @@ export const LoginScreen = () => {
 										placeholderTextColor={colors.textMuted}
 										onFocus={() => setPhoneFocused(true)}
 										onBlur={() => setPhoneFocused(false)}
+										returnKeyType="next"
 									/>
 								</View>
 							</View>
 
-							{/* Password input */}
+							{/* Password */}
 							<View style={styles.fieldGroup}>
-								<Text style={[styles.label, { color: colors.textMuted }]}>
+								<Text style={[styles.fieldLabel, { color: colors.textMuted }]}>
 									PASSWORD
 								</Text>
 								<View
@@ -210,7 +237,7 @@ export const LoginScreen = () => {
 										{
 											backgroundColor: inputBg,
 											borderColor: passFocused ? colors.primary : inputBorder,
-											shadowColor: passFocused ? colors.primary : "transparent",
+											shadowColor: colors.primary,
 											shadowOpacity: passFocused ? 0.15 : 0,
 										},
 									]}
@@ -230,10 +257,12 @@ export const LoginScreen = () => {
 										placeholderTextColor={colors.textMuted}
 										onFocus={() => setPassFocused(true)}
 										onBlur={() => setPassFocused(false)}
+										returnKeyType="done"
+										onSubmitEditing={handleLogin}
 									/>
 									<TouchableOpacity
 										onPress={() => setShowPassword(v => !v)}
-										hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+										hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
 									>
 										<Ionicons
 											name={showPassword ? "eye-off-outline" : "eye-outline"}
@@ -247,7 +276,7 @@ export const LoginScreen = () => {
 							{/* Remember me */}
 							<TouchableOpacity
 								style={styles.rememberRow}
-								onPress={() => setRememberEmail(!rememberEmail)}
+								onPress={() => setRememberEmail(v => !v)}
 								activeOpacity={0.7}
 							>
 								<View
@@ -255,22 +284,19 @@ export const LoginScreen = () => {
 										styles.checkbox,
 										{
 											borderColor: rememberEmail ? colors.primary : inputBorder,
-											backgroundColor: rememberEmail
-												? colors.primary
-												: "transparent",
+											backgroundColor: rememberEmail ? colors.primary : "transparent",
 										},
 									]}
 								>
-									{rememberEmail && (
-										<Ionicons name="checkmark" size={12} color="#fff" />
-									)}
+									{rememberEmail && <Ionicons name="checkmark" size={12} color="#fff" />}
 								</View>
 								<Text style={[styles.rememberLabel, { color: colors.textMuted }]}>
 									Remember phone number
 								</Text>
 							</TouchableOpacity>
 
-							{error ? (
+							{/* Error */}
+							{!!error && (
 								<View
 									style={[
 										styles.errorBox,
@@ -285,7 +311,7 @@ export const LoginScreen = () => {
 										{error}
 									</Text>
 								</View>
-							) : null}
+							)}
 
 							<PrimaryButton
 								title="Sign In"
@@ -297,9 +323,7 @@ export const LoginScreen = () => {
 						</Animated.View>
 
 						{/* ── Register link ── */}
-						<Animated.View
-							style={[styles.registerWrap, { opacity: fadeAnim }]}
-						>
+						<Animated.View style={{ opacity: fadeAnim }}>
 							<View
 								style={[
 									styles.registerCard,
@@ -325,8 +349,7 @@ export const LoginScreen = () => {
 								</TouchableOpacity>
 							</View>
 						</Animated.View>
-
-					</View>
+					</ScrollView>
 				</KeyboardAvoidingView>
 			</SafeAreaView>
 		</View>
@@ -337,14 +360,19 @@ const styles = StyleSheet.create({
 	root: { flex: 1 },
 	safeArea: { flex: 1 },
 	kav: { flex: 1 },
-	inner: {
-		flex: 1,
+
+	// ScrollView fills the KAV; content centres itself via flexGrow + justifyContent.
+	// When keyboard appears the scroll view shrinks but content stays scrollable,
+	// so inputs never lose focus or get pushed off-screen.
+	scroll: { flex: 1 },
+	scrollContent: {
+		flexGrow: 1,
 		justifyContent: "center",
 		paddingHorizontal: 20,
-		paddingBottom: 24,
+		paddingVertical: 32,
 	},
 
-	// Decorative bg shape
+	// Decorative bg blob
 	bgShape: {
 		position: "absolute",
 		top: -120,
@@ -354,11 +382,8 @@ const styles = StyleSheet.create({
 		borderRadius: 160,
 	},
 
-	// Logo section
-	logoSection: {
-		alignItems: "center",
-		marginBottom: 32,
-	},
+	// Logo
+	logoSection: { alignItems: "center", marginBottom: 28 },
 	logoRing: {
 		padding: 4,
 		borderRadius: 28,
@@ -405,7 +430,7 @@ const styles = StyleSheet.create({
 
 	// Fields
 	fieldGroup: { marginBottom: 16 },
-	label: {
+	fieldLabel: {
 		fontSize: 10,
 		fontWeight: "700",
 		letterSpacing: 0.8,
@@ -423,7 +448,12 @@ const styles = StyleSheet.create({
 		elevation: 0,
 	},
 	inputIcon: { marginRight: 10 },
-	input: { flex: 1, fontSize: 15, paddingVertical: 0 },
+	input: {
+		flex: 1,
+		fontSize: 15,
+		paddingVertical: 0,
+		includeFontPadding: false, // Android: removes extra internal padding
+	},
 
 	// Remember me
 	rememberRow: {
@@ -457,8 +487,7 @@ const styles = StyleSheet.create({
 
 	signInBtn: { marginTop: 4 },
 
-	// Register footer
-	registerWrap: {},
+	// Register footer card
 	registerCard: {
 		flexDirection: "row",
 		alignItems: "center",
