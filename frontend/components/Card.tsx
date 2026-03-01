@@ -9,11 +9,16 @@ interface CardProps {
 }
 
 export const Card: React.FC<CardProps> = ({ children, style, onPress }) => {
-  const { colors } = useTheme();
+  const { colors, isDarkMode } = useTheme();
 
   const containerStyle = [
     styles.card,
-    { backgroundColor: colors.card, borderColor: colors.border },
+    {
+      backgroundColor: colors.card,
+      borderColor: colors.cardBorder,
+      shadowColor: colors.shadowColor,
+      shadowOpacity: isDarkMode ? 0.25 : 0.08,
+    },
     style
   ];
 
@@ -33,11 +38,9 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     padding: 20,
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.03,
-    shadowRadius: 8,
-    elevation: 1,
+    shadowRadius: 10,
+    elevation: 2,
     marginBottom: 16,
   }
 });

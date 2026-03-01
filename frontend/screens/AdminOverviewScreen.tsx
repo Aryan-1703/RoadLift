@@ -30,91 +30,11 @@ interface SettingsSection {
 	items: SettingsItem[];
 }
 
-// ── Theme tokens ──────────────────────────────────────────────────────────────
-// All colours live here — the component stays colour-free below.
-const T = {
-	dark: {
-		root: "#060b18",
-		card: "#0d1424",
-		cardBorder: "rgba(255,255,255,0.07)",
-		text: "#ffffff",
-		textSecondary: "#e2e8f0",
-		textMuted: "#8a9ab5",
-		textFaint: "#4d6080",
-		sectionLabel: "#4d6080",
-		divider: "rgba(255,255,255,0.07)",
-		arrowBg: "rgba(255,255,255,0.04)",
-		arrowIcon: "#3d4f6b",
-		statValue: "#ffffff",
-		accentBlue: "#1a6bff",
-		accentBlueText: "#60a5fa",
-		accentBlueBg: "rgba(26,107,255,0.15)",
-		accentBlueBorder: "rgba(26,107,255,0.3)",
-		accentGreen: "#34d399",
-		accentGreenBg: "rgba(52,211,153,0.1)",
-		accentGreenBorder: "rgba(52,211,153,0.25)",
-		avatarBg: "#1a3a6e",
-		avatarRing: "rgba(26,107,255,0.4)",
-		onlineDotBorder: "#0d1424",
-		glowBar: "#1a6bff",
-		editBtnBg: "rgba(96,165,250,0.1)",
-		editBtnBorder: "rgba(96,165,250,0.2)",
-		editBtnIcon: "#60a5fa",
-		logoutBg: "rgba(239,68,68,0.07)",
-		logoutBorder: "rgba(239,68,68,0.18)",
-		logoutIconBg: "rgba(239,68,68,0.1)",
-		logoutText: "#f87171",
-		logoutArrow: "#7f1d1d",
-		footerBrand: "#1a6bff",
-		footerVersion: "#2d3f57",
-		shadowColor: "#000000",
-		shadowOpacity: 0.25,
-	},
-	light: {
-		root: "#f0f4f8",
-		card: "#ffffff",
-		cardBorder: "#e2e8f0",
-		text: "#0f172a",
-		textSecondary: "#1e293b",
-		textMuted: "#64748b",
-		textFaint: "#94a3b8",
-		sectionLabel: "#94a3b8",
-		divider: "#e2e8f0",
-		arrowBg: "#f1f5f9",
-		arrowIcon: "#cbd5e1",
-		statValue: "#0f172a",
-		accentBlue: "#1a6bff",
-		accentBlueText: "#1a6bff",
-		accentBlueBg: "rgba(26,107,255,0.08)",
-		accentBlueBorder: "rgba(26,107,255,0.2)",
-		accentGreen: "#059669",
-		accentGreenBg: "rgba(5,150,105,0.08)",
-		accentGreenBorder: "rgba(5,150,105,0.2)",
-		avatarBg: "#dbeafe",
-		avatarRing: "rgba(26,107,255,0.2)",
-		onlineDotBorder: "#ffffff",
-		glowBar: "#1a6bff",
-		editBtnBg: "#eff6ff",
-		editBtnBorder: "#bfdbfe",
-		editBtnIcon: "#1a6bff",
-		logoutBg: "#fff5f5",
-		logoutBorder: "#fecaca",
-		logoutIconBg: "#fee2e2",
-		logoutText: "#ef4444",
-		logoutArrow: "#fca5a5",
-		footerBrand: "#1a6bff",
-		footerVersion: "#cbd5e1",
-		shadowColor: "#64748b",
-		shadowOpacity: 0.08,
-	},
-} as const;
-
 // ── Component ─────────────────────────────────────────────────────────────────
 export const AdminOverviewScreen = ({ navigation }: any) => {
 	const { user, logout } = useAuth();
-	const { isDarkMode } = useTheme();
+	const { isDarkMode, colors } = useTheme();
 	const insets = useSafeAreaInsets();
-	const c = isDarkMode ? T.dark : T.light; // active colour set
 
 	// Mount + theme-switch animation
 	const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -129,16 +49,12 @@ export const AdminOverviewScreen = ({ navigation }: any) => {
 		]).start();
 	};
 
-	useEffect(() => {
-		runAnim(28, 420);
-	}, []);
-	useEffect(() => {
-		runAnim(12, 260);
-	}, [isDarkMode]);
+	useEffect(() => { runAnim(28, 420); }, []);
+	useEffect(() => { runAnim(12, 260); }, [isDarkMode]);
 
 	const isDriver = user?.role === "DRIVER";
 
-	// ── Section data ───────────────────────────────────────────────────────────
+	// ── Section data ─────────────────────────────────────────────────────────
 	const sections: SettingsSection[] = [
 		{
 			title: "Account",
@@ -149,7 +65,7 @@ export const AdminOverviewScreen = ({ navigation }: any) => {
 					route: "EditProfile",
 					icon: "person-outline",
 					dark: { iconColor: "#60a5fa", iconBg: "#1e3a5f" },
-					light: { iconColor: "#1a6bff", iconBg: "#dbeafe" },
+					light: { iconColor: "#1A6BFF", iconBg: "#DBEAFE" },
 				},
 				{
 					label: "Security & Privacy",
@@ -157,7 +73,7 @@ export const AdminOverviewScreen = ({ navigation }: any) => {
 					route: "Security",
 					icon: "lock-closed-outline",
 					dark: { iconColor: "#34d399", iconBg: "#064e3b" },
-					light: { iconColor: "#059669", iconBg: "#d1fae5" },
+					light: { iconColor: "#0B7B56", iconBg: "#D1FAE5" },
 				},
 			],
 		},
@@ -173,7 +89,7 @@ export const AdminOverviewScreen = ({ navigation }: any) => {
 								route: "ManageVehicles",
 								icon: "car-sport-outline" as IoniconsName,
 								dark: { iconColor: "#a78bfa", iconBg: "#2e1065" },
-								light: { iconColor: "#7c3aed", iconBg: "#ede9fe" },
+								light: { iconColor: "#7C3AED", iconBg: "#EDE9FE" },
 							},
 						]),
 				{
@@ -182,7 +98,7 @@ export const AdminOverviewScreen = ({ navigation }: any) => {
 					route: "PaymentMethods",
 					icon: "card-outline",
 					dark: { iconColor: "#f59e0b", iconBg: "#451a03" },
-					light: { iconColor: "#d97706", iconBg: "#fef3c7" },
+					light: { iconColor: "#B87000", iconBg: "#FEF3C7" },
 				},
 			],
 		},
@@ -195,7 +111,7 @@ export const AdminOverviewScreen = ({ navigation }: any) => {
 					route: "Preferences",
 					icon: "color-palette-outline",
 					dark: { iconColor: "#fb7185", iconBg: "#4c0519" },
-					light: { iconColor: "#e11d48", iconBg: "#ffe4e6" },
+					light: { iconColor: "#D93025", iconBg: "#FFE4E6" },
 				},
 			],
 		},
@@ -208,7 +124,7 @@ export const AdminOverviewScreen = ({ navigation }: any) => {
 					route: "HelpCenter",
 					icon: "help-buoy-outline",
 					dark: { iconColor: "#38bdf8", iconBg: "#082f49" },
-					light: { iconColor: "#0284c7", iconBg: "#e0f2fe" },
+					light: { iconColor: "#0284C7", iconBg: "#E0F2FE" },
 				},
 				{
 					label: "Terms of Service",
@@ -216,7 +132,7 @@ export const AdminOverviewScreen = ({ navigation }: any) => {
 					route: "Terms",
 					icon: "document-text-outline",
 					dark: { iconColor: "#94a3b8", iconBg: "#1e293b" },
-					light: { iconColor: "#64748b", iconBg: "#f1f5f9" },
+					light: { iconColor: "#6D6359", iconBg: "#EDE9E2" },
 				},
 			],
 		},
@@ -234,9 +150,23 @@ export const AdminOverviewScreen = ({ navigation }: any) => {
 				{ l: "Saved", v: "—" },
 			];
 
-	// ── Render ─────────────────────────────────────────────────────────────────
+	// Derived from ThemeContext colors
+	const avatarBg = isDarkMode ? "#1a3a6e" : "#DBEAFE";
+	const avatarRingColor = isDarkMode ? "rgba(26,107,255,0.4)" : "rgba(26,107,255,0.2)";
+	const onlineDotBorder = isDarkMode ? colors.card : "#FFFFFF";
+	const glowBarColor = colors.primary;
+	const editBtnBg = isDarkMode ? "rgba(96,165,250,0.1)" : colors.accentBg;
+	const editBtnBorder = isDarkMode ? "rgba(96,165,250,0.2)" : colors.accentBorder;
+	const editBtnIcon = isDarkMode ? "#60a5fa" : colors.primary;
+	const logoutBg = colors.dangerBg;
+	const logoutBorder = colors.dangerBorder;
+	const logoutIconBg = colors.dangerIconBg;
+	const logoutText = colors.danger;
+	const logoutArrow = isDarkMode ? "#7f1d1d" : "#FCA5A5";
+
+	// ── Render ────────────────────────────────────────────────────────────────
 	return (
-		<View style={[styles.root, { backgroundColor: c.root }]}>
+		<View style={[styles.root, { backgroundColor: colors.background }]}>
 			<ScrollView
 				showsVerticalScrollIndicator={false}
 				contentContainerStyle={[
@@ -252,22 +182,22 @@ export const AdminOverviewScreen = ({ navigation }: any) => {
 						style={[
 							styles.profileCard,
 							{
-								backgroundColor: c.card,
-								borderColor: c.cardBorder,
-								shadowColor: c.shadowColor,
-								shadowOpacity: c.shadowOpacity,
+								backgroundColor: colors.card,
+								borderColor: colors.cardBorder,
+								shadowColor: colors.shadowColor,
+								shadowOpacity: colors.shadowOpacity as number,
 							},
 						]}
 					>
-						{/* Blue top accent bar */}
-						<View style={[styles.glowBar, { backgroundColor: c.glowBar }]} />
+						{/* Top accent bar */}
+						<View style={[styles.glowBar, { backgroundColor: glowBarColor }]} />
 
 						<View style={styles.profileRow}>
 							{/* Avatar with ring + online dot */}
 							<View>
-								<View style={[styles.avatarRing, { borderColor: c.avatarRing }]}>
-									<View style={[styles.avatar, { backgroundColor: c.avatarBg }]}>
-										<Text style={[styles.avatarLetter, { color: c.accentBlueText }]}>
+								<View style={[styles.avatarRing, { borderColor: avatarRingColor }]}>
+									<View style={[styles.avatar, { backgroundColor: avatarBg }]}>
+										<Text style={[styles.avatarLetter, { color: colors.accentText }]}>
 											{user?.name?.charAt(0)?.toUpperCase() || "?"}
 										</Text>
 									</View>
@@ -276,8 +206,8 @@ export const AdminOverviewScreen = ({ navigation }: any) => {
 									style={[
 										styles.onlineDot,
 										{
-											backgroundColor: c.accentGreen,
-											borderColor: c.onlineDotBorder,
+											backgroundColor: colors.green,
+											borderColor: onlineDotBorder,
 										},
 									]}
 								/>
@@ -285,10 +215,10 @@ export const AdminOverviewScreen = ({ navigation }: any) => {
 
 							{/* Name / email / badges */}
 							<View style={styles.profileMeta}>
-								<Text style={[styles.profileName, { color: c.text }]}>
+								<Text style={[styles.profileName, { color: colors.text }]}>
 									{user?.name || "User"}
 								</Text>
-								<Text style={[styles.profileEmail, { color: c.textMuted }]}>
+								<Text style={[styles.profileEmail, { color: colors.textMuted }]}>
 									{user?.email}
 								</Text>
 								<View style={styles.badgeRow}>
@@ -296,13 +226,13 @@ export const AdminOverviewScreen = ({ navigation }: any) => {
 										style={[
 											styles.badge,
 											{
-												backgroundColor: c.accentBlueBg,
-												borderColor: c.accentBlueBorder,
+												backgroundColor: colors.accentBg,
+												borderColor: colors.accentBorder,
 											},
 										]}
 									>
-										<View style={[styles.badgeDot, { backgroundColor: c.accentBlue }]} />
-										<Text style={[styles.badgeText, { color: c.accentBlueText }]}>
+										<View style={[styles.badgeDot, { backgroundColor: colors.accent }]} />
+										<Text style={[styles.badgeText, { color: colors.accentText }]}>
 											{isDriver ? "Driver" : "Customer"}
 										</Text>
 									</View>
@@ -311,13 +241,13 @@ export const AdminOverviewScreen = ({ navigation }: any) => {
 											style={[
 												styles.badge,
 												{
-													backgroundColor: c.accentGreenBg,
-													borderColor: c.accentGreenBorder,
+													backgroundColor: colors.greenBg,
+													borderColor: colors.greenBorder,
 													marginLeft: 6,
 												},
 											]}
 										>
-											<Text style={[styles.badgeText, { color: c.accentGreen }]}>
+											<Text style={[styles.badgeText, { color: colors.green }]}>
 												Active
 											</Text>
 										</View>
@@ -330,19 +260,19 @@ export const AdminOverviewScreen = ({ navigation }: any) => {
 								style={[
 									styles.editBtn,
 									{
-										backgroundColor: c.editBtnBg,
-										borderColor: c.editBtnBorder,
+										backgroundColor: editBtnBg,
+										borderColor: editBtnBorder,
 									},
 								]}
 								onPress={() => navigation.navigate("EditProfile")}
 								activeOpacity={0.75}
 							>
-								<Ionicons name="pencil" size={15} color={c.editBtnIcon} />
+								<Ionicons name="pencil" size={15} color={editBtnIcon} />
 							</TouchableOpacity>
 						</View>
 
 						{/* Stats row */}
-						<View style={[styles.statsRow, { borderTopColor: c.divider }]}>
+						<View style={[styles.statsRow, { borderTopColor: colors.divider }]}>
 							{stats.map((s, i) => (
 								<View
 									key={s.l}
@@ -350,21 +280,21 @@ export const AdminOverviewScreen = ({ navigation }: any) => {
 										styles.statCell,
 										i < stats.length - 1 && {
 											borderRightWidth: 1,
-											borderRightColor: c.divider,
+											borderRightColor: colors.divider,
 										},
 									]}
 								>
-									<Text style={[styles.statValue, { color: c.statValue }]}>{s.v}</Text>
-									<Text style={[styles.statLabel, { color: c.textFaint }]}>{s.l}</Text>
+									<Text style={[styles.statValue, { color: colors.text }]}>{s.v}</Text>
+									<Text style={[styles.statLabel, { color: colors.textFaint }]}>{s.l}</Text>
 								</View>
 							))}
 						</View>
 					</View>
 
-					{/* ── Setting sections ── */}
+					{/* ── Settings sections ── */}
 					{sections.map((section, si) => (
 						<View key={si} style={styles.section}>
-							<Text style={[styles.sectionLabel, { color: c.sectionLabel }]}>
+							<Text style={[styles.sectionLabel, { color: colors.sectionLabel }]}>
 								{section.title}
 							</Text>
 
@@ -372,10 +302,10 @@ export const AdminOverviewScreen = ({ navigation }: any) => {
 								style={[
 									styles.sectionCard,
 									{
-										backgroundColor: c.card,
-										borderColor: c.cardBorder,
-										shadowColor: c.shadowColor,
-										shadowOpacity: c.shadowOpacity,
+										backgroundColor: colors.card,
+										borderColor: colors.cardBorder,
+										shadowColor: colors.shadowColor,
+										shadowOpacity: colors.shadowOpacity as number,
 									},
 								]}
 							>
@@ -388,7 +318,7 @@ export const AdminOverviewScreen = ({ navigation }: any) => {
 												styles.row,
 												ii < section.items.length - 1 && {
 													borderBottomWidth: 1,
-													borderBottomColor: c.divider,
+													borderBottomColor: colors.divider,
 												},
 											]}
 											onPress={() => navigation.navigate(item.route)}
@@ -398,25 +328,25 @@ export const AdminOverviewScreen = ({ navigation }: any) => {
 												<Ionicons name={item.icon} size={18} color={icon.iconColor} />
 											</View>
 											<View style={styles.rowTexts}>
-												<Text style={[styles.rowLabel, { color: c.textSecondary }]}>
+												<Text style={[styles.rowLabel, { color: colors.textSecondary }]}>
 													{item.label}
 												</Text>
-												<Text style={[styles.rowSublabel, { color: c.textFaint }]}>
+												<Text style={[styles.rowSublabel, { color: colors.textFaint }]}>
 													{item.sublabel}
 												</Text>
 											</View>
 											{item.badge ? (
 												<View
-													style={[styles.rowBadge, { backgroundColor: c.accentBlue }]}
+													style={[styles.rowBadge, { backgroundColor: colors.accent }]}
 												>
 													<Text style={styles.rowBadgeText}>{item.badge}</Text>
 												</View>
 											) : (
-												<View style={[styles.rowArrow, { backgroundColor: c.arrowBg }]}>
+												<View style={[styles.rowArrow, { backgroundColor: colors.arrowBg }]}>
 													<Ionicons
 														name="chevron-forward"
 														size={13}
-														color={c.arrowIcon}
+														color={colors.arrowIcon}
 													/>
 												</View>
 											)}
@@ -429,28 +359,28 @@ export const AdminOverviewScreen = ({ navigation }: any) => {
 
 					{/* ── Logout ── */}
 					<View style={styles.section}>
-						<Text style={[styles.sectionLabel, { color: c.sectionLabel }]}>
+						<Text style={[styles.sectionLabel, { color: colors.sectionLabel }]}>
 							Account Actions
 						</Text>
 						<TouchableOpacity
 							style={[
 								styles.logoutRow,
 								{
-									backgroundColor: c.logoutBg,
-									borderColor: c.logoutBorder,
+									backgroundColor: logoutBg,
+									borderColor: logoutBorder,
 								},
 							]}
 							onPress={logout}
 							activeOpacity={0.75}
 						>
-							<View style={[styles.rowIcon, { backgroundColor: c.logoutIconBg }]}>
-								<Ionicons name="log-out-outline" size={18} color={c.logoutText} />
+							<View style={[styles.rowIcon, { backgroundColor: logoutIconBg }]}>
+								<Ionicons name="log-out-outline" size={18} color={logoutText} />
 							</View>
-							<Text style={[styles.rowLabel, { color: c.logoutText, flex: 1 }]}>
+							<Text style={[styles.rowLabel, { color: logoutText, flex: 1 }]}>
 								Log Out
 							</Text>
-							<View style={[styles.rowArrow, { backgroundColor: c.logoutBg }]}>
-								<Ionicons name="chevron-forward" size={13} color={c.logoutArrow} />
+							<View style={[styles.rowArrow, { backgroundColor: logoutBg }]}>
+								<Ionicons name="chevron-forward" size={13} color={logoutArrow} />
 							</View>
 						</TouchableOpacity>
 					</View>
@@ -458,12 +388,12 @@ export const AdminOverviewScreen = ({ navigation }: any) => {
 					{/* ── Footer ── */}
 					<View style={styles.footer}>
 						<View style={styles.footerBrandRow}>
-							<Ionicons name="flash" size={12} color={c.footerBrand} />
-							<Text style={[styles.footerBrandText, { color: c.footerBrand }]}>
+							<Ionicons name="flash" size={12} color={colors.footerBrand} />
+							<Text style={[styles.footerBrandText, { color: colors.footerBrand }]}>
 								RoadLift
 							</Text>
 						</View>
-						<Text style={[styles.footerVersion, { color: c.footerVersion }]}>
+						<Text style={[styles.footerVersion, { color: colors.footerVersion }]}>
 							Version 1.0.0 · Build 100
 						</Text>
 					</View>
@@ -473,12 +403,10 @@ export const AdminOverviewScreen = ({ navigation }: any) => {
 	);
 };
 
-// ── Geometry-only styles (zero colour values) ─────────────────────────────────
+// ── Geometry-only styles ──────────────────────────────────────────────────────
 const styles = StyleSheet.create({
 	root: { flex: 1 },
 	content: { paddingHorizontal: 16 },
-
-	pageTitle: { fontSize: 30, fontWeight: "800", letterSpacing: -0.5, marginBottom: 20 },
 
 	// Profile card
 	profileCard: {

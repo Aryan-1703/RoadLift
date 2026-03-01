@@ -3,77 +3,86 @@ import { Appearance, ColorSchemeName } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ThemeOption } from "../types";
 
+// ─────────────────────────────────────────────────────────────────────────────
+// "Warm Dispatch" Light Theme
+// Inspired by premium automotive & emergency services aesthetics.
+// Warm asphalt-dust backgrounds, crisp white cards, deep warm typography.
+// ─────────────────────────────────────────────────────────────────────────────
 export const lightColors = {
-	// ── Core (existing keys — unchanged API) ──────────────────────────────────
-	background: "#f0f4f8",
-	card: "#ffffff",
-	text: "#0f172a",
-	textMuted: "#64748b",
-	border: "#e2e8f0",
-	primary: "#1a6bff",
-	danger: "#ef4444",
-	dangerBg: "#fff5f5",
+	// ── Core ─────────────────────────────────────────────────────────────────
+	background: "#F0EDE7",       // warm asphalt-dust off-white
+	card: "#FFFFFF",
+	text: "#1B1916",             // near-black with warm undertone
+	textMuted: "#6D6359",        // warm medium gray
+	border: "#E2DDD6",           // warm light border
+	primary: "#1A6BFF",
+	danger: "#D93025",
+	dangerBg: "#FEF2F2",
 
-	// ── Extended tokens (used by new screen designs) ──────────────────────────
-	textSecondary: "#1e293b",
-	textFaint: "#94a3b8",
-	sectionLabel: "#94a3b8",
-	divider: "#e2e8f0",
+	// ── Extended tokens ───────────────────────────────────────────────────────
+	textSecondary: "#2D2723",
+	textFaint: "#9C9289",
+	sectionLabel: "#9C9289",
+	divider: "#E2DDD6",
 
 	// surfaces
-	surface: "#f8fafc",
-	surfaceBorder: "#e2e8f0",
-	inputBg: "#f8fafc",
-	inputBorder: "#e2e8f0",
+	surface: "#F7F4EF",
+	surfaceBorder: "#E2DDD6",
+	inputBg: "#F7F4EF",
+	inputBorder: "#D4CFC8",
 
 	// cards
-	cardBorder: "#e2e8f0",
+	cardBorder: "#E2DDD6",
 
 	// accent blue
-	accent: "#1a6bff",
-	accentText: "#1a6bff",
-	accentBg: "rgba(26,107,255,0.08)",
-	accentBorder: "rgba(26,107,255,0.20)",
+	accent: "#1A6BFF",
+	accentText: "#1A6BFF",
+	accentBg: "rgba(26,107,255,0.07)",
+	accentBorder: "rgba(26,107,255,0.18)",
 
 	// accent green
-	green: "#059669",
-	greenBg: "rgba(5,150,105,0.08)",
-	greenBorder: "rgba(5,150,105,0.20)",
+	green: "#0B7B56",
+	greenBg: "rgba(11,123,86,0.08)",
+	greenBorder: "rgba(11,123,86,0.18)",
 
-	// accent amber
-	amber: "#d97706",
-	amberBg: "rgba(217,119,6,0.08)",
-	amberBorder: "rgba(217,119,6,0.20)",
+	// accent amber — premium warm gold for light theme personality
+	amber: "#B87000",
+	amberBg: "rgba(184,112,0,0.08)",
+	amberBorder: "rgba(184,112,0,0.18)",
 
 	// danger (extended)
-	dangerBorder: "#fecaca",
-	dangerIconBg: "#fee2e2",
+	dangerBorder: "#FECACA",
+	dangerIconBg: "#FEE2E2",
 
 	// chevrons / chip backgrounds
-	arrowBg: "#f1f5f9",
-	arrowIcon: "#cbd5e1",
+	arrowBg: "#EDE9E2",
+	arrowIcon: "#C4BDB4",
 
-	// shadows
-	shadowColor: "#64748b",
-	shadowOpacity: 0.08,
+	// shadows — warm brown-tinted for depth
+	shadowColor: "#5C4A3A",
+	shadowOpacity: 0.10,
 
 	// status dots
-	online: "#059669",
-	offline: "#9ca3af",
+	online: "#0B7B56",
+	offline: "#9C9289",
 
 	// overlays
-	overlay: "rgba(0,0,0,0.40)",
+	overlay: "rgba(27,25,22,0.40)",
 
 	// switch track (off state)
-	switchTrackOff: "#e2e8f0",
+	switchTrackOff: "#D4CFC8",
 
 	// footer brand
-	footerBrand: "#1a6bff",
-	footerVersion: "#cbd5e1",
+	footerBrand: "#1A6BFF",
+	footerVersion: "#C4BDB4",
 } as const;
 
+// ─────────────────────────────────────────────────────────────────────────────
+// "Midnight Highway" Dark Theme
+// Deep navy cosmos, electric blue accents, glowing status indicators.
+// ─────────────────────────────────────────────────────────────────────────────
 export const darkColors = {
-	// ── Core (existing keys — unchanged API) ──────────────────────────────────
+	// ── Core ─────────────────────────────────────────────────────────────────
 	background: "#060b18",
 	card: "#0d1424",
 	text: "#ffffff",
@@ -144,9 +153,6 @@ export const darkColors = {
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
-// Widen every value to string | number so both lightColors and darkColors
-// are assignable — without this, `typeof lightColors` locks each key to its
-// exact literal (e.g. "#f0f4f8") and darkColors' different literals error.
 export type Colors = {
 	[K in keyof typeof lightColors]: (typeof lightColors)[K] extends number
 		? number
@@ -210,7 +216,7 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Hook  (same signature as before — zero changes needed in any screen)
+// Hook
 // ─────────────────────────────────────────────────────────────────────────────
 export const useTheme = () => {
 	const context = useContext(ThemeContext);

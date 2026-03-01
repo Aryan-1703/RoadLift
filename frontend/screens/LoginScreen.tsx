@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
 	View,
 	Text,
@@ -7,18 +7,19 @@ import {
 	KeyboardAvoidingView,
 	Platform,
 	TouchableOpacity,
+	Animated,
+	StatusBar,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { PrimaryButton } from "../components/PrimaryButton";
-import { Card } from "../components/Card";
 import { Ionicons } from "@expo/vector-icons";
 import { API_URL } from "../config";
 
 export const LoginScreen = () => {
-	const { colors } = useTheme();
+	const { colors, isDarkMode } = useTheme();
 	const { login, getRememberedEmail } = useAuth();
 	const navigation = useNavigation<any>();
 
@@ -27,6 +28,28 @@ export const LoginScreen = () => {
 	const [rememberEmail, setRememberEmail] = useState(false);
 	const [error, setError] = useState("");
 	const [isSubmitting, setIsSubmitting] = useState(false);
+	const [showPassword, setShowPassword] = useState(false);
+	const [phoneFocused, setPhoneFocused] = useState(false);
+	const [passFocused, setPassFocused] = useState(false);
+
+	// Entrance animation
+	const fadeAnim = useRef(new Animated.Value(0)).current;
+	const slideAnim = useRef(new Animated.Value(32)).current;
+	const logoAnim = useRef(new Animated.Value(0)).current;
+	const logoScale = useRef(new Animated.Value(0.8)).current;
+
+	useEffect(() => {
+		Animated.sequence([
+			Animated.parallel([
+				Animated.spring(logoScale, { toValue: 1, tension: 60, friction: 8, useNativeDriver: true }),
+				Animated.timing(logoAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
+			]),
+			Animated.parallel([
+				Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
+				Animated.spring(slideAnim, { toValue: 0, tension: 50, friction: 10, useNativeDriver: true }),
+			]),
+		]).start();
+	}, []);
 
 	useEffect(() => {
 		const loadRememberedEmail = async () => {
@@ -40,15 +63,8 @@ export const LoginScreen = () => {
 	}, [getRememberedEmail]);
 
 	const handleLogin = async () => {
-		if (!phoneNumber) {
-			setError("Phone Number is required");
-			return;
-		}
-		if (!password) {
-			setError("Password is required");
-			return;
-		}
-
+		if (!phoneNumber) { setError("Phone number is required"); return; }
+		if (!password) { setError("Password is required"); return; }
 		setError("");
 		setIsSubmitting(true);
 		try {
@@ -57,138 +73,402 @@ export const LoginScreen = () => {
 			const backendError = err.response?.data?.error || err.response?.data?.message;
 			const fallbackError =
 				err.message === "Network Error"
-					? `Network Error: Cannot reach backend at ${API_URL}.\n\nIf you are testing on a physical phone, you MUST enter your computer's Wi-Fi IP address in frontend/config.ts!`
+					? `Network Error: Cannot reach backend at ${API_URL}.\n\nIf testing on a physical device, enter your Wi-Fi IP in frontend/config.ts`
 					: err.message;
-
 			setError(backendError || fallbackError || "Failed to login");
 		} finally {
 			setIsSubmitting(false);
 		}
 	};
 
+	// Theme-aware colors
+	const screenBg = isDarkMode ? "#060b18" : "#F0EDE7";
+	const cardBg = isDarkMode ? "#0d1424" : "#FFFFFF";
+	const cardBorder = isDarkMode ? "rgba(255,255,255,0.07)" : "#E2DDD6";
+	const inputBg = isDarkMode ? "#0a1020" : "#F7F4EF";
+	const inputBorder = isDarkMode ? "rgba(255,255,255,0.10)" : "#D4CFC8";
+	const logoBg = isDarkMode ? "rgba(26,107,255,0.15)" : "rgba(26,107,255,0.09)";
+	const logoRing = isDarkMode ? "rgba(26,107,255,0.30)" : "rgba(26,107,255,0.18)";
+	const dividerColor = isDarkMode ? "rgba(255,255,255,0.07)" : "#E2DDD6";
+	const taglineBg = isDarkMode ? "rgba(26,107,255,0.12)" : "rgba(26,107,255,0.07)";
+
 	return (
-		<SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-			<KeyboardAvoidingView
-				behavior={Platform.OS === "ios" ? "padding" : "height"}
-				style={styles.keyboardView}
-			>
-				<View style={styles.header}>
-					<View style={[styles.iconContainer, { backgroundColor: colors.primary }]}>
-						<Ionicons name="car-sport" size={48} color="#FFF" />
+		<View style={[styles.root, { backgroundColor: screenBg }]}>
+			<StatusBar
+				barStyle={isDarkMode ? "light-content" : "dark-content"}
+				backgroundColor={screenBg}
+			/>
+
+			{/* Decorative background shape */}
+			<View
+				style={[
+					styles.bgShape,
+					{
+						backgroundColor: isDarkMode
+							? "rgba(26,107,255,0.04)"
+							: "rgba(26,107,255,0.045)",
+					},
+				]}
+				pointerEvents="none"
+			/>
+
+			<SafeAreaView style={styles.safeArea}>
+				<KeyboardAvoidingView
+					behavior={Platform.OS === "ios" ? "padding" : "height"}
+					style={styles.kav}
+				>
+					<View style={styles.inner}>
+
+						{/* ── Logo block ── */}
+						<Animated.View
+							style={[
+								styles.logoSection,
+								{ opacity: logoAnim, transform: [{ scale: logoScale }] },
+							]}
+						>
+							<View style={[styles.logoRing, { borderColor: logoRing }]}>
+								<View style={[styles.logoBox, { backgroundColor: logoBg }]}>
+									<Ionicons name="car-sport" size={36} color={colors.primary} />
+								</View>
+							</View>
+							<Text style={[styles.appName, { color: colors.text }]}>RoadLift</Text>
+							<View style={[styles.taglineChip, { backgroundColor: taglineBg }]}>
+								<View style={[styles.taglineDot, { backgroundColor: colors.primary }]} />
+								<Text style={[styles.tagline, { color: colors.primary }]}>
+									On-demand roadside assistance
+								</Text>
+							</View>
+						</Animated.View>
+
+						{/* ── Form card ── */}
+						<Animated.View
+							style={[
+								styles.card,
+								{
+									backgroundColor: cardBg,
+									borderColor: cardBorder,
+									opacity: fadeAnim,
+									transform: [{ translateY: slideAnim }],
+									shadowColor: isDarkMode ? "#000" : "#5C4A3A",
+									shadowOpacity: isDarkMode ? 0.3 : 0.10,
+								},
+							]}
+						>
+							<Text style={[styles.cardTitle, { color: colors.text }]}>
+								Welcome back
+							</Text>
+							<Text style={[styles.cardSubtitle, { color: colors.textMuted }]}>
+								Sign in to your account
+							</Text>
+
+							<View style={[styles.divider, { backgroundColor: dividerColor }]} />
+
+							{/* Phone input */}
+							<View style={styles.fieldGroup}>
+								<Text style={[styles.label, { color: colors.textMuted }]}>
+									PHONE NUMBER
+								</Text>
+								<View
+									style={[
+										styles.inputWrapper,
+										{
+											backgroundColor: inputBg,
+											borderColor: phoneFocused ? colors.primary : inputBorder,
+											shadowColor: phoneFocused ? colors.primary : "transparent",
+											shadowOpacity: phoneFocused ? 0.15 : 0,
+										},
+									]}
+								>
+									<Ionicons
+										name="call-outline"
+										size={18}
+										color={phoneFocused ? colors.primary : colors.textMuted}
+										style={styles.inputIcon}
+									/>
+									<TextInput
+										style={[styles.input, { color: colors.text }]}
+										value={phoneNumber}
+										onChangeText={setPhoneNumber}
+										keyboardType="phone-pad"
+										autoCapitalize="none"
+										placeholder="Enter your phone number"
+										placeholderTextColor={colors.textMuted}
+										onFocus={() => setPhoneFocused(true)}
+										onBlur={() => setPhoneFocused(false)}
+									/>
+								</View>
+							</View>
+
+							{/* Password input */}
+							<View style={styles.fieldGroup}>
+								<Text style={[styles.label, { color: colors.textMuted }]}>
+									PASSWORD
+								</Text>
+								<View
+									style={[
+										styles.inputWrapper,
+										{
+											backgroundColor: inputBg,
+											borderColor: passFocused ? colors.primary : inputBorder,
+											shadowColor: passFocused ? colors.primary : "transparent",
+											shadowOpacity: passFocused ? 0.15 : 0,
+										},
+									]}
+								>
+									<Ionicons
+										name="lock-closed-outline"
+										size={18}
+										color={passFocused ? colors.primary : colors.textMuted}
+										style={styles.inputIcon}
+									/>
+									<TextInput
+										style={[styles.input, { color: colors.text }]}
+										value={password}
+										onChangeText={setPassword}
+										secureTextEntry={!showPassword}
+										placeholder="Enter your password"
+										placeholderTextColor={colors.textMuted}
+										onFocus={() => setPassFocused(true)}
+										onBlur={() => setPassFocused(false)}
+									/>
+									<TouchableOpacity
+										onPress={() => setShowPassword(v => !v)}
+										hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+									>
+										<Ionicons
+											name={showPassword ? "eye-off-outline" : "eye-outline"}
+											size={18}
+											color={colors.textMuted}
+										/>
+									</TouchableOpacity>
+								</View>
+							</View>
+
+							{/* Remember me */}
+							<TouchableOpacity
+								style={styles.rememberRow}
+								onPress={() => setRememberEmail(!rememberEmail)}
+								activeOpacity={0.7}
+							>
+								<View
+									style={[
+										styles.checkbox,
+										{
+											borderColor: rememberEmail ? colors.primary : inputBorder,
+											backgroundColor: rememberEmail
+												? colors.primary
+												: "transparent",
+										},
+									]}
+								>
+									{rememberEmail && (
+										<Ionicons name="checkmark" size={12} color="#fff" />
+									)}
+								</View>
+								<Text style={[styles.rememberLabel, { color: colors.textMuted }]}>
+									Remember phone number
+								</Text>
+							</TouchableOpacity>
+
+							{error ? (
+								<View
+									style={[
+										styles.errorBox,
+										{
+											backgroundColor: colors.dangerBg,
+											borderColor: colors.dangerBorder,
+										},
+									]}
+								>
+									<Ionicons name="alert-circle-outline" size={16} color={colors.danger} />
+									<Text style={[styles.errorText, { color: colors.danger }]}>
+										{error}
+									</Text>
+								</View>
+							) : null}
+
+							<PrimaryButton
+								title="Sign In"
+								onPress={handleLogin}
+								isLoading={isSubmitting}
+								disabled={isSubmitting}
+								style={styles.signInBtn}
+							/>
+						</Animated.View>
+
+						{/* ── Register link ── */}
+						<Animated.View
+							style={[styles.registerWrap, { opacity: fadeAnim }]}
+						>
+							<View
+								style={[
+									styles.registerCard,
+									{
+										backgroundColor: isDarkMode
+											? "rgba(255,255,255,0.04)"
+											: "rgba(27,25,22,0.04)",
+										borderColor: cardBorder,
+									},
+								]}
+							>
+								<Text style={[styles.registerHint, { color: colors.textMuted }]}>
+									Don't have an account?
+								</Text>
+								<TouchableOpacity
+									onPress={() => navigation.navigate("Register")}
+									disabled={isSubmitting}
+									activeOpacity={0.7}
+								>
+									<Text style={[styles.registerLink, { color: colors.primary }]}>
+										Create Account →
+									</Text>
+								</TouchableOpacity>
+							</View>
+						</Animated.View>
+
 					</View>
-					<Text style={[styles.title, { color: colors.text }]}>RoadLift</Text>
-					<Text style={[styles.subtitle, { color: colors.textMuted }]}>
-						On-demand roadside assistance.
-					</Text>
-				</View>
-
-				<Card style={styles.form}>
-					<Text style={[styles.label, { color: colors.text }]}>Phone Number</Text>
-					<TextInput
-						style={[
-							styles.input,
-							{
-								borderColor: colors.border,
-								color: colors.text,
-								backgroundColor: colors.background,
-							},
-						]}
-						value={phoneNumber}
-						onChangeText={setPhoneNumber}
-						keyboardType="phone-pad"
-						autoCapitalize="none"
-						placeholder="Enter your phone number"
-						placeholderTextColor={colors.textMuted}
-					/>
-
-					<Text style={[styles.label, { color: colors.text, marginTop: 20 }]}>
-						Password
-					</Text>
-					<TextInput
-						style={[
-							styles.input,
-							{
-								borderColor: colors.border,
-								color: colors.text,
-								backgroundColor: colors.background,
-							},
-						]}
-						value={password}
-						onChangeText={setPassword}
-						secureTextEntry
-						placeholder="Enter your password"
-						placeholderTextColor={colors.textMuted}
-					/>
-
-					<TouchableOpacity
-						style={styles.checkboxContainer}
-						onPress={() => setRememberEmail(!rememberEmail)}
-						activeOpacity={0.7}
-					>
-						<Ionicons
-							name={rememberEmail ? "checkbox" : "square-outline"}
-							size={24}
-							color={rememberEmail ? colors.primary : colors.textMuted}
-						/>
-						<Text style={[styles.checkboxLabel, { color: colors.text }]}>
-							Remember Phone Number
-						</Text>
-					</TouchableOpacity>
-
-					{error ? <Text style={styles.error}>{error}</Text> : null}
-
-					<PrimaryButton
-						title="Sign In"
-						onPress={handleLogin}
-						isLoading={isSubmitting}
-						disabled={isSubmitting}
-						style={styles.button}
-					/>
-
-					<PrimaryButton
-						title="Create an Account"
-						variant="secondary"
-						onPress={() => navigation.navigate("Register")}
-						disabled={isSubmitting}
-						style={styles.registerButton}
-					/>
-				</Card>
-			</KeyboardAvoidingView>
-		</SafeAreaView>
+				</KeyboardAvoidingView>
+			</SafeAreaView>
+		</View>
 	);
 };
 
 const styles = StyleSheet.create({
-	container: { flex: 1 },
-	keyboardView: { flex: 1, justifyContent: "center", padding: 24 },
-	header: { alignItems: "center", marginBottom: 48 },
-	iconContainer: {
-		padding: 20,
-		borderRadius: 24,
-		marginBottom: 20,
-		transform: [{ rotate: "-5deg" }],
-		shadowColor: '#000',
-		shadowOffset: { width: 0, height: 8 },
-		shadowOpacity: 0.15,
-		shadowRadius: 12,
-		elevation: 5,
+	root: { flex: 1 },
+	safeArea: { flex: 1 },
+	kav: { flex: 1 },
+	inner: {
+		flex: 1,
+		justifyContent: "center",
+		paddingHorizontal: 20,
+		paddingBottom: 24,
 	},
-	title: { fontSize: 36, fontWeight: "800", letterSpacing: -0.5 },
-	subtitle: { fontSize: 16, marginTop: 8, letterSpacing: 0.2 },
-	form: { padding: 24 },
-	label: { fontSize: 14, fontWeight: "600", marginBottom: 8, letterSpacing: 0.5 },
-	input: { borderWidth: 1, borderRadius: 16, padding: 16, fontSize: 16 },
-	checkboxContainer: {
+
+	// Decorative bg shape
+	bgShape: {
+		position: "absolute",
+		top: -120,
+		right: -80,
+		width: 320,
+		height: 320,
+		borderRadius: 160,
+	},
+
+	// Logo section
+	logoSection: {
+		alignItems: "center",
+		marginBottom: 32,
+	},
+	logoRing: {
+		padding: 4,
+		borderRadius: 28,
+		borderWidth: 1.5,
+		marginBottom: 14,
+	},
+	logoBox: {
+		width: 64,
+		height: 64,
+		borderRadius: 20,
+		alignItems: "center",
+		justifyContent: "center",
+	},
+	appName: {
+		fontSize: 32,
+		fontWeight: "800",
+		letterSpacing: -0.8,
+		marginBottom: 10,
+	},
+	taglineChip: {
 		flexDirection: "row",
 		alignItems: "center",
-		marginTop: 20,
+		gap: 6,
+		paddingHorizontal: 12,
+		paddingVertical: 5,
+		borderRadius: 20,
 	},
-	checkboxLabel: {
-		marginLeft: 10,
-		fontSize: 15,
-		fontWeight: "500",
+	taglineDot: { width: 5, height: 5, borderRadius: 3 },
+	tagline: { fontSize: 12, fontWeight: "600", letterSpacing: 0.2 },
+
+	// Card
+	card: {
+		borderRadius: 24,
+		borderWidth: 1,
+		padding: 24,
+		marginBottom: 16,
+		shadowOffset: { width: 0, height: 6 },
+		shadowRadius: 16,
+		elevation: 6,
 	},
-	error: { color: "#DC2626", marginTop: 16, textAlign: "center", lineHeight: 20, fontWeight: "500" },
-	button: { marginTop: 32 },
-	registerButton: { marginTop: 16 },
+	cardTitle: { fontSize: 22, fontWeight: "700", letterSpacing: -0.3, marginBottom: 4 },
+	cardSubtitle: { fontSize: 14, marginBottom: 20 },
+	divider: { height: 1, marginBottom: 20 },
+
+	// Fields
+	fieldGroup: { marginBottom: 16 },
+	label: {
+		fontSize: 10,
+		fontWeight: "700",
+		letterSpacing: 0.8,
+		marginBottom: 8,
+	},
+	inputWrapper: {
+		flexDirection: "row",
+		alignItems: "center",
+		borderWidth: 1.5,
+		borderRadius: 14,
+		paddingHorizontal: 14,
+		paddingVertical: 13,
+		shadowOffset: { width: 0, height: 0 },
+		shadowRadius: 8,
+		elevation: 0,
+	},
+	inputIcon: { marginRight: 10 },
+	input: { flex: 1, fontSize: 15, paddingVertical: 0 },
+
+	// Remember me
+	rememberRow: {
+		flexDirection: "row",
+		alignItems: "center",
+		gap: 10,
+		marginBottom: 20,
+		marginTop: 4,
+	},
+	checkbox: {
+		width: 20,
+		height: 20,
+		borderRadius: 6,
+		borderWidth: 1.5,
+		alignItems: "center",
+		justifyContent: "center",
+	},
+	rememberLabel: { fontSize: 13, fontWeight: "500" },
+
+	// Error
+	errorBox: {
+		flexDirection: "row",
+		alignItems: "flex-start",
+		gap: 8,
+		borderWidth: 1,
+		borderRadius: 12,
+		padding: 12,
+		marginBottom: 16,
+	},
+	errorText: { flex: 1, fontSize: 13, lineHeight: 18 },
+
+	signInBtn: { marginTop: 4 },
+
+	// Register footer
+	registerWrap: {},
+	registerCard: {
+		flexDirection: "row",
+		alignItems: "center",
+		justifyContent: "center",
+		gap: 8,
+		borderWidth: 1,
+		borderRadius: 16,
+		paddingVertical: 14,
+		paddingHorizontal: 20,
+	},
+	registerHint: { fontSize: 14 },
+	registerLink: { fontSize: 14, fontWeight: "700" },
 });
