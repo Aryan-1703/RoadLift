@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import {
 	View,
 	Text,
@@ -13,6 +13,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import MapView, { PROVIDER_GOOGLE, Region } from "react-native-maps";
 import * as Location from "expo-location";
+import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
 import { useJob } from "../context/JobContext";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
@@ -34,6 +35,9 @@ export const HomeScreen = () => {
 	const { user } = useAuth();
 	const { colors } = useTheme();
 	const navigation = useNavigation<any>();
+
+	const bottomSheetRef = useRef<BottomSheet>(null);
+	const snapPoints = useMemo(() => ["35%", "55%"], []);
 
 	const [initialRegion, setInitialRegion] = useState<Region | null>(null);
 	const [address, setAddress] = useState<string>("Locating...");
@@ -198,46 +202,102 @@ export const HomeScreen = () => {
 
 			{/* Bottom Sheet Overlay */}
 			{!isLoading && !permissionDenied && initialRegion && (
-				<View style={[styles.bottomSheet, { backgroundColor: colors.card }]}>
-					<View style={[styles.dragHandle, { backgroundColor: colors.border }]} />
+				<BottomSheet
+					ref={bottomSheetRef}
+					index={0}
+					snapPoints={snapPoints}
+					enablePanDownToClose={false}
+					handleIndicatorStyle={{ backgroundColor: colors.border, width: 40 }}
+					backgroundStyle={{ backgroundColor: colors.card, borderRadius: 24 }}
+					shadowStyle={{
+						shadowColor: "#000",
+						shadowOffset: { width: 0, height: -4 },
+						shadowOpacity: 0.1,
+						shadowRadius: 12,
+						elevation: 20,
+					}}
+				>
+					<BottomSheetView style={styles.bottomSheetContent}>
+						<View style={styles.sheetHeader}>
+							<Text style={[styles.title, { color: colors.text }]}>
+								Need Roadside Assistance?
+							</Text>
+							<Text style={[styles.subtitle, { color: colors.textMuted }]}>
+								Stranded? We're here to get you back on the road fast.
+							</Text>
+						</View>
 
-					<Text style={[styles.title, { color: colors.text }]}>Need a lift?</Text>
-					<Text style={[styles.subtitle, { color: colors.textMuted }]}>
-						Request fast, reliable roadside assistance.
-					</Text>
+						<View style={styles.quickActions}>
+							<View style={styles.quickActionItem}>
+								<View
+									style={[styles.actionIcon, { backgroundColor: colors.primary + "15" }]}
+								>
+									<Ionicons name="car-sport" size={24} color={colors.primary} />
+								</View>
+								<Text style={[styles.actionLabel, { color: colors.text }]}>Towing</Text>
+							</View>
+							<View style={styles.quickActionItem}>
+								<View
+									style={[styles.actionIcon, { backgroundColor: colors.primary + "15" }]}
+								>
+									<Ionicons name="flash" size={24} color={colors.primary} />
+								</View>
+								<Text style={[styles.actionLabel, { color: colors.text }]}>Battery</Text>
+							</View>
+							<View style={styles.quickActionItem}>
+								<View
+									style={[styles.actionIcon, { backgroundColor: colors.primary + "15" }]}
+								>
+									<Ionicons name="construct" size={24} color={colors.primary} />
+								</View>
+								<Text style={[styles.actionLabel, { color: colors.text }]}>
+									Flat Tire
+								</Text>
+							</View>
+							<View style={styles.quickActionItem}>
+								<View
+									style={[styles.actionIcon, { backgroundColor: colors.primary + "15" }]}
+								>
+									<Ionicons name="water" size={24} color={colors.primary} />
+								</View>
+								<Text style={[styles.actionLabel, { color: colors.text }]}>Fuel</Text>
+							</View>
+						</View>
 
-					<View
-						style={[
-							styles.locationCard,
-							{ backgroundColor: colors.background, borderColor: colors.border },
-						]}
-					>
 						<View
-							style={[styles.locationIcon, { backgroundColor: colors.primary + "20" }]}
+							style={[
+								styles.locationCard,
+								{ backgroundColor: colors.background, borderColor: colors.border },
+							]}
 						>
-							<Ionicons name="location" size={20} color={colors.primary} />
-						</View>
-						<View style={styles.locationTextContainer}>
-							<Text style={[styles.locationLabel, { color: colors.textMuted }]}>
-								Current Location
-							</Text>
-							<Text
-								style={[styles.locationText, { color: colors.text }]}
-								numberOfLines={1}
+							<View
+								style={[styles.locationIcon, { backgroundColor: colors.primary + "20" }]}
 							>
-								{address}
-							</Text>
+								<Ionicons name="location" size={20} color={colors.primary} />
+							</View>
+							<View style={styles.locationTextContainer}>
+								<Text style={[styles.locationLabel, { color: colors.textMuted }]}>
+									Your Current Location
+								</Text>
+								<Text
+									style={[styles.locationText, { color: colors.text }]}
+									numberOfLines={1}
+								>
+									{address}
+								</Text>
+							</View>
+							<TouchableOpacity onPress={initializeLocation} style={styles.refreshBtn}>
+								<Ionicons name="refresh" size={20} color={colors.primary} />
+							</TouchableOpacity>
 						</View>
-						<TouchableOpacity onPress={initializeLocation} style={styles.refreshBtn}>
-							<Ionicons name="refresh" size={20} color={colors.primary} />
-						</TouchableOpacity>
-					</View>
 
-					<PrimaryButton
-						title="Request Assistance"
-						onPress={() => setJobStatus("selecting")}
-					/>
-				</View>
+						<PrimaryButton
+							title="Get Help Now"
+							onPress={() => setJobStatus("selecting")}
+							style={styles.mainCta}
+						/>
+					</BottomSheetView>
+				</BottomSheet>
 			)}
 		</View>
 	);
@@ -339,43 +399,58 @@ const styles = StyleSheet.create({
 		shadowRadius: 2,
 	},
 	profileInitial: { fontSize: 16, fontWeight: "bold" },
-	bottomSheet: {
-		position: "absolute",
-		bottom: 0,
-		left: 0,
-		right: 0,
-		borderTopLeftRadius: 24,
-		borderTopRightRadius: 24,
-		padding: 24,
-		paddingBottom: Platform.OS === "ios" ? 40 : 24,
-		elevation: 10,
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: -2 },
-		shadowOpacity: 0.1,
-		shadowRadius: 8,
-		zIndex: 10,
+	bottomSheetContent: {
+		flex: 1,
+		paddingHorizontal: 24,
+		paddingTop: 8,
 	},
-	dragHandle: {
-		width: 40,
-		height: 5,
-		borderRadius: 3,
-		alignSelf: "center",
+	sheetHeader: {
 		marginBottom: 20,
 	},
-	title: { fontSize: 24, fontWeight: "bold", marginBottom: 4 },
-	subtitle: { fontSize: 14, marginBottom: 20 },
+	title: {
+		fontSize: 22,
+		fontWeight: "800",
+		marginBottom: 6,
+		letterSpacing: -0.5,
+	},
+	subtitle: {
+		fontSize: 15,
+		lineHeight: 20,
+		opacity: 0.8,
+	},
+	quickActions: {
+		flexDirection: "row",
+		justifyContent: "space-between",
+		marginBottom: 24,
+	},
+	quickActionItem: {
+		alignItems: "center",
+		width: (width - 48) / 4 - 8,
+	},
+	actionIcon: {
+		width: 56,
+		height: 56,
+		borderRadius: 16,
+		alignItems: "center",
+		justifyContent: "center",
+		marginBottom: 8,
+	},
+	actionLabel: {
+		fontSize: 12,
+		fontWeight: "600",
+	},
 	locationCard: {
 		flexDirection: "row",
 		alignItems: "center",
 		padding: 16,
-		borderRadius: 16,
+		borderRadius: 20,
 		borderWidth: 1,
 		marginBottom: 24,
 	},
 	locationIcon: {
-		width: 40,
-		height: 40,
-		borderRadius: 20,
+		width: 44,
+		height: 44,
+		borderRadius: 12,
 		alignItems: "center",
 		justifyContent: "center",
 		marginRight: 16,
@@ -383,9 +458,19 @@ const styles = StyleSheet.create({
 	locationTextContainer: {
 		flex: 1,
 	},
-	locationLabel: { fontSize: 12, fontWeight: "bold", marginBottom: 4 },
-	locationText: { fontSize: 14, fontWeight: "bold" },
+	locationLabel: {
+		fontSize: 11,
+		fontWeight: "700",
+		marginBottom: 2,
+		textTransform: "uppercase",
+		letterSpacing: 0.5,
+	},
+	locationText: { fontSize: 15, fontWeight: "600" },
 	refreshBtn: {
 		padding: 8,
+	},
+	mainCta: {
+		height: 56,
+		borderRadius: 16,
 	},
 });

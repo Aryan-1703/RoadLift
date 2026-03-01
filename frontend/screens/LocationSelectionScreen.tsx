@@ -419,9 +419,11 @@ export const LocationSelectionScreen = () => {
 			<View style={[styles.bottomSheet, { backgroundColor: colors.card }]}>
 				<View style={[styles.dragHandle, { backgroundColor: colors.border }]} />
 
-				<Text style={[styles.title, { color: colors.text }]}>Need a lift?</Text>
+				<Text style={[styles.title, { color: colors.text }]}>
+					Need Roadside Assistance?
+				</Text>
 				<Text style={[styles.subtitle, { color: colors.textMuted }]}>
-					Request fast, reliable roadside assistance.
+					Stranded? We're here to get you back on the road fast.
 				</Text>
 
 				<View
@@ -446,7 +448,7 @@ export const LocationSelectionScreen = () => {
 				</View>
 
 				<PrimaryButton
-					title="Request Assistance"
+					title="Get Help Now"
 					onPress={handleRequestAssistance}
 					disabled={!selectedLocation || isLocating}
 				/>

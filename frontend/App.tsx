@@ -3,6 +3,7 @@ import { View, ActivityIndicator } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { JobProvider } from "./context/JobContext";
@@ -24,8 +25,19 @@ const RootNavigator = () => {
 
 	if (isLoading) {
 		return (
-			<View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#111827" }}>
-				<ActivityIndicator size="large" color="#3B82F6" style={{ transform: [{ scale: 1.5 }] }} />
+			<View
+				style={{
+					flex: 1,
+					justifyContent: "center",
+					alignItems: "center",
+					backgroundColor: "#111827",
+				}}
+			>
+				<ActivityIndicator
+					size="large"
+					color="#3B82F6"
+					style={{ transform: [{ scale: 1.5 }] }}
+				/>
 			</View>
 		);
 	}
@@ -54,20 +66,22 @@ const RootNavigator = () => {
 
 export default function App() {
 	return (
-		<SafeAreaProvider>
-			<ThemeProvider>
-				<ToastProvider>
-					<AuthProvider>
-						<JobProvider>
-							<DriverProvider>
-								<NavigationContainer>
-									<RootNavigator />
-								</NavigationContainer>
-							</DriverProvider>
-						</JobProvider>
-					</AuthProvider>
-				</ToastProvider>
-			</ThemeProvider>
-		</SafeAreaProvider>
+		<GestureHandlerRootView style={{ flex: 1 }}>
+			<SafeAreaProvider>
+				<ThemeProvider>
+					<ToastProvider>
+						<AuthProvider>
+							<JobProvider>
+								<DriverProvider>
+									<NavigationContainer>
+										<RootNavigator />
+									</NavigationContainer>
+								</DriverProvider>
+							</JobProvider>
+						</AuthProvider>
+					</ToastProvider>
+				</ThemeProvider>
+			</SafeAreaProvider>
+		</GestureHandlerRootView>
 	);
 }
