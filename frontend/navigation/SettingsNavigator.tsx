@@ -2,15 +2,17 @@ import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useTheme } from "../context/ThemeContext";
 
-// Screens
+// ── Screens ──────────────────────────────────────────────────────────────────
 import { AdminOverviewScreen } from "../screens/AdminOverviewScreen";
+import { EditProfileScreen } from "../screens/EditProfileScreen";
 import { PreferencesScreen } from "../screens/PreferencesScreen";
 import { SecurityScreen } from "../screens/SecurityScreen";
 import { ManageVehiclesScreen } from "../screens/ManageVehiclesScreen";
 import { PaymentMethodsScreen } from "../screens/PaymentMethodsScreen";
-import { EditProfileScreen } from "../screens/EditProfileScreen";
 import { HelpCenterScreen } from "../screens/HelpCenterScreen";
 import { TermsScreen } from "../screens/TermsScreen";
+import { JobHistoryScreen } from "../screens/JobHistoryScreen";
+import { StripeOnboardingScreen } from "../screens/StripeOnboardingScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -27,16 +29,45 @@ export const SettingsNavigator = () => {
 				headerShadowVisible: false,
 			}}
 		>
+			{/* Hub */}
 			<Stack.Screen
 				name="AdminOverview"
 				component={AdminOverviewScreen}
 				options={{ title: "Settings" }}
 			/>
+
+			{/* Account */}
 			<Stack.Screen
 				name="EditProfile"
 				component={EditProfileScreen}
 				options={{ title: "Edit Profile" }}
 			/>
+			<Stack.Screen
+				name="PaymentMethods"
+				component={PaymentMethodsScreen}
+				options={{ title: "Payment Methods" }}
+			/>
+			<Stack.Screen
+				name="ManageVehicles"
+				component={ManageVehiclesScreen}
+				options={{ title: "My Vehicles" }}
+			/>
+
+			{/* NEW: Job history for both customers and drivers */}
+			<Stack.Screen
+				name="JobHistory"
+				component={JobHistoryScreen}
+				options={{ title: "Job History" }}
+			/>
+
+			{/* NEW: Stripe Connect onboarding for drivers */}
+			<Stack.Screen
+				name="StripeOnboarding"
+				component={StripeOnboardingScreen}
+				options={{ title: "Set Up Payouts" }}
+			/>
+
+			{/* Preferences */}
 			<Stack.Screen
 				name="Preferences"
 				component={PreferencesScreen}
@@ -47,16 +78,8 @@ export const SettingsNavigator = () => {
 				component={SecurityScreen}
 				options={{ title: "Security & Privacy" }}
 			/>
-			<Stack.Screen
-				name="ManageVehicles"
-				component={ManageVehiclesScreen}
-				options={{ title: "Manage Vehicles" }}
-			/>
-			<Stack.Screen
-				name="PaymentMethods"
-				component={PaymentMethodsScreen}
-				options={{ title: "Payment Methods" }}
-			/>
+
+			{/* Support */}
 			<Stack.Screen
 				name="HelpCenter"
 				component={HelpCenterScreen}

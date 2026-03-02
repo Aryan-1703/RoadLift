@@ -58,14 +58,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 		}
 	};
 
-	const login = async (phoneNumber: string, pass: string, rememberEmail: boolean) => {
-		const response = await api.post<any>("/auth/login/user", {
+	const login = async (phoneNumber: string, pass: string, rememberPhone: boolean) => {
+		// FIX: was "/auth/login/user" — legacy dual-table endpoint, now removed.
+		const response = await api.post<any>("/auth/login", {
 			phoneNumber,
 			password: pass,
 		});
 		const payload = response.data;
 
-		const loggedInUser: User = {
+		const loggedInUser = {
 			id: payload.user.id,
 			email: payload.user.email,
 			name: payload.user.name,
@@ -77,10 +78,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 			defaultVehicleId: payload.user.defaultVehicleId,
 		};
 
-		if (rememberEmail) {
-			await setRememberedEmail(phoneNumber);
+		if (rememberPhone) {
+			await AsyncStorage.setItem("@roadlift_remembered_phone", phoneNumber);
 		} else {
-			await setRememberedEmail(null);
+			await AsyncStorage.removeItem("@roadlift_remembered_phone");
 		}
 
 		setUser(loggedInUser);
