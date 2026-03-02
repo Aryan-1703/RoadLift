@@ -1,34 +1,42 @@
 const express = require("express");
-const router = express.Router();
+const router  = express.Router();
 const {
-	registerUser,
-	registerDriver,
+	login,
 	loginUser,
 	loginDriver,
+	registerCustomer,
+	registerDriver,
+	registerUser,
 } = require("../controllers/authController");
 
-// @route   POST /api/auth/register/user
-// @desc    Register a new user (customer)
-// @access  Public
-router.post("/register/user", registerUser);
+// ─────────────────────────────────────────────────────────────────────────────
+// PRIMARY ENDPOINTS (use these going forward)
+// ─────────────────────────────────────────────────────────────────────────────
 
-// @route   POST /api/auth/register/driver
-// @desc    Register a new driver
-// @access  Public
+/**
+ * POST /api/auth/login
+ * Unified login for all roles. Role is determined from the users table.
+ * Response includes role so the frontend can route accordingly.
+ */
+router.post("/login", login);
+
+/**
+ * POST /api/auth/register/customer
+ */
+router.post("/register/customer", registerCustomer);
+
+/**
+ * POST /api/auth/register/driver
+ */
 router.post("/register/driver", registerDriver);
 
-// We will add login routes here later
-// router.post('/login/user', loginUser);
-// router.post('/login/driver', loginDriver);
-
-// @route   POST /api/auth/login/user
-// @desc    Login a user and get a token
-// @access  Public
-router.post("/login/user", loginUser);
-
-// @route   POST /api/auth/login/driver
-// @desc    Login a driver and get a token
-// @access  Public
-router.post("/login/driver", loginDriver);
+// ─────────────────────────────────────────────────────────────────────────────
+// LEGACY SHIMS — kept for backward compatibility with existing mobile clients.
+// All delegate to the unified handlers above.
+// Deprecate once all clients are on the new endpoints.
+// ─────────────────────────────────────────────────────────────────────────────
+router.post("/login/user",        loginUser);
+router.post("/login/driver",      loginDriver);
+router.post("/register/user",     registerUser);   // old customer endpoint
 
 module.exports = router;

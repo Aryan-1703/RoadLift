@@ -17,9 +17,11 @@ module.exports = sequelize => {
 			userId: {
 				type: DataTypes.INTEGER,
 				allowNull: false,
-				unique: true, // one profile per driver
-				references: { model: "users", key: "id" },
+				unique: true,
+				// Must match the EXACT table name in your DB — "Users" not "users"
+				references: { model: "Users", key: "id" },
 				onDelete: "CASCADE",
+				onUpdate: "CASCADE",
 			},
 			companyName: {
 				type: DataTypes.STRING,
@@ -58,6 +60,7 @@ module.exports = sequelize => {
 			},
 		},
 		{
+			// CRITICAL: must be lowercase — this is a new table we created, not Sequelize-generated
 			tableName: "driver_profiles",
 			indexes: [{ fields: ["userId"] }, { fields: ["licenseNumber"] }],
 		},

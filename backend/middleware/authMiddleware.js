@@ -1,47 +1,81 @@
-const jwt = require("jsonwebtoken");
-const { User, Driver } = require("../models");
+const jwt  = require("jsonwebtoken");
+const { User, DriverProfile } = require("../models");
 
+// ─────────────────────────────────────────────────────────────────────────────
+// protect — verifies JWT and attaches req.user + req.role
+// ─────────────────────────────────────────────────────────────────────────────
 const protect = async (req, res, next) => {
-	let token;
+	const authHeader = req.headers.authorization;
 
-	if (req.headers.authorization && req.headers.authorization.startsWith("Bearer")) {
-		try {
-			token = req.headers.authorization.split(" ")[1];
-			const decoded = jwt.verify(token, process.env.JWT_SECRET);
+	if (!authHeader || !authHeader.startsWith("Bearer ")) {
+		return res.status(401).json({ message: "Not authorized, no token." });
+	}
 
-			// Check the role from the decoded token
-			if (decoded.role === "user") {
-				req.user = await User.findByPk(decoded.id);
-			} else if (decoded.role === "driver") {
-				req.user = await Driver.findByPk(decoded.id);
-			}
+	const token = authHeader.split(" ")[1];
 
-			if (!req.user) {
-				// If we couldn't find a user, deny access.
-				return res
-					.status(401)
-					.json({ message: "Not authorized, user not found for this token." });
-			}
+	try {
+		const decoded = jwt.verify(token, process.env.JWT_SECRET);
+		// { id, role, iat, exp }
 
-			req.role = decoded.role; // Attach role for later use
-			next(); // Proceed to the next step (the controller)
-		} catch (error) {
-			console.error("--- ERROR IN PROTECT MIDDLEWARE ---", error);
-			res.status(401).json({ message: "Not authorized, token failed" });
+		// Single table lookup — no branching on role needed
+		const user = await User.findByPk(decoded.id, {
+			attributes: { exclude: ["password"] },
+			include: [
+				{
+					model: DriverProfile,
+					as: "driverProfile",
+					required: false,
+				},
+			],
+		});
+
+		if (!user) {
+			return res.status(401).json({ message: "Not authorized, account not found." });
 		}
-	}
 
-	if (!token) {
-		res.status(401).json({ message: "Not authorized, no token" });
-	}
-};
-const protectDriver = (req, res, next) => {
-	// This middleware should run AFTER the 'protect' middleware
-	if (req.role && req.role === "driver") {
+		if (user.deletedAt) {
+			return res.status(401).json({ message: "This account has been deactivated." });
+		}
+
+		req.user = user;
+		req.role = user.role; // 'CUSTOMER' | 'DRIVER' | 'ADMIN'
 		next();
-	} else {
-		res.status(403).json({ message: "Forbidden: Driver access required." });
+	} catch (error) {
+		if (error.name === "TokenExpiredError") {
+			return res.status(401).json({ message: "Session expired, please log in again." });
+		}
+		return res.status(401).json({ message: "Not authorized, token invalid." });
 	}
 };
 
-module.exports = { protect, protectDriver };
+// ─────────────────────────────────────────────────────────────────────────────
+// requireRole — factory for role-based route guards
+//
+// Usage:
+//   router.get('/admin', protect, requireRole('ADMIN'), handler)
+//   router.get('/driver/jobs', protect, requireRole('DRIVER'), handler)
+//   router.get('/shared', protect, requireRole('CUSTOMER', 'DRIVER'), handler)
+// ─────────────────────────────────────────────────────────────────────────────
+const requireRole = (...roles) => (req, res, next) => {
+	if (!req.role || !roles.includes(req.role)) {
+		return res.status(403).json({
+			message: `Access denied. Required role: ${roles.join(" or ")}.`,
+		});
+	}
+	next();
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Named guards (backwards-compatible with existing route files)
+// ─────────────────────────────────────────────────────────────────────────────
+const protectDriver   = requireRole("DRIVER");
+const protectAdmin    = requireRole("ADMIN");
+const protectCustomer = requireRole("CUSTOMER");
+
+module.exports = {
+	protect,
+	requireRole,
+	protectDriver,
+	protectAdmin,
+	protectCustomer,
+};

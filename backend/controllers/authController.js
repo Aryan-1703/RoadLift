@@ -1,75 +1,118 @@
 const authService = require("../services/authServices");
-const { User, Driver } = require("../models");
 
-// Controller for logging in a User (customer)
-const loginUser = async (req, res) => {
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/auth/login
+// Unified login for all roles — single endpoint, role returned in response.
+// ─────────────────────────────────────────────────────────────────────────────
+const login = async (req, res) => {
 	try {
-		const { record, token } = await authService.login(req.body, User);
-		res.status(200).json({
-			message: "User logged in successfully!",
-			user: record,
+		const { phoneNumber, password } = req.body;
+		const { user, token } = await authService.login({ phoneNumber, password });
+
+		return res.status(200).json({
+			message: "Logged in successfully.",
 			token,
+			user: {
+				id:          user.id,
+				name:        user.name,
+				email:       user.email,
+				phoneNumber: user.phoneNumber,
+				role:        user.role,           // 'CUSTOMER' | 'DRIVER' | 'ADMIN'
+				isActive:    user.isActive,
+				driverProfile: user.driverProfile || null,
+				defaultVehicleId:       user.defaultVehicleId       || null,
+				defaultPaymentMethodId: user.defaultPaymentMethodId || null,
+			},
 		});
 	} catch (error) {
-		// Send 401 for authentication errors
-		res.status(401).json({ message: error.message });
+		// 401 for auth failures, 400 for validation
+		const status = error.message.includes("required") ? 400 : 401;
+		return res.status(status).json({ message: error.message });
 	}
 };
 
-// Controller for logging in a Driver
-const loginDriver = async (req, res) => {
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/auth/register/customer
+// ─────────────────────────────────────────────────────────────────────────────
+const registerCustomer = async (req, res) => {
 	try {
-		const { record, token } = await authService.login(req.body, Driver);
-		res.status(200).json({
-			message: "Driver logged in successfully!",
-			driver: record,
+		const { name, phoneNumber, email, password } = req.body;
+		const { user, token } = await authService.registerCustomer({
+			name,
+			phoneNumber,
+			email,
+			password,
+		});
+
+		return res.status(201).json({
+			message: "Customer registered successfully.",
 			token,
+			user: {
+				id:          user.id,
+				name:        user.name,
+				email:       user.email,
+				phoneNumber: user.phoneNumber,
+				role:        user.role,
+			},
 		});
 	} catch (error) {
-		res.status(401).json({ message: error.message });
-	}
-};
-// Controller for registering a User (customer)
-const registerUser = async (req, res) => {
-	try {
-		const { createdRecord, token } = await authService.register(req.body, User);
-		res.status(201).json({
-			message: "User registered successfully!",
-			user: createdRecord,
-			token,
-		});
-	} catch (error) {
-		console.error("User registration error:", error.message);
-		// Send 400 for specific, known errors (like duplicates)
-		if (error.message.includes("already exists") || error.message.includes("required")) {
-			return res.status(400).json({ message: error.message });
-		}
-		// Send 500 for unexpected server errors
-		res.status(500).json({ message: "Internal Server Error" });
+		const status =
+			error.message.includes("already exists") || error.message.includes("required")
+				? 400
+				: 500;
+		return res.status(status).json({ message: error.message });
 	}
 };
 
-// Controller for registering a Driver
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/auth/register/driver
+// ─────────────────────────────────────────────────────────────────────────────
 const registerDriver = async (req, res) => {
 	try {
-		const { createdRecord, token } = await authService.register(req.body, Driver);
-		res.status(201).json({
-			message: "Driver registered successfully!",
-			driver: createdRecord,
+		const { name, phoneNumber, email, password, driverProfile } = req.body;
+		const { user, token } = await authService.registerDriver({
+			name,
+			phoneNumber,
+			email,
+			password,
+			driverProfile,
+		});
+
+		return res.status(201).json({
+			message: "Driver registered successfully.",
 			token,
+			user: {
+				id:            user.id,
+				name:          user.name,
+				email:         user.email,
+				phoneNumber:   user.phoneNumber,
+				role:          user.role,
+				driverProfile: user.driverProfile || null,
+			},
 		});
 	} catch (error) {
-		console.error("Driver registration error:", error.message);
-		if (error.message.includes("already exists") || error.message.includes("required")) {
-			return res.status(400).json({ message: error.message });
-		}
-		res.status(500).json({ message: "Internal Server Error" });
+		const status =
+			error.message.includes("already exists") || error.message.includes("required")
+				? 400
+				: 500;
+		return res.status(status).json({ message: error.message });
 	}
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Legacy shims — keep old endpoints alive during transition period.
+// These simply delegate to the unified handlers above.
+// Remove once mobile clients are fully updated to /api/auth/login.
+// ─────────────────────────────────────────────────────────────────────────────
+const loginUser   = login;
+const loginDriver = login;
+const registerUser = registerCustomer;
+
 module.exports = {
-	registerUser,
-	registerDriver,
+	login,
 	loginUser,
 	loginDriver,
+	registerCustomer,
+	registerDriver,
+	registerUser,
 };

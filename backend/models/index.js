@@ -3,44 +3,48 @@ const sequelize = require("../config/database");
 const db = {};
 db.sequelize = sequelize;
 
-// Import models
-db.Driver = require("./driver.model")(sequelize);
-db.Job = require("./job.model")(sequelize);
-db.User = require("./user.model")(sequelize);
-db.Review = require("./review.model")(sequelize);
-db.Vehicle = require("./vehicle.model")(sequelize);
+// ── Models ───────────────────────────────────────────────────────────────────
+db.User          = require("./user.model")(sequelize);
+db.DriverProfile = require("./driverProfile.model")(sequelize);
+db.Job           = require("./job.model")(sequelize);
+db.Review        = require("./review.model")(sequelize);
+db.Vehicle       = require("./vehicle.model")(sequelize);
 
-// --- Define Relationships ---
+// ── Associations ──────────────────────────────────────────────────────────────
 
-// A Job is requested by one User
-db.User.hasMany(db.Job, { foreignKey: "userId" });
-db.Job.belongsTo(db.User, { foreignKey: "userId" });
+// User ↔ DriverProfile (1:1)
+// A driver user has one profile with operational details.
+db.User.hasOne(db.DriverProfile, { foreignKey: "userId", as: "driverProfile" });
+db.DriverProfile.belongsTo(db.User, { foreignKey: "userId", as: "user" });
 
-// A Job is assigned to one Driver
-db.Driver.hasMany(db.Job, { foreignKey: "driverId" });
-db.Job.belongsTo(db.Driver, { foreignKey: "driverId" });
+// User (as Customer) → Jobs
+// The user who *requested* the job.
+db.User.hasMany(db.Job, { foreignKey: "userId", as: "requestedJobs" });
+db.Job.belongsTo(db.User, { foreignKey: "userId", as: "customer" });
 
-db.Review = require("./review.model")(sequelize);
+// User (as Driver) → Jobs
+// The user (role=DRIVER) who *accepted* the job.
+db.User.hasMany(db.Job, { foreignKey: "driverId", as: "assignedJobs" });
+db.Job.belongsTo(db.User, { foreignKey: "driverId", as: "driver" });
 
-// A Job can have one Review
+// Job ↔ Review (1:1)
 db.Job.hasOne(db.Review, { foreignKey: "jobId" });
 db.Review.belongsTo(db.Job, { foreignKey: "jobId" });
 
-// A User can write many Reviews (as a customer)
-db.User.hasMany(db.Review, { foreignKey: "userId" });
-db.Review.belongsTo(db.User, { foreignKey: "userId" });
+// User → Reviews (written by customer)
+db.User.hasMany(db.Review, { foreignKey: "userId", as: "writtenReviews" });
+db.Review.belongsTo(db.User, { foreignKey: "userId", as: "reviewer" });
 
-// A Driver can write many Reviews (as a driver)
-db.Driver.hasMany(db.Review, { foreignKey: "driverId" });
-db.Review.belongsTo(db.Driver, { foreignKey: "driverId" });
+// User → Reviews (received by driver)
+db.User.hasMany(db.Review, { foreignKey: "driverId", as: "receivedReviews" });
+db.Review.belongsTo(db.User, { foreignKey: "driverId", as: "reviewedDriver" });
 
-// A User can have many Vehicles
+// User → Vehicles (customers own vehicles)
 db.User.hasMany(db.Vehicle, { foreignKey: "userId" });
 db.Vehicle.belongsTo(db.User, { foreignKey: "userId" });
 
-// This creates the vehicleId foreign key in the Jobs table
+// Vehicle → Jobs
 db.Vehicle.hasMany(db.Job, { foreignKey: "vehicleId" });
 db.Job.belongsTo(db.Vehicle, { foreignKey: "vehicleId" });
-// ---
 
 module.exports = db;
