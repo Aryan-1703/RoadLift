@@ -8,6 +8,7 @@ import {
 	ActivityIndicator,
 	Alert,
 } from "react-native";
+import { useStripe } from "@stripe/stripe-react-native";
 import { useTheme } from "../context/ThemeContext";
 import { useToast } from "../context/ToastContext";
 import { api } from "../services/api";
@@ -16,26 +17,27 @@ import { Card } from "../components/Card";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { Ionicons } from "@expo/vector-icons";
 
-// Card brand icon map
-const BRAND_ICONS: Record<string, string> = {
-	visa: "VISA",
-	mastercard: "MC",
-	amex: "AMEX",
-	discover: "DISC",
-};
-
 const BRAND_COLORS: Record<string, string> = {
 	visa: "#1A1F71",
 	mastercard: "#EB001B",
 	amex: "#2E77BC",
 	discover: "#FF6600",
 };
+const BRAND_LABELS: Record<string, string> = {
+	visa: "VISA",
+	mastercard: "MC",
+	amex: "AMEX",
+	discover: "DISC",
+};
 
 export const PaymentMethodsScreen = () => {
-	const { colors, isDarkMode } = useTheme();
+	const { colors } = useTheme();
 	const { showToast } = useToast();
+	const { initPaymentSheet, presentPaymentSheet } = useStripe();
+
 	const [payments, setPayments] = useState<PaymentMethod[]>([]);
 	const [loading, setLoading] = useState(true);
+	const [addingCard, setAddingCard] = useState(false);
 	const [deletingId, setDeletingId] = useState<string | null>(null);
 	const [settingDefaultId, setSettingDefaultId] = useState<string | null>(null);
 
@@ -44,16 +46,63 @@ export const PaymentMethodsScreen = () => {
 	}, []);
 
 	const loadPayments = async () => {
+		setLoading(true);
 		try {
-			// FIX: was calling /users/payments — correct endpoint is /payments/methods
 			const res = await api.get<PaymentMethod[]>("/payments/methods");
 			setPayments(Array.isArray(res.data) ? res.data : []);
 		} catch (e: any) {
 			console.warn("Failed to load payment methods:", e?.message);
-			// Graceful degradation — don't show error for empty state
 			setPayments([]);
 		} finally {
 			setLoading(false);
+		}
+	};
+
+	// ── Add card via Stripe Setup Intent + Payment Sheet ─────────────────────
+	const handleAddCard = async () => {
+		setAddingCard(true);
+		try {
+			// 1. Ask backend to create a SetupIntent
+			const res = await api.post<{
+				setupIntent: string;
+				ephemeralKey: string;
+				customer: string;
+			}>("/payments/create-setup-intent");
+
+			const { setupIntent, ephemeralKey, customer } = res.data;
+
+			// 2. Initialise the Payment Sheet in "setup" mode (saves card, no charge)
+			const { error: initError } = await initPaymentSheet({
+				merchantDisplayName: "RoadLift",
+				customerId: customer,
+				customerEphemeralKeySecret: ephemeralKey,
+				setupIntentClientSecret: setupIntent,
+				allowsDelayedPaymentMethods: false,
+				returnURL: "roadlift://payment-return",
+			});
+
+			if (initError) {
+				showToast(initError.message || "Failed to open card form", "error");
+				return;
+			}
+
+			// 3. Present the sheet
+			const { error: presentError } = await presentPaymentSheet();
+
+			if (presentError) {
+				if (presentError.code !== "Canceled") {
+					showToast(presentError.message || "Card setup failed", "error");
+				}
+				return;
+			}
+
+			// 4. Card saved — reload the list
+			showToast("Card added successfully!", "success");
+			await loadPayments();
+		} catch (e: any) {
+			showToast(e?.response?.data?.message || "Failed to add card", "error");
+		} finally {
+			setAddingCard(false);
 		}
 	};
 
@@ -61,9 +110,7 @@ export const PaymentMethodsScreen = () => {
 		setSettingDefaultId(id);
 		try {
 			await api.put("/payments/set-default", { paymentMethodId: id });
-			setPayments(prev =>
-				prev.map(pm => ({ ...pm, isDefault: pm.id === id })),
-			);
+			setPayments(prev => prev.map(pm => ({ ...pm, isDefault: pm.id === id })));
 			showToast("Default card updated", "success");
 		} catch {
 			showToast("Failed to update default card", "error");
@@ -94,46 +141,18 @@ export const PaymentMethodsScreen = () => {
 		]);
 	};
 
-	const handleAddCard = async () => {
-		// Initialise the Stripe Payment Sheet
-		try {
-			const res = await api.post<{
-				setupIntent: string;
-				ephemeralKey: string;
-				customer: string;
-			}>("/payments/create-setup-intent");
-
-			// In production you'd call Stripe.initPaymentSheet() + presentPaymentSheet() here.
-			// For now, inform the user this requires the native Stripe SDK.
-			Alert.alert(
-				"Add Payment Method",
-				"Stripe Payment Sheet ready. Integrate with @stripe/stripe-react-native to present the UI.",
-				[{ text: "OK" }],
-			);
-			console.log("Setup intent created:", res.data.setupIntent?.slice(0, 20) + "…");
-		} catch (e: any) {
-			showToast(
-				e?.response?.data?.message || "Failed to initialize card setup",
-				"error",
-			);
-		}
-	};
-
 	const renderItem = ({ item }: { item: PaymentMethod }) => {
 		const brand = (item.brand ?? "").toLowerCase();
-		const brandLabel = BRAND_ICONS[brand] ?? item.brand?.toUpperCase() ?? "CARD";
+		const brandLabel = BRAND_LABELS[brand] ?? item.brand?.toUpperCase() ?? "CARD";
 		const brandColor = BRAND_COLORS[brand] ?? "#374151";
 		const isProcessing = deletingId === item.id || settingDefaultId === item.id;
 
 		return (
 			<Card style={[styles.card, { opacity: isProcessing ? 0.6 : 1 }]}>
 				<View style={styles.cardRow}>
-					{/* Brand chip */}
 					<View style={[styles.brandChip, { backgroundColor: brandColor }]}>
 						<Text style={styles.brandText}>{brandLabel}</Text>
 					</View>
-
-					{/* Card details */}
 					<View style={{ flex: 1 }}>
 						<View style={styles.brandRow}>
 							<Text style={[styles.cardTitle, { color: colors.text }]}>
@@ -143,10 +162,10 @@ export const PaymentMethodsScreen = () => {
 								<View
 									style={[
 										styles.defaultBadge,
-										{ backgroundColor: colors.greenBg, borderColor: colors.greenBorder },
+										{ backgroundColor: colors.primary + "20" },
 									]}
 								>
-									<Text style={[styles.defaultBadgeText, { color: colors.green }]}>
+									<Text style={[styles.defaultBadgeText, { color: colors.primary }]}>
 										Default
 									</Text>
 								</View>
@@ -156,8 +175,6 @@ export const PaymentMethodsScreen = () => {
 							Expires {String(item.expMonth).padStart(2, "0")}/{item.expYear}
 						</Text>
 					</View>
-
-					{/* Actions */}
 					{isProcessing ? (
 						<ActivityIndicator size="small" color={colors.primary} />
 					) : (
@@ -174,12 +191,12 @@ export const PaymentMethodsScreen = () => {
 							<TouchableOpacity
 								style={[
 									styles.actionBtn,
-									{ borderColor: colors.dangerBorder, backgroundColor: colors.dangerBg },
+									{ borderColor: "#FCA5A5", backgroundColor: "#FEE2E2" },
 								]}
 								onPress={() => handleDelete(item.id)}
 								activeOpacity={0.7}
 							>
-								<Ionicons name="trash-outline" size={16} color={colors.danger} />
+								<Ionicons name="trash-outline" size={16} color="#DC2626" />
 							</TouchableOpacity>
 						</View>
 					)}
@@ -197,33 +214,32 @@ export const PaymentMethodsScreen = () => {
 					data={payments}
 					keyExtractor={item => item.id}
 					renderItem={renderItem}
-					contentContainerStyle={styles.listContent}
-					showsVerticalScrollIndicator={false}
+					contentContainerStyle={styles.list}
 					ListEmptyComponent={
-						<View style={styles.emptyState}>
-							<View
-								style={[styles.emptyIcon, { backgroundColor: colors.surface }]}
-							>
-								<Ionicons name="card-outline" size={32} color={colors.textMuted} />
-							</View>
+						<View style={styles.empty}>
+							<Ionicons name="card-outline" size={48} color={colors.textMuted} />
 							<Text style={[styles.emptyTitle, { color: colors.text }]}>
 								No cards saved
 							</Text>
 							<Text style={[styles.emptySubtitle, { color: colors.textMuted }]}>
-								Add a payment method to speed up checkout.
+								Add a payment method to pay for services quickly.
 							</Text>
 						</View>
 					}
 				/>
 			)}
-
 			<View
 				style={[
 					styles.footer,
-					{ borderTopColor: colors.border, backgroundColor: colors.background },
+					{ backgroundColor: colors.background, borderTopColor: colors.border },
 				]}
 			>
-				<PrimaryButton title="Add Payment Method" onPress={handleAddCard} />
+				<PrimaryButton
+					title={addingCard ? "Opening…" : "+ Add Payment Method"}
+					onPress={handleAddCard}
+					isLoading={addingCard}
+					disabled={addingCard}
+				/>
 			</View>
 		</View>
 	);
@@ -231,63 +247,28 @@ export const PaymentMethodsScreen = () => {
 
 const styles = StyleSheet.create({
 	container: { flex: 1 },
-	loader: { marginTop: 60 },
-	listContent: { padding: 16, paddingBottom: 110 },
-
-	card: { marginBottom: 10, padding: 14 },
-	cardRow: { flexDirection: "row", alignItems: "center", gap: 14 },
-	brandChip: {
-		width: 52,
-		height: 34,
-		borderRadius: 8,
-		alignItems: "center",
-		justifyContent: "center",
-	},
-	brandText: { color: "#fff", fontSize: 11, fontWeight: "800", letterSpacing: 0.5 },
-	brandRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 3 },
-	cardTitle: { fontSize: 16, fontWeight: "700" },
-	defaultBadge: {
-		paddingHorizontal: 7,
-		paddingVertical: 2,
-		borderRadius: 8,
-		borderWidth: 1,
-	},
-	defaultBadgeText: { fontSize: 10, fontWeight: "700" },
+	loader: { flex: 1, marginTop: 40 },
+	list: { padding: 16, paddingBottom: 100 },
+	card: { marginBottom: 12, padding: 16 },
+	cardRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+	brandChip: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 },
+	brandText: { color: "#FFF", fontSize: 10, fontWeight: "800", fontStyle: "italic" },
+	brandRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 2 },
+	cardTitle: { fontSize: 15, fontWeight: "700" },
 	cardExp: { fontSize: 12 },
-
+	defaultBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 },
+	defaultBadgeText: { fontSize: 11, fontWeight: "700" },
 	actions: { flexDirection: "row", gap: 8 },
 	actionBtn: {
 		width: 34,
 		height: 34,
-		borderRadius: 10,
+		borderRadius: 8,
 		borderWidth: 1,
 		alignItems: "center",
 		justifyContent: "center",
 	},
-
-	emptyState: {
-		alignItems: "center",
-		justifyContent: "center",
-		paddingVertical: 60,
-		paddingHorizontal: 32,
-	},
-	emptyIcon: {
-		width: 72,
-		height: 72,
-		borderRadius: 36,
-		alignItems: "center",
-		justifyContent: "center",
-		marginBottom: 16,
-	},
-	emptyTitle: { fontSize: 17, fontWeight: "700", marginBottom: 6 },
-	emptySubtitle: { fontSize: 14, textAlign: "center", lineHeight: 20 },
-
-	footer: {
-		padding: 16,
-		borderTopWidth: StyleSheet.hairlineWidth,
-		position: "absolute",
-		bottom: 0,
-		left: 0,
-		right: 0,
-	},
+	empty: { alignItems: "center", paddingTop: 80, gap: 12 },
+	emptyTitle: { fontSize: 18, fontWeight: "700" },
+	emptySubtitle: { fontSize: 14, textAlign: "center", paddingHorizontal: 40 },
+	footer: { padding: 16, paddingBottom: 32, borderTopWidth: 1 },
 });

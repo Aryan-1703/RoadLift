@@ -1,118 +1,156 @@
 const stripe = require("../config/stripe");
 const { User } = require("../models");
 
-/**
- * Creates/retrieves a Stripe Customer and prepares a Setup Intent and Ephemeral Key.
- * @param {string} userId - The ID of the user in our database.
- * @returns {object} Contains the setupIntent, stripeCustomerId, and ephemeralKey.
- */
+// ── Ensure Stripe Customer exists, return their ID ────────────────────────────
+async function ensureStripeCustomer(user) {
+	if (user.stripeCustomerId) return user.stripeCustomerId;
+
+	const customer = await stripe.customers.create({
+		name: user.name,
+		email: user.email,
+		phone: user.phoneNumber,
+		metadata: { appUserId: String(user.id) },
+	});
+
+	await User.update({ stripeCustomerId: customer.id }, { where: { id: user.id } });
+	user.stripeCustomerId = customer.id; // update in-memory
+	return customer.id;
+}
+
+// ── createSetupIntent — used by PaymentMethodsScreen to add a new card ────────
+// Returns: { setupIntent (client_secret), ephemeralKey (secret), customer (id) }
 async function createSetupIntent(userId) {
 	const user = await User.findByPk(userId);
 	if (!user) throw new Error("User not found.");
 
-	let stripeCustomerId = user.stripeCustomerId;
+	const customerId = await ensureStripeCustomer(user);
 
-	// If the user is not yet a Stripe customer in our DB, create one on Stripe.
-	if (!stripeCustomerId) {
-		const customer = await stripe.customers.create({
-			name: user.name,
-			phone: user.phoneNumber,
-			metadata: { ourAppUserId: user.id }, // Link back to our system
-		});
-		stripeCustomerId = customer.id;
-
-		// Save the new Stripe Customer ID to our database for future use.
-		user.stripeCustomerId = stripeCustomerId;
-		await user.save();
-	}
-
-	// Create an Ephemeral Key. This is a temporary key that gives the frontend
-	// permission to act on behalf of the customer for this one session.
 	const ephemeralKey = await stripe.ephemeralKeys.create(
-		{ customer: stripeCustomerId },
-		{ apiVersion: "2023-10-16" } // Use a recent, fixed API version
+		{ customer: customerId },
+		{ apiVersion: "2023-10-16" },
 	);
 
-	// Create a Setup Intent. This is the object that orchestrates card setup.
 	const setupIntent = await stripe.setupIntents.create({
-		customer: stripeCustomerId,
+		customer: customerId,
 		payment_method_types: ["card"],
+		usage: "off_session", // card can be reused for future payments
 	});
 
-	// Return all necessary components to the controller.
-	return { setupIntent, stripeCustomerId, ephemeralKey };
+	return {
+		setupIntent: setupIntent.client_secret, // ← string, not object
+		ephemeralKey: ephemeralKey.secret, // ← string, not object
+		customer: customerId,
+		stripeCustomerId: customerId,
+	};
 }
 
-/**
- * Retrieves a formatted list of saved payment methods for a Stripe customer.
- * @param {string} stripeCustomerId - The customer's ID from Stripe.
- * @returns {Array} A list of formatted payment method objects.
- */
-async function getPaymentMethods(stripeCustomerId) {
-	if (!stripeCustomerId) {
-		return []; // A user with no Stripe ID has no saved cards.
-	}
-	const paymentMethods = await stripe.paymentMethods.list({
+// ── getPaymentMethods — list saved cards, mark which is default ───────────────
+async function getPaymentMethods(stripeCustomerId, defaultPaymentMethodId) {
+	if (!stripeCustomerId) return [];
+
+	const list = await stripe.paymentMethods.list({
 		customer: stripeCustomerId,
 		type: "card",
 	});
 
-	// Format the data to send only what the frontend needs.
-	return paymentMethods.data.map(pm => ({
+	// Fall back to the default stored on the Stripe Customer object
+	let defaultId = defaultPaymentMethodId;
+	if (!defaultId) {
+		try {
+			const cust = await stripe.customers.retrieve(stripeCustomerId);
+			defaultId = cust.invoice_settings?.default_payment_method ?? null;
+		} catch {
+			/* non-fatal */
+		}
+	}
+
+	return list.data.map(pm => ({
 		id: pm.id,
 		brand: pm.card.brand,
 		last4: pm.card.last4,
-		exp_month: pm.card.exp_month,
-		exp_year: pm.card.exp_year,
+		expMonth: pm.card.exp_month,
+		expYear: pm.card.exp_year,
+		isDefault: pm.id === defaultId,
 	}));
 }
-// In services/paymentService.js
+
+// ── setAsDefault ──────────────────────────────────────────────────────────────
 async function setAsDefault(userId, paymentMethodId) {
 	const user = await User.findByPk(userId);
 	if (!user || !user.stripeCustomerId)
 		throw new Error("User or Stripe Customer not found.");
 
-	// This tells Stripe to use this card for future invoices/payments for this customer
 	await stripe.customers.update(user.stripeCustomerId, {
-		invoice_settings: {
-			default_payment_method: paymentMethodId,
-		},
+		invoice_settings: { default_payment_method: paymentMethodId },
 	});
 
-	// Also save it in our own database for quick access
-	user.defaultPaymentMethodId = paymentMethodId;
-	await user.save();
-	return user;
+	await User.update(
+		{ defaultPaymentMethodId: paymentMethodId },
+		{ where: { id: userId } },
+	);
+	return { success: true };
 }
 
+// ── deletePaymentMethod ───────────────────────────────────────────────────────
 async function deletePaymentMethod(paymentMethodId) {
 	await stripe.paymentMethods.detach(paymentMethodId);
 	return { id: paymentMethodId, status: "detached" };
 }
 
-/**
- * Creates a Stripe Payment Intent to authorize a charge on a customer's card.
- * @param {object} job - The full job object from the database.
- * @param {object} user - The full user object for the customer.
- * @returns {object} The created PaymentIntent object from Stripe.
- */
-// In backend/services/paymentService.js
-
+// ── createPaymentIntent — called by PaymentScreen checkout flow ───────────────
+// Returns the exact shape that Stripe Payment Sheet's initPaymentSheet() needs:
+//   { paymentIntentClientSecret, ephemeralKey, customer }
 async function createPaymentIntent(jobDetails, user) {
-	if (!user.stripeCustomerId) {
-		// We can create the customer on the fly if needed
-		const customer = await stripe.customers.create({ name: user.name });
-		user.stripeCustomerId = customer.id;
-		await user.save();
-	}
-	const amountInCents = Math.round(parseFloat(jobDetails.estimatedCost) * 100);
+	const dbUser = await User.findByPk(user.id);
+	if (!dbUser) throw new Error("User not found.");
+
+	const customerId = await ensureStripeCustomer(dbUser);
+
+	const ephemeralKey = await stripe.ephemeralKeys.create(
+		{ customer: customerId },
+		{ apiVersion: "2023-10-16" },
+	);
+
+	// Amount comes in as cents from the frontend (Math.round(total * 100))
+	const amount = jobDetails.amount
+		? Math.round(Number(jobDetails.amount))
+		: Math.round(parseFloat(jobDetails.estimatedCost ?? "0") * 100);
+
+	if (!amount || amount <= 0) throw new Error("Invalid payment amount.");
 
 	const paymentIntent = await stripe.paymentIntents.create({
-		amount: amountInCents,
+		amount,
 		currency: "cad",
-		customer: user.stripeCustomerId,
+		customer: customerId,
+		automatic_payment_methods: { enabled: true },
+		// Pre-select the default card if one is saved
+		...(dbUser.defaultPaymentMethodId && {
+			payment_method: dbUser.defaultPaymentMethodId,
+		}),
+		metadata: { jobId: String(jobDetails.jobId ?? "") },
+	});
+
+	return {
+		paymentIntentClientSecret: paymentIntent.client_secret, // ← correct key name
+		ephemeralKey: ephemeralKey.secret,
+		customer: customerId,
+	};
+}
+
+// ── createPaymentIntentForJob — called internally when driver accepts ─────────
+async function createPaymentIntentForJob(job, customerUser) {
+	const customerId = await ensureStripeCustomer(customerUser);
+	const amountCents = job.estimatedCost
+		? Math.round(parseFloat(job.estimatedCost) * 100)
+		: 5000;
+
+	const paymentIntent = await stripe.paymentIntents.create({
+		amount: amountCents,
+		currency: "cad",
+		customer: customerId,
 		setup_future_usage: "off_session",
 		payment_method_types: ["card"],
+		metadata: { jobId: String(job.id) },
 	});
 
 	return paymentIntent;
@@ -124,4 +162,5 @@ module.exports = {
 	setAsDefault,
 	deletePaymentMethod,
 	createPaymentIntent,
+	createPaymentIntentForJob,
 };

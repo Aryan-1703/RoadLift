@@ -12,20 +12,14 @@ import { DriverProvider } from "./context/DriverContext";
 import { ThemeProvider, useTheme } from "./context/ThemeContext";
 import { ToastProvider } from "./context/ToastContext";
 
-// Screens
 import { LoginScreen } from "./screens/LoginScreen";
 import { RegisterScreen } from "./screens/RegisterScreen";
 import { JobFlowScreen } from "./screens/JobFlowScreen";
 import { SettingsNavigator } from "./navigation/SettingsNavigator";
 import { DriverFlowScreen } from "./screens/DriverFlowScreen";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Your Stripe publishable key — set EXPO_PUBLIC_STRIPE_PK in .env
-// For testing use the Stripe test key: pk_test_...
-// ─────────────────────────────────────────────────────────────────────────────
-const STRIPE_PK =
-	process.env.EXPO_PUBLIC_STRIPE_PK ??
-	"pk_test_REPLACE_WITH_YOUR_STRIPE_PUBLISHABLE_KEY";
+const STRIPE_PUBLISHABLE_KEY =
+	"pk_test_51RpW2T7C4sCNpdjEa0WyFFkGanThDJKGp9fRal7rUIZhfW8QO6X34JgM7C4Dg2rZgpZgJwS9F5YLniAcZfy4A2Cy00qvB9Gwqf";
 
 const Stack = createNativeStackNavigator();
 
@@ -40,7 +34,6 @@ const RootNavigator = () => {
 					flex: 1,
 					justifyContent: "center",
 					alignItems: "center",
-					// Use the actual theme background so there's no jarring flash
 					backgroundColor: colors.background,
 				}}
 			>
@@ -57,17 +50,17 @@ const RootNavigator = () => {
 		<Stack.Navigator id="Root" screenOptions={{ headerShown: false }}>
 			{!user ? (
 				<>
-					<Stack.Screen name="Login"    component={LoginScreen} />
+					<Stack.Screen name="Login" component={LoginScreen} />
 					<Stack.Screen name="Register" component={RegisterScreen} />
 				</>
 			) : user.role === "CUSTOMER" ? (
 				<>
-					<Stack.Screen name="JobFlow"     component={JobFlowScreen} />
+					<Stack.Screen name="JobFlow" component={JobFlowScreen} />
 					<Stack.Screen name="SettingsNav" component={SettingsNavigator} />
 				</>
 			) : (
 				<>
-					<Stack.Screen name="DriverFlow"  component={DriverFlowScreen} />
+					<Stack.Screen name="DriverFlow" component={DriverFlowScreen} />
 					<Stack.Screen name="SettingsNav" component={SettingsNavigator} />
 				</>
 			)}
@@ -80,7 +73,11 @@ export default function App() {
 		<GestureHandlerRootView style={{ flex: 1 }}>
 			<SafeAreaProvider>
 				<ThemeProvider>
-					<StripeProvider publishableKey={STRIPE_PK} urlScheme="roadlift">
+					<StripeProvider
+						publishableKey={STRIPE_PUBLISHABLE_KEY}
+						urlScheme="roadlift"
+						merchantIdentifier="merchant.com.aryan1703.RoadLift"
+					>
 						<ToastProvider>
 							<AuthProvider>
 								<JobProvider>
