@@ -5,14 +5,19 @@ import React, {
 	ReactNode,
 	useCallback,
 	useEffect,
+	useRef,
 } from "react";
 import { Job, JobStatus, ServiceTypeId, Provider, Location } from "../types";
 import socketClient from "../services/socket";
 import { api } from "../services/api";
 import { useAuth } from "./AuthContext";
 
+// How long to wait for a driver before giving up (ms)
+const SEARCH_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes
+
 interface JobContextType {
 	job: Job;
+	searchTimedOut: boolean;
 	setJobStatus: (status: JobStatus) => void;
 	selectService: (type: ServiceTypeId, price: number) => void;
 	setCustomerLocation: (loc: Location) => void;
@@ -36,13 +41,26 @@ export const JobProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 	const [job, setJob] = useState<Job>(initialJobState);
 	const [providerLocation, setProviderLocation] = useState<Location | null>(null);
 	const [eta, setEta] = useState<number | null>(null);
+	const [searchTimedOut, setSearchTimedOut] = useState(false);
 	const { user } = useAuth();
 
+	// Timer ref so we can clear it when a driver is assigned
+	const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+	const clearSearchTimeout = useCallback(() => {
+		if (searchTimeoutRef.current) {
+			clearTimeout(searchTimeoutRef.current);
+			searchTimeoutRef.current = null;
+		}
+	}, []);
+
 	const resetJob = useCallback(() => {
+		clearSearchTimeout();
+		setSearchTimedOut(false);
 		setJob(initialJobState);
 		setProviderLocation(null);
 		setEta(null);
-	}, []);
+	}, [clearSearchTimeout]);
 
 	useEffect(() => {
 		if (!user) {
@@ -50,9 +68,11 @@ export const JobProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 		}
 	}, [user, resetJob]);
 
+	// ── Socket listeners ────────────────────────────────────────────────────
 	useEffect(() => {
-		// Real-time Socket Listeners
 		const handleProviderAssigned = (data: { jobId: string; provider: Provider }) => {
+			clearSearchTimeout(); // driver found — cancel the no-drivers timeout
+			setSearchTimedOut(false);
 			socketClient.emit("join-job", data.jobId);
 			setJob(prev => ({
 				...prev,
@@ -88,7 +108,7 @@ export const JobProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 			socketClient.off("driver-location-updated", handleLocationUpdate);
 			socketClient.off("job-completed", handleJobCompleted);
 		};
-	}, []);
+	}, [clearSearchTimeout]);
 
 	const setJobStatus = useCallback((status: JobStatus) => {
 		setJob(prev => ({ ...prev, status }));
@@ -114,34 +134,63 @@ export const JobProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 	const requestService = useCallback(async () => {
 		if (!job.customerLocation || !job.serviceType || !user) return;
 
+		setSearchTimedOut(false);
 		setJob(prev => ({ ...prev, status: "searching" }));
 
 		try {
 			const response = await api.post<any>("/jobs", {
-				serviceType: job.serviceType,
-				pickupLatitude: job.customerLocation.latitude,
-				pickupLongitude: job.customerLocation.longitude,
-				notes: job.notes,
+				serviceType:       job.serviceType,
+				pickupLatitude:    job.customerLocation.latitude,
+				pickupLongitude:   job.customerLocation.longitude,
+				notes:             job.notes,
 			});
 
 			const createdJob = response.data.data;
-			setJob(prev => ({ ...prev, id: createdJob?.id || response.data.job?.id }));
+			const jobId = createdJob?.id || response.data.job?.id;
+			setJob(prev => ({ ...prev, id: jobId }));
+
+			// Start the "no drivers available" timeout
+			searchTimeoutRef.current = setTimeout(async () => {
+				// Only fire if still searching (driver not yet assigned)
+				setJob(current => {
+					if (current.status !== "searching") return current;
+					// Cancel the job on the backend silently
+					if (jobId) {
+						api.put(`/jobs/${jobId}/cancel`).catch(() => {});
+					}
+					setSearchTimedOut(true);
+					return { ...current, status: "idle" };
+				});
+			}, SEARCH_TIMEOUT_MS);
 		} catch (err) {
 			console.error("Failed to request service", err);
 			setJob(prev => ({ ...prev, status: "idle" }));
-			// We should ideally throw this error so the UI can catch it and show a toast
 			throw err;
 		}
 	}, [job.customerLocation, job.serviceType, job.notes, user]);
 
+	// ── Cancel job — calls backend so the job is not left in PENDING ────────
 	const cancelJob = useCallback(() => {
+		clearSearchTimeout();
+		setSearchTimedOut(false);
+
+		const currentJobId = job.id;
+		const currentStatus = job.status;
+
 		resetJob();
-	}, [resetJob]);
+
+		if (currentJobId && (currentStatus === "searching" || currentStatus === "tracking")) {
+			api.put(`/jobs/${currentJobId}/cancel`).catch(err => {
+				console.warn("[JobContext] Failed to cancel job on backend:", err?.message);
+			});
+		}
+	}, [job.id, job.status, resetJob, clearSearchTimeout]);
 
 	return (
 		<JobContext.Provider
 			value={{
 				job,
+				searchTimedOut,
 				setJobStatus,
 				selectService,
 				setCustomerLocation,

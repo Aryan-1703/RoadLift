@@ -6,16 +6,33 @@
 		"version": "1.0.0",
 		"sdkVersion": "54.0.0",
 		"platforms": ["ios", "android"],
+		"plugins": [
+			[
+				"expo-notifications",
+				{
+					"icon": "./assets/notification-icon.png",
+					"color": "#1A6BFF",
+					"sounds": []
+				}
+			]
+		],
 		"android": {
 			"package": "com.aryan1703.RoadLift",
-			"permissions": ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"]
+			"permissions": [
+				"ACCESS_COARSE_LOCATION",
+				"ACCESS_FINE_LOCATION",
+				"RECEIVE_BOOT_COMPLETED",
+				"VIBRATE",
+				"POST_NOTIFICATIONS"
+			]
 		},
 		"ios": {
 			"bundleIdentifier": "com.aryan1703.RoadLift",
 			"infoPlist": {
 				"ITSAppUsesNonExemptEncryption": false,
 				"NSLocationWhenInUseUsageDescription": "We need your location to show the driver where you are and to track your route.",
-				"NSLocationAlwaysAndWhenInUseUsageDescription": "We need your location to show the driver where you are and to track your route."
+				"NSLocationAlwaysAndWhenInUseUsageDescription": "We need your location to show the driver where you are and to track your route.",
+				"UIBackgroundModes": ["remote-notification", "location", "fetch"]
 			}
 		},
 		"extra": {

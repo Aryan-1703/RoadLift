@@ -1,19 +1,19 @@
 require("dotenv").config();
 const express = require("express");
-const http = require("http"); // Required to attach socket.io
+const http = require("http");
 const cors = require("cors");
-const { Job } = require("./models");
 
+const { Job, User } = require("./models");
 const db = require("./models");
-const io = require("./socket"); // Import our shared, singleton socket instance
+const io = require("./socket");
 
 // --- SERVER AND APP SETUP ---
 const app = express();
 const server = http.createServer(app);
 
-// Attach the imported io instance to the HTTP server
 io.attach(server);
 app.set("io", io);
+
 // --- MIDDLEWARE ---
 app.use(cors());
 app.use(express.json());
@@ -42,49 +42,68 @@ app.use("/api/vehicles", vehicleRoutes);
 app.use("/api/maps", mapsRoutes);
 app.use("/api/users", userRoutes);
 
-// --- HEALTH CHECK ROUTE ---
-app.get("/", (req, res) => {
-	res.send("RoadLift API is running...");
-});
+// --- HEALTH CHECK ---
+app.get("/", (req, res) => res.send("RoadLift API is running..."));
 
-// --- SOCKET.IO CONNECTION LOGIC ---
-// This is where we define what happens when a new client connects
+// --- SOCKET.IO ---
 io.on("connection", socket => {
-	console.log(`Socket connected: ${socket.id}`);
+	console.log(`[Socket] Connected: ${socket.id}`);
 
+	// ── join-room — called once on login to subscribe to personal events ──
+	// Frontend: socketClient.ioSocket.emit("join-room", { userId, role })
 	socket.on("join-room", ({ userId, role }) => {
-		console.log(
-			`--- JOIN-ROOM EVENT RECEIVED from socket ${socket.id} for User ID: ${userId}, Role: ${role} ---`,
-		);
-		if (userId) {
-			socket.join(String(userId)); // Join private room for customer/driver
-		}
-		if (role === "driver") {
-			socket.join("drivers"); // All drivers join shared room
-			console.log(`--- Driver ${userId} joined 'drivers' room ---`);
+		if (!userId) return;
+		const userRoom = String(userId);
+		socket.join(userRoom);
+		console.log(`[Socket] User ${userId} (${role}) joined room '${userRoom}'`);
+
+		if (role === "DRIVER" || role === "driver") {
+			socket.join("drivers");
+			console.log(`[Socket] Driver ${userId} joined 'drivers' room`);
 		}
 	});
 
-	socket.on("disconnect", () => {
-		console.log(`Socket disconnected: ${socket.id}`);
+	// ── join-job — called by both customer and driver after a job is matched ──
+	// Frontend (customer): socketClient.emit("join-job", jobId)
+	// Frontend (driver):   socketClient.emit("join-job", jobId) after acceptJob
+	socket.on("join-job", jobId => {
+		const room = `job-${jobId}`;
+		socket.join(room);
+		console.log(`[Socket] Socket ${socket.id} joined job room '${room}'`);
 	});
-	socket.on("driver-location-update", async data => {
-		const { jobId, location } = data;
+
+	// ── driver-location-update — driver sends their GPS position ─────────────
+	// We relay it to the customer via their personal room AND the job room.
+	socket.on("driver-location-update", async ({ jobId, location }) => {
+		if (!jobId || !location) return;
 
 		try {
 			const job = await Job.findByPk(jobId, { attributes: ["userId"] });
-			if (job && job.userId) {
-				// Relay the location to that specific customer's private room.
-				io.to(String(job.userId)).emit("driver-location-updated", {
-					jobId: jobId,
-					location: location, // { latitude, longitude }
-				});
-				// Log for debugging
-				// console.log(`Relayed location for job ${jobId} to customer ${job.userId}`);
-			}
-		} catch (error) {
-			console.error(`Error relaying location for job ${jobId}:`, error);
+			if (!job) return;
+
+			const payload = { jobId, location };
+
+			// To customer personal room (userId)
+			io.to(String(job.userId)).emit("driver-location-updated", payload);
+
+			// To job room (both customer and driver subscribed after match)
+			io.to(`job-${jobId}`).emit("driver-location-updated", payload);
+		} catch (err) {
+			console.error(`[Socket] Error relaying location for job ${jobId}:`, err.message);
 		}
+	});
+
+	// ── driver-online / driver-offline — mirror the REST status toggle ───────
+	socket.on("driver-online", ({ driverId }) => {
+		if (driverId) socket.join("drivers");
+	});
+
+	socket.on("driver-offline", ({ driverId }) => {
+		socket.leave("drivers");
+	});
+
+	socket.on("disconnect", () => {
+		console.log(`[Socket] Disconnected: ${socket.id}`);
 	});
 });
 
@@ -99,10 +118,9 @@ const startServer = async () => {
 		await db.sequelize.sync({ alter: true });
 		console.log("Database synchronized.");
 
-		// Start the combined HTTP/Socket.IO server
 		server.listen(PORT, () => console.log(`Server started on port ${PORT}`));
 	} catch (err) {
-		console.error("Error starting server:", err); // Use console.error for errors
+		console.error("Error starting server:", err);
 	}
 };
 

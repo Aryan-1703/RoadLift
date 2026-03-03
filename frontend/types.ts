@@ -19,11 +19,13 @@ export interface User {
 	name: string;
 	email: string;
 	phone: string;
+	phoneNumber?: string; // backend alias — prefer phone
 	role: "CUSTOMER" | "DRIVER";
 	vehicle?: Vehicle;
 	driverProfile?: DriverProfile;
 	token: string;
 	defaultVehicleId?: string | number;
+	defaultPaymentMethodId?: string; // ← was missing; needed by PaymentScreen
 }
 
 export interface RegisterDTO {
@@ -76,6 +78,7 @@ export interface Provider {
 	rating: number;
 	vehicle: string;
 	location: Location;
+	phone?: string; // ← needed for call button in LiveTrackingScreen
 }
 
 export type JobStatus =
@@ -94,6 +97,10 @@ export interface Job {
 	customerLocation: Location | null;
 	notes?: string;
 	status: JobStatus;
+	// Driver-facing fields (populated when driver accepts job)
+	customerName?: string;  // ← was missing — shown in ActiveJobScreen
+	customerPhone?: string; // ← was missing — used for call button
+	// Customer-facing fields
 	provider?: Provider;
 	estimatedPrice?: number;
 	finalPrice?: number;
@@ -125,7 +132,7 @@ export interface ActiveSession {
 
 export interface PaymentMethod {
 	id: string;
-	brand: "Visa" | "Mastercard" | "Amex";
+	brand: string;
 	last4: string;
 	expMonth: number;
 	expYear: number;

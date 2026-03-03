@@ -3,6 +3,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { User, RegisterDTO } from "../types";
 import { api } from "../services/api";
 import socketClient from "../services/socket";
+import { registerForPushNotifications } from "../utils/notifications";
 
 interface AuthContextType {
 	user: User | null;
@@ -17,6 +18,22 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// ─────────────────────────────────────────────────────────────────────────────
+// After any successful auth, register Expo push token on the backend so
+// drivers receive job notifications and customers get status updates.
+// ─────────────────────────────────────────────────────────────────────────────
+async function storePushToken() {
+	try {
+		const token = await registerForPushNotifications();
+		if (token) {
+			await api.post("/driver/store-push-token", { token });
+		}
+	} catch (err) {
+		// Non-fatal — app works without push, just logs a warning
+		console.warn("[Auth] Failed to store push token:", err);
+	}
+}
+
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
 	const [user, setUser] = useState<User | null>(null);
 	const [isLoading, setIsLoading] = useState(true);
@@ -28,6 +45,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 				if (storedUser) {
 					setUser(JSON.parse(storedUser));
 					await socketClient.connect();
+					// Re-register push token on session restore (token may have rotated)
+					storePushToken();
 				}
 			} catch (e) {
 				console.error("Failed to parse stored user", e);
@@ -59,23 +78,24 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 	};
 
 	const login = async (phoneNumber: string, pass: string, rememberPhone: boolean) => {
-		// FIX: was "/auth/login/user" — legacy dual-table endpoint, now removed.
 		const response = await api.post<any>("/auth/login", {
 			phoneNumber,
 			password: pass,
 		});
 		const payload = response.data;
 
-		const loggedInUser = {
+		const loggedInUser: User = {
 			id: payload.user.id,
 			email: payload.user.email,
 			name: payload.user.name,
 			phone: payload.user.phoneNumber || payload.user.phone || phoneNumber,
+			phoneNumber: payload.user.phoneNumber || phoneNumber,
 			role: payload.user.role || "CUSTOMER",
 			vehicle: payload.user.vehicle,
 			driverProfile: payload.user.driverProfile,
 			token: payload.token,
 			defaultVehicleId: payload.user.defaultVehicleId,
+			defaultPaymentMethodId: payload.user.defaultPaymentMethodId,
 		};
 
 		if (rememberPhone) {
@@ -87,6 +107,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 		setUser(loggedInUser);
 		await AsyncStorage.setItem("@roadlift_user", JSON.stringify(loggedInUser));
 		await socketClient.connect();
+		storePushToken(); // fire-and-forget
 	};
 
 	const registerUser = async (data: RegisterDTO) => {
@@ -120,23 +141,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 				payload.createdRecord?.phoneNumber ||
 				payload.driver?.phoneNumber ||
 				data.phone,
+			phoneNumber:
+				payload.user?.phoneNumber ||
+				payload.createdRecord?.phoneNumber ||
+				payload.driver?.phoneNumber ||
+				data.phone,
 			role: data.role,
-			vehicle:
-				payload.user?.vehicle ||
-				payload.createdRecord?.vehicle ||
-				payload.driver?.vehicle ||
-				data.vehicle,
-			driverProfile:
-				payload.user?.driverProfile ||
-				payload.createdRecord?.driverProfile ||
-				payload.driver?.driverProfile ||
-				data.driverProfile,
+			vehicle: payload.user?.vehicle || data.vehicle,
+			driverProfile: payload.user?.driverProfile || data.driverProfile,
 			token: payload.token,
 		};
 
 		setUser(loggedInUser);
 		await AsyncStorage.setItem("@roadlift_user", JSON.stringify(loggedInUser));
 		await socketClient.connect();
+		storePushToken(); // fire-and-forget
 	};
 
 	const logout = async () => {

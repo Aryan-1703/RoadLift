@@ -8,6 +8,7 @@ module.exports = sequelize => {
 				type: DataTypes.ENUM(
 					"pending",
 					"accepted",
+					"arrived", // ← added: driver has reached customer location
 					"in_progress",
 					"completed",
 					"cancelled",
@@ -22,6 +23,7 @@ module.exports = sequelize => {
 					"tire-change",
 					"towing",
 					"fuel-delivery",
+					"accident", // ← added to match frontend constants
 				),
 				allowNull: false,
 			},
@@ -49,6 +51,10 @@ module.exports = sequelize => {
 				type: DataTypes.DECIMAL(10, 2),
 				allowNull: true,
 			},
+			finalCost: {
+				type: DataTypes.DECIMAL(10, 2),
+				allowNull: true,
+			},
 			notes: {
 				type: DataTypes.TEXT,
 				allowNull: true,
@@ -67,13 +73,8 @@ module.exports = sequelize => {
 			},
 		},
 		{
-			// Must match existing DB table name exactly
 			tableName: "Jobs",
-			indexes: [
-				{ fields: ["status"] },
-				{ fields: ["userId"] },
-				{ fields: ["driverId"] },
-			],
+			indexes: [{ fields: ["status"] }, { fields: ["userId"] }, { fields: ["driverId"] }],
 		},
 	);
 

@@ -7,6 +7,7 @@ import {
 	ActivityIndicator,
 	Alert,
 	Linking,
+	TouchableOpacity,
 } from "react-native";
 import * as Location from "expo-location";
 import { useJob } from "../context/JobContext";
@@ -16,10 +17,12 @@ import { PrimaryButton } from "../components/PrimaryButton";
 import { Ionicons } from "@expo/vector-icons";
 
 export const LiveTrackingScreen = () => {
-	const { job, providerLocation, eta, cancelJob, setCustomerLocation } = useJob();
+	const { job, providerLocation, eta, cancelJob, setCustomerLocation, searchTimedOut } =
+		useJob();
 	const { colors } = useTheme();
 	const [locationError, setLocationError] = useState(false);
 
+	// ── Track customer location ──────────────────────────────────────────────
 	useEffect(() => {
 		let locationSubscription: Location.LocationSubscription | null = null;
 
@@ -40,19 +43,19 @@ export const LiveTrackingScreen = () => {
 
 			const location = await Location.getCurrentPositionAsync({});
 			setCustomerLocation({
-				latitude: location.coords.latitude,
+				latitude:  location.coords.latitude,
 				longitude: location.coords.longitude,
 			});
 
 			locationSubscription = await Location.watchPositionAsync(
 				{
-					accuracy: Location.Accuracy.High,
-					timeInterval: 5000,
-					distanceInterval: 10,
+					accuracy:          Location.Accuracy.High,
+					timeInterval:      5000,
+					distanceInterval:  10,
 				},
 				loc => {
 					setCustomerLocation({
-						latitude: loc.coords.latitude,
+						latitude:  loc.coords.latitude,
 						longitude: loc.coords.longitude,
 					});
 				},
@@ -68,11 +71,50 @@ export const LiveTrackingScreen = () => {
 		};
 	}, [setCustomerLocation]);
 
+	// ── Call driver helper ───────────────────────────────────────────────────
+	const handleCallDriver = () => {
+		const phone = job.provider?.phone;
+		if (!phone) {
+			Alert.alert("Contact Driver", "Driver contact is not available right now.");
+			return;
+		}
+		const url = `tel:${phone.replace(/\s/g, "")}`;
+		Linking.canOpenURL(url).then(supported => {
+			if (supported) {
+				Linking.openURL(url);
+			} else {
+				Alert.alert("Cannot make call", "Your device does not support phone calls.");
+			}
+		});
+	};
+
+	// ── "No drivers available" state ─────────────────────────────────────────
+	if (searchTimedOut) {
+		return (
+			<SafeAreaView style={[styles.searchingContainer, { backgroundColor: colors.background }]}>
+				<View style={styles.searchingContent}>
+					<View style={[styles.noDriversIcon, { backgroundColor: colors.amberBg }]}>
+						<Ionicons name="car-outline" size={48} color={colors.amber} />
+					</View>
+					<Text style={[styles.searchingTitle, { color: colors.text }]}>
+						No Drivers Available
+					</Text>
+					<Text style={[styles.searchingDesc, { color: colors.textMuted }]}>
+						We couldn't find a nearby provider right now. Please try again in a few
+						minutes or contact support.
+					</Text>
+				</View>
+				<View style={styles.cancelWrap}>
+					<PrimaryButton title="Try Again" onPress={cancelJob} />
+				</View>
+			</SafeAreaView>
+		);
+	}
+
+	// ── Searching state ──────────────────────────────────────────────────────
 	if (job.status === "searching") {
 		return (
-			<SafeAreaView
-				style={[styles.searchingContainer, { backgroundColor: colors.background }]}
-			>
+			<SafeAreaView style={[styles.searchingContainer, { backgroundColor: colors.background }]}>
 				<View style={styles.searchingContent}>
 					<ActivityIndicator
 						size="large"
@@ -85,6 +127,9 @@ export const LiveTrackingScreen = () => {
 					<Text style={[styles.searchingDesc, { color: colors.textMuted }]}>
 						We're locating the nearest available truck in the GTA for you.
 					</Text>
+					<Text style={[styles.searchingHint, { color: colors.textMuted }]}>
+						This usually takes 1–3 minutes.
+					</Text>
 				</View>
 				<View style={styles.cancelWrap}>
 					<PrimaryButton title="Cancel Request" variant="danger" onPress={cancelJob} />
@@ -93,6 +138,7 @@ export const LiveTrackingScreen = () => {
 		);
 	}
 
+	// ── Tracking state ───────────────────────────────────────────────────────
 	return (
 		<View style={styles.container}>
 			<SafeAreaView style={styles.safeTop}>
@@ -148,9 +194,14 @@ export const LiveTrackingScreen = () => {
 							</Text>
 						</View>
 					</View>
-					<View style={[styles.callBtn, { backgroundColor: colors.primary + "20" }]}>
+					{/* ── Call button — now wired up ── */}
+					<TouchableOpacity
+						onPress={handleCallDriver}
+						style={[styles.callBtn, { backgroundColor: colors.primary + "20" }]}
+						activeOpacity={0.7}
+					>
 						<Ionicons name="call" size={20} color={colors.primary} />
-					</View>
+					</TouchableOpacity>
 				</View>
 
 				<PrimaryButton title="Cancel Request" variant="secondary" onPress={cancelJob} />
@@ -167,11 +218,20 @@ const styles = StyleSheet.create({
 		justifyContent: "center",
 		padding: 32,
 	},
-	searchingTitle: { fontSize: 24, fontWeight: "bold", marginBottom: 12 },
-	searchingDesc: { fontSize: 16, textAlign: "center", lineHeight: 24 },
-	cancelWrap: { padding: 24 },
-	container: { flex: 1 },
-	map: { flex: 1 },
+	noDriversIcon: {
+		width: 96,
+		height: 96,
+		borderRadius: 48,
+		alignItems: "center",
+		justifyContent: "center",
+		marginBottom: 32,
+	},
+	searchingTitle:  { fontSize: 24, fontWeight: "bold", marginBottom: 12, textAlign: "center" },
+	searchingDesc:   { fontSize: 16, textAlign: "center", lineHeight: 24 },
+	searchingHint:   { fontSize: 13, textAlign: "center", marginTop: 12, fontStyle: "italic" },
+	cancelWrap:      { padding: 24 },
+	container:       { flex: 1 },
+	map:             { flex: 1 },
 	safeTop: {
 		position: "absolute",
 		top: 0,
@@ -197,10 +257,10 @@ const styles = StyleSheet.create({
 		justifyContent: "space-between",
 		alignItems: "flex-end",
 	},
-	etaText: { fontSize: 32, fontWeight: "900" },
-	etaLabel: { fontSize: 12, fontWeight: "bold" },
-	vehicleBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 },
-	vehicleText: { fontSize: 10, fontWeight: "bold" },
+	etaText:       { fontSize: 32, fontWeight: "900" },
+	etaLabel:      { fontSize: 12, fontWeight: "bold" },
+	vehicleBadge:  { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 },
+	vehicleText:   { fontSize: 10, fontWeight: "bold" },
 	bottomSheet: {
 		borderTopLeftRadius: 24,
 		borderTopRightRadius: 24,
@@ -218,7 +278,7 @@ const styles = StyleSheet.create({
 		alignSelf: "center",
 		marginBottom: 20,
 	},
-	providerRow: { flexDirection: "row", alignItems: "center", marginBottom: 24 },
+	providerRow:   { flexDirection: "row", alignItems: "center", marginBottom: 24 },
 	avatar: {
 		width: 56,
 		height: 56,
@@ -229,10 +289,10 @@ const styles = StyleSheet.create({
 		justifyContent: "center",
 		marginRight: 16,
 	},
-	providerInfo: { flex: 1 },
-	providerName: { fontSize: 20, fontWeight: "bold", marginBottom: 4 },
-	ratingRow: { flexDirection: "row", alignItems: "center" },
-	ratingText: { fontSize: 14, fontWeight: "bold" },
+	providerInfo:  { flex: 1 },
+	providerName:  { fontSize: 20, fontWeight: "bold", marginBottom: 4 },
+	ratingRow:     { flexDirection: "row", alignItems: "center" },
+	ratingText:    { fontSize: 14, fontWeight: "bold" },
 	callBtn: {
 		width: 48,
 		height: 48,

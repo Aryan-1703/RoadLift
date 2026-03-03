@@ -18,7 +18,7 @@ router.get("/jobs/available", protect, protectDriver, getAvailableJobs);
 router.put("/jobs/:jobId/accept", protect, protectDriver, acceptJob);
 router.put("/jobs/:jobId/complete", protect, protectDriver, completeJob);
 router.put("/status", protect, protectDriver, updateStatus);
-router.post("/store-push-token", protect, protectDriver, storePushToken);
+router.post("/store-push-token", protect, storePushToken);
 router.delete("/remove-push-token", protect, protectDriver, removePushToken);
 router.post("/stripe-onboarding", protect, protectDriver, createStripeOnboardingLink);
 

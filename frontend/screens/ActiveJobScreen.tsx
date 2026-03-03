@@ -27,6 +27,7 @@ export const ActiveJobScreen = () => {
 		longitude: number;
 	} | null>(null);
 
+	// ── Track driver location ────────────────────────────────────────────────
 	useEffect(() => {
 		let locationSubscription: Location.LocationSubscription | null = null;
 
@@ -48,26 +49,24 @@ export const ActiveJobScreen = () => {
 
 			const initialLocation = await Location.getCurrentPositionAsync({});
 			setDriverLocation({
-				latitude: initialLocation.coords.latitude,
+				latitude:  initialLocation.coords.latitude,
 				longitude: initialLocation.coords.longitude,
 			});
 
 			locationSubscription = await Location.watchPositionAsync(
 				{
-					accuracy: Location.Accuracy.High,
-					timeInterval: 5000,
+					accuracy:         Location.Accuracy.High,
+					timeInterval:     5000,
 					distanceInterval: 10,
 				},
 				loc => {
 					const newLocation = {
-						latitude: loc.coords.latitude,
+						latitude:  loc.coords.latitude,
 						longitude: loc.coords.longitude,
 					};
 					setDriverLocation(newLocation);
-
-					// Emit location to backend
 					socketClient.emit("driver-location-update", {
-						jobId: activeJob.id,
+						jobId:    activeJob.id,
 						location: newLocation,
 					});
 				},
@@ -94,20 +93,53 @@ export const ActiveJobScreen = () => {
 	const getNextStatus = () => {
 		switch (activeJob.status) {
 			case "ACCEPTED":
-				return { status: "ARRIVED", label: "Mark as Arrived" };
+				return { status: "ARRIVED",     label: "Mark as Arrived" };
 			case "ARRIVED":
 				return { status: "IN_PROGRESS", label: "Start Service" };
 			case "IN_PROGRESS":
-				return { status: "COMPLETED", label: "Complete Job" };
+				return { status: "COMPLETED",   label: "Complete Job" };
 			default:
 				return null;
 		}
 	};
 
+	// ── Call customer ────────────────────────────────────────────────────────
+	const handleCallCustomer = () => {
+		const phone = activeJob.customerPhone;
+		if (!phone) {
+			Alert.alert("Contact Customer", "Customer phone number is not available.");
+			return;
+		}
+		const url = `tel:${phone.replace(/\s/g, "")}`;
+		Linking.canOpenURL(url).then(supported => {
+			if (supported) {
+				Linking.openURL(url);
+			} else {
+				Alert.alert("Cannot make call", "Your device does not support phone calls.");
+			}
+		});
+	};
+
+	// ── Open GPS navigation to customer ─────────────────────────────────────
+	const handleNavigate = () => {
+		const loc = activeJob.customerLocation;
+		if (!loc) return;
+		const { latitude, longitude, address } = loc;
+		const label = encodeURIComponent(address || "Customer Location");
+		// Works on both iOS (Apple Maps) and Android (Google Maps)
+		const url = `https://maps.google.com/?q=${latitude},${longitude}(${label})`;
+		Linking.openURL(url).catch(() =>
+			Alert.alert("Navigation", "Could not open maps application."),
+		);
+	};
+
 	const nextAction = getNextStatus();
+	const customerName  = activeJob.customerName  || "Customer";
+	const customerPhone = activeJob.customerPhone || null;
 
 	return (
 		<SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+			{/* Header */}
 			<View
 				style={[
 					styles.header,
@@ -117,11 +149,12 @@ export const ActiveJobScreen = () => {
 				<Text style={[styles.title, { color: colors.text }]}>Active Request</Text>
 				<View style={[styles.statusBadge, { backgroundColor: colors.primary + "20" }]}>
 					<Text style={[styles.statusText, { color: colors.primary }]}>
-						{activeJob.status.replace("_", " ")}
+						{(activeJob.status as string).replace("_", " ")}
 					</Text>
 				</View>
 			</View>
 
+			{/* Map */}
 			<View style={styles.mapContainer}>
 				<LiveMap
 					userLocation={activeJob.customerLocation || null}
@@ -132,6 +165,7 @@ export const ActiveJobScreen = () => {
 			</View>
 
 			<ScrollView style={styles.detailsContainer}>
+				{/* Customer details */}
 				<Card style={styles.card}>
 					<Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
 						CUSTOMER DETAILS
@@ -141,21 +175,42 @@ export const ActiveJobScreen = () => {
 							<Ionicons name="person" size={24} color={colors.primary} />
 						</View>
 						<View style={styles.customerInfo}>
-							<Text style={[styles.customerName, { color: colors.text }]}>Customer</Text>
+							<Text style={[styles.customerName, { color: colors.text }]}>
+								{customerName}
+							</Text>
 							<Text style={[styles.customerPhone, { color: colors.textMuted }]}>
-								Contact via App
+								{customerPhone ?? "Phone not available"}
 							</Text>
 						</View>
-						<TouchableOpacity style={[styles.callBtn, { backgroundColor: "#10B98120" }]}>
-							<Ionicons name="call" size={20} color="#10B981" />
+						{/* Call button */}
+						<TouchableOpacity
+							onPress={handleCallCustomer}
+							style={[
+								styles.callBtn,
+								{
+									backgroundColor: customerPhone
+										? "#10B98120"
+										: colors.border,
+								},
+							]}
+							activeOpacity={0.7}
+							disabled={!customerPhone}
+						>
+							<Ionicons
+								name="call"
+								size={20}
+								color={customerPhone ? "#10B981" : colors.textMuted}
+							/>
 						</TouchableOpacity>
 					</View>
 				</Card>
 
+				{/* Job details */}
 				<Card style={styles.card}>
 					<Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
 						JOB DETAILS
 					</Text>
+
 					<View style={styles.detailRow}>
 						<Ionicons name="car-outline" size={20} color={colors.textMuted} />
 						<Text style={[styles.detailText, { color: colors.text }]}>
@@ -165,29 +220,41 @@ export const ActiveJobScreen = () => {
 								.join(" ")}
 						</Text>
 					</View>
-					<View style={styles.detailRow}>
-						<Ionicons name="location-outline" size={20} color={colors.textMuted} />
-						<Text style={[styles.detailText, { color: colors.text }]}>
-							{activeJob.customerLocation?.address || "Unknown Location"}
+
+					<TouchableOpacity
+						style={styles.detailRow}
+						onPress={handleNavigate}
+						activeOpacity={0.7}
+					>
+						<Ionicons name="navigate-outline" size={20} color={colors.primary} />
+						<Text
+							style={[styles.detailText, { color: colors.primary, textDecorationLine: "underline" }]}
+						>
+							{activeJob.customerLocation?.address || "Tap to navigate"}
 						</Text>
-					</View>
+					</TouchableOpacity>
+
 					<View style={styles.detailRow}>
 						<Ionicons name="cash-outline" size={20} color={colors.textMuted} />
 						<Text style={[styles.detailText, { color: colors.text }]}>
 							Estimated: ${activeJob.estimatedPrice}
 						</Text>
 					</View>
-					{activeJob.notes && (
-						<View style={styles.notesContainer}>
-							<Text style={[styles.notesLabel, { color: colors.textMuted }]}>Notes:</Text>
+
+					{activeJob.notes ? (
+						<View style={[styles.notesContainer, { borderTopColor: colors.border }]}>
+							<Text style={[styles.notesLabel, { color: colors.textMuted }]}>
+								Notes:
+							</Text>
 							<Text style={[styles.notesText, { color: colors.text }]}>
 								{activeJob.notes}
 							</Text>
 						</View>
-					)}
+					) : null}
 				</Card>
 			</ScrollView>
 
+			{/* Footer action */}
 			<View
 				style={[
 					styles.footer,
@@ -203,7 +270,7 @@ export const ActiveJobScreen = () => {
 					/>
 				) : (
 					<Text style={[styles.waitingText, { color: colors.textMuted }]}>
-						Waiting for customer payment...
+						Waiting for customer payment…
 					</Text>
 				)}
 			</View>
@@ -221,12 +288,12 @@ const styles = StyleSheet.create({
 		paddingBottom: 20,
 		borderBottomWidth: 1,
 	},
-	title: { fontSize: 24, fontWeight: "bold" },
+	title:       { fontSize: 24, fontWeight: "bold" },
 	statusBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 },
-	statusText: { fontSize: 12, fontWeight: "bold", textTransform: "uppercase" },
-	mapContainer: { height: 250 },
+	statusText:  { fontSize: 12, fontWeight: "bold", textTransform: "uppercase" },
+	mapContainer:     { height: 250 },
 	detailsContainer: { flex: 1, padding: 16 },
-	card: { marginBottom: 16, padding: 16 },
+	card:        { marginBottom: 16, padding: 16 },
 	sectionTitle: {
 		fontSize: 12,
 		fontWeight: "bold",
@@ -242,8 +309,8 @@ const styles = StyleSheet.create({
 		justifyContent: "center",
 		marginRight: 16,
 	},
-	customerInfo: { flex: 1 },
-	customerName: { fontSize: 18, fontWeight: "bold", marginBottom: 4 },
+	customerInfo:  { flex: 1 },
+	customerName:  { fontSize: 18, fontWeight: "bold", marginBottom: 4 },
 	customerPhone: { fontSize: 14 },
 	callBtn: {
 		width: 40,
@@ -252,17 +319,16 @@ const styles = StyleSheet.create({
 		alignItems: "center",
 		justifyContent: "center",
 	},
-	detailRow: { flexDirection: "row", alignItems: "center", marginBottom: 12 },
-	detailText: { fontSize: 16, marginLeft: 12, flex: 1 },
+	detailRow:   { flexDirection: "row", alignItems: "center", marginBottom: 12 },
+	detailText:  { fontSize: 16, marginLeft: 12, flex: 1 },
 	notesContainer: {
 		marginTop: 12,
 		paddingTop: 12,
 		borderTopWidth: 1,
-		borderTopColor: "#E5E7EB",
 	},
 	notesLabel: { fontSize: 12, fontWeight: "bold", marginBottom: 4 },
-	notesText: { fontSize: 14, fontStyle: "italic" },
-	footer: { padding: 16, borderTopWidth: 1 },
+	notesText:  { fontSize: 14, fontStyle: "italic" },
+	footer:      { padding: 16, borderTopWidth: 1 },
 	waitingText: {
 		textAlign: "center",
 		fontSize: 16,

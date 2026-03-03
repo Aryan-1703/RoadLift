@@ -5,12 +5,16 @@ import React, {
 	ReactNode,
 	useCallback,
 	useEffect,
+	useRef,
 } from "react";
 import { Job, Location } from "../types";
 import { api } from "../services/api";
 import socketClient from "../services/socket";
 import { useAuth } from "./AuthContext";
 import { useToast } from "./ToastContext";
+
+// Poll for available jobs every 30 s when online, as a socket fallback
+const POLL_INTERVAL_MS = 30_000;
 
 interface DriverContextType {
 	isOnline: boolean;
@@ -36,6 +40,9 @@ export const DriverProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 	const [activeJob, setActiveJob] = useState<Job | null>(null);
 	const [earnings, setEarnings] = useState({ today: 0, completedJobs: [] });
 
+	const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+	// ── Reset on logout ──────────────────────────────────────────────────────
 	useEffect(() => {
 		if (!user) {
 			setIsOnline(false);
@@ -45,7 +52,18 @@ export const DriverProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 		}
 	}, [user]);
 
-	// Socket setup for driver
+	// ── Fetch available jobs ─────────────────────────────────────────────────
+	const fetchAvailableJobs = useCallback(async () => {
+		if (!isOnline) return;
+		try {
+			const response = await api.get("/driver/jobs/available");
+			setAvailableJobs(Array.isArray(response.data) ? response.data : []);
+		} catch (err) {
+			console.error("Failed to fetch available jobs", err);
+		}
+	}, [isOnline]);
+
+	// ── Socket + polling setup ────────────────────────────────────────────────
 	useEffect(() => {
 		if (user?.role !== "DRIVER") return;
 
@@ -70,27 +88,28 @@ export const DriverProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 			socketClient.emit("driver-online", { driverId: user.id });
 			socketClient.on("new-job-available", handleNewJob);
 			socketClient.on("job-cancelled", handleJobCancelled);
+
+			// Polling fallback — catches jobs that arrive during a socket gap
+			pollIntervalRef.current = setInterval(fetchAvailableJobs, POLL_INTERVAL_MS);
 		} else {
 			socketClient.emit("driver-offline", { driverId: user.id });
+			if (pollIntervalRef.current) {
+				clearInterval(pollIntervalRef.current);
+				pollIntervalRef.current = null;
+			}
 		}
 
 		return () => {
 			socketClient.off("new-job-available", handleNewJob);
 			socketClient.off("job-cancelled", handleJobCancelled);
+			if (pollIntervalRef.current) {
+				clearInterval(pollIntervalRef.current);
+				pollIntervalRef.current = null;
+			}
 		};
-	}, [isOnline, user, activeJob]);
+	}, [isOnline, user, activeJob, fetchAvailableJobs, showToast]);
 
-	const fetchAvailableJobs = useCallback(async () => {
-		if (!isOnline) return;
-		try {
-			const response = await api.get("/driver/jobs/available");
-			// The backend returns the array directly, not wrapped in { data: ... }
-			setAvailableJobs(Array.isArray(response.data) ? response.data : []);
-		} catch (err) {
-			console.error("Failed to fetch available jobs", err);
-		}
-	}, [isOnline]);
-
+	// ── goOnline / goOffline ─────────────────────────────────────────────────
 	const goOnline = useCallback(async () => {
 		setIsOnline(true);
 		try {
@@ -111,6 +130,7 @@ export const DriverProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 		}
 	}, []);
 
+	// ── Accept job ───────────────────────────────────────────────────────────
 	const acceptJob = useCallback(
 		async (jobId: string) => {
 			try {
@@ -127,7 +147,6 @@ export const DriverProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 						"Failed to accept job",
 					"error",
 				);
-				// Remove from available if it was taken
 				setAvailableJobs(prev => prev.filter(j => j.id !== jobId));
 			}
 		},
@@ -138,19 +157,32 @@ export const DriverProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 		setAvailableJobs(prev => prev.filter(j => j.id !== jobId));
 	}, []);
 
+	// ── Update job status (ARRIVED / IN_PROGRESS / COMPLETED) ───────────────
 	const updateJobStatus = useCallback(
 		async (status: string) => {
 			if (!activeJob?.id) return;
 			try {
 				if (status === "COMPLETED") {
-					const response = await api.put(`/driver/jobs/${activeJob.id}/complete`);
+					await api.put(`/driver/jobs/${activeJob.id}/complete`);
 					setActiveJob(null);
 					showToast("Job completed successfully!", "success");
 					fetchEarnings();
 				} else {
-					// If there are other statuses, handle them here
-					// For now, we only have complete
-					console.warn("Status update not fully implemented for:", status);
+					// ARRIVED and IN_PROGRESS — general status endpoint
+					// Backend: PUT /driver/jobs/:id/status  { status: "ARRIVED" | "IN_PROGRESS" }
+					const response = await api.put(`/driver/jobs/${activeJob.id}/status`, {
+						status,
+					});
+					// Merge updated job fields (backend may return updated record)
+					setActiveJob(prev =>
+						prev ? { ...prev, status: status as any, ...response.data } : prev,
+					);
+
+					const labels: Record<string, string> = {
+						ARRIVED: "Marked as arrived!",
+						IN_PROGRESS: "Service started!",
+					};
+					showToast(labels[status] || "Status updated", "success");
 				}
 			} catch (err: any) {
 				showToast(
@@ -164,6 +196,7 @@ export const DriverProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 		[activeJob, showToast],
 	);
 
+	// ── Earnings ─────────────────────────────────────────────────────────────
 	const fetchEarnings = useCallback(async () => {
 		try {
 			const response = await api.get("/driver/earnings");
