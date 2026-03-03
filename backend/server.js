@@ -29,6 +29,7 @@ const paymentRoutes = require("./routes/paymentRoutes");
 const geocodingRoutes = require("./routes/geocodingRoutes");
 const vehicleRoutes = require("./routes/vehicleRoutes");
 const mapsRoutes = require("./routes/mapsRoutes");
+const userRoutes = require("./routes/userRoutes");
 
 app.use("/api/auth", authRoutes);
 app.use("/api/jobs", jobRoutes);
@@ -39,6 +40,7 @@ app.use("/api/payments", paymentRoutes);
 app.use("/api/geocode", geocodingRoutes);
 app.use("/api/vehicles", vehicleRoutes);
 app.use("/api/maps", mapsRoutes);
+app.use("/api/users", userRoutes);
 
 // --- HEALTH CHECK ROUTE ---
 app.get("/", (req, res) => {
