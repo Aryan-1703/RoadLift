@@ -8,13 +8,13 @@ module.exports = sequelize => {
 				type: DataTypes.ENUM(
 					"pending",
 					"accepted",
-					"arrived", // ← added: driver has reached customer location
+					"arrived",       // driver reached customer location
 					"in_progress",
 					"completed",
 					"cancelled",
 				),
 				defaultValue: "pending",
-				allowNull: false,
+				allowNull:    false,
 			},
 			serviceType: {
 				type: DataTypes.ENUM(
@@ -23,58 +23,68 @@ module.exports = sequelize => {
 					"tire-change",
 					"towing",
 					"fuel-delivery",
-					"accident", // ← added to match frontend constants
+					"accident",
 				),
 				allowNull: false,
 			},
 			// FK → Users.id (role = CUSTOMER)
 			userId: {
-				type: DataTypes.INTEGER,
-				allowNull: false,
+				type:       DataTypes.INTEGER,
+				allowNull:  false,
 				references: { model: "Users", key: "id" },
 			},
 			// FK → Users.id (role = DRIVER) — null until accepted
 			driverId: {
-				type: DataTypes.INTEGER,
-				allowNull: true,
+				type:       DataTypes.INTEGER,
+				allowNull:  true,
 				references: { model: "Users", key: "id" },
 			},
 			pickupLocation: {
-				type: DataTypes.GEOMETRY("POINT", 4326),
+				type:      DataTypes.GEOMETRY("POINT", 4326),
 				allowNull: false,
 			},
 			dropoffLocation: {
-				type: DataTypes.GEOMETRY("POINT", 4326),
+				type:      DataTypes.GEOMETRY("POINT", 4326),
+				allowNull: true,
+			},
+			// BUG FIX: store human-readable address so drivers can see it without
+			// a reverse-geocode round-trip.  allowNull so existing rows don't break.
+			pickupAddress: {
+				type:      DataTypes.STRING(500),
 				allowNull: true,
 			},
 			estimatedCost: {
-				type: DataTypes.DECIMAL(10, 2),
+				type:      DataTypes.DECIMAL(10, 2),
 				allowNull: true,
 			},
 			finalCost: {
-				type: DataTypes.DECIMAL(10, 2),
+				type:      DataTypes.DECIMAL(10, 2),
 				allowNull: true,
 			},
 			notes: {
-				type: DataTypes.TEXT,
+				type:      DataTypes.TEXT,
 				allowNull: true,
 			},
 			paymentMethodId: {
-				type: DataTypes.STRING,
+				type:      DataTypes.STRING,
 				allowNull: true,
 			},
 			paymentIntentId: {
-				type: DataTypes.STRING,
+				type:      DataTypes.STRING,
 				allowNull: true,
 			},
 			vehicleId: {
-				type: DataTypes.INTEGER,
+				type:      DataTypes.INTEGER,
 				allowNull: true,
 			},
 		},
 		{
 			tableName: "Jobs",
-			indexes: [{ fields: ["status"] }, { fields: ["userId"] }, { fields: ["driverId"] }],
+			indexes: [
+				{ fields: ["status"] },
+				{ fields: ["userId"] },
+				{ fields: ["driverId"] },
+			],
 		},
 	);
 

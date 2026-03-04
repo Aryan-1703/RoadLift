@@ -8,20 +8,18 @@ const {
 	submitReview,
 } = require("../controllers/jobController");
 
-// POST   /api/jobs          — Customer creates a new job request
+// POST   /api/jobs  — Customer creates a new job request
 router.post("/", protect, createJob);
 
-// GET    /api/jobs/history  — Job history for the authenticated user (customer OR driver)
-// NOTE: Must be defined BEFORE /:id to prevent "history" being parsed as an ID
 router.get("/history", protect, async (req, res) => {
-	// Delegate to jobController — add getJobHistory to jobController.js
-	// For now, inline a safe fallback so the route doesn't 404
 	try {
 		const { Job, User } = require("../models");
 		const userId = req.user.id;
 		const role = req.user.role;
 
-		const whereClause = role === "DRIVER" ? { driverId: userId } : { customerId: userId };
+		// BUG WAS: `{ customerId: userId }` — that column doesn't exist.
+		// The Job model uses `userId` for the customer FK.
+		const whereClause = role === "DRIVER" ? { driverId: userId } : { userId: userId }; // ← FIXED
 
 		const jobs = await Job.findAll({
 			where: whereClause,
@@ -33,20 +31,22 @@ router.get("/history", protect, async (req, res) => {
 			limit: 100,
 		});
 
-		res.json(jobs);
+		// Normalize through jobService so frontend gets consistent shape
+		const { normalizeJob } = require("./driverService");
+		res.json(jobs.map(normalizeJob));
 	} catch (err) {
 		console.error("[jobRoutes] /history error:", err);
 		res.status(500).json({ message: "Failed to fetch job history." });
 	}
 });
 
-// GET    /api/jobs/:id      — Get single job by ID
+// GET    /api/jobs/:id  — Single job by ID
 router.get("/:id", protect, getJobById);
 
-// PUT    /api/jobs/:jobId/cancel — Customer cancels a pending/accepted job
+// PUT    /api/jobs/:jobId/cancel  — Customer cancels a pending job
 router.put("/:jobId/cancel", protect, cancelJob);
 
-// POST   /api/jobs/:jobId/review — Customer submits rating after completion
+// POST   /api/jobs/:jobId/review  — Customer rates the completed job
 router.post("/:jobId/review", protect, submitReview);
 
 module.exports = router;

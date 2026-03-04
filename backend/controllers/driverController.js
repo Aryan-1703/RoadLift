@@ -1,15 +1,12 @@
 const driverService = require("../services/driverService");
-const { User } = require("../models");
+const jobService = require("../services/jobService");
+const { User, Job } = require("../models");
+const { Op } = require("sequelize");
+const io = require("../socket");
 
-// All handlers receive req.user from the `protect` middleware.
-// req.user is now always a User instance (role = 'DRIVER' enforced by protectDriver).
-
-// @desc    Get all pending jobs available for acceptance
-// @route   GET /api/driver/jobs/available
-// @access  DRIVER
+// ── getAvailableJobs ──────────────────────────────────────────────────────────
 const getAvailableJobs = async (req, res) => {
 	try {
-		// isActive on the unified users table
 		if (!req.user.isActive) {
 			return res.status(403).json({ message: "You must be active to view jobs." });
 		}
@@ -21,9 +18,7 @@ const getAvailableJobs = async (req, res) => {
 	}
 };
 
-// @desc    Accept a pending job
-// @route   PUT /api/driver/jobs/:jobId/accept
-// @access  DRIVER
+// ── acceptJob ─────────────────────────────────────────────────────────────────
 const acceptJob = async (req, res) => {
 	try {
 		const { jobId } = req.params;
@@ -39,9 +34,46 @@ const acceptJob = async (req, res) => {
 	}
 };
 
-// @desc    Mark an accepted job as complete
-// @route   PUT /api/driver/jobs/:jobId/complete
-// @access  DRIVER
+// ── updateJobStatus — ARRIVED / IN_PROGRESS ───────────────────────────────────
+const updateJobStatus = async (req, res) => {
+	try {
+		const { jobId } = req.params;
+		const driverId = req.user.id;
+		const { status } = req.body;
+
+		if (!status) {
+			return res.status(400).json({ message: "status is required." });
+		}
+
+		const updatedJob = await jobService.updateJobStatus(jobId, driverId, status);
+
+		// Notify customer in real time
+		if (updatedJob.customerId) {
+			const statusMessages = {
+				arrived: "Your driver has arrived!",
+				in_progress: "Service has started.",
+			};
+			io.to(String(updatedJob.customerId)).emit("job-status-updated", {
+				jobId: updatedJob.id,
+				status: updatedJob.status,
+				message: statusMessages[updatedJob.status] || "Job status updated.",
+			});
+		}
+
+		return res.status(200).json(updatedJob);
+	} catch (error) {
+		if (error.message === "Forbidden") {
+			return res.status(403).json({ message: "Not authorized to update this job." });
+		}
+		if (error.message.startsWith("Invalid status")) {
+			return res.status(400).json({ message: error.message });
+		}
+		console.error("Error updating job status:", error.message);
+		return res.status(500).json({ message: "Server error while updating job status." });
+	}
+};
+
+// ── completeJob ───────────────────────────────────────────────────────────────
 const completeJob = async (req, res) => {
 	try {
 		const { jobId } = req.params;
@@ -58,9 +90,54 @@ const completeJob = async (req, res) => {
 	}
 };
 
-// @desc    Toggle driver online/offline
-// @route   PUT /api/driver/status
-// @access  DRIVER
+// ── getEarnings ───────────────────────────────────────────────────────────────
+// GET /api/driver/earnings
+// Returns today's earnings total + all completed jobs for this driver.
+const getEarnings = async (req, res) => {
+	try {
+		const driverId = req.user.id;
+
+		// All completed jobs for this driver
+		const completedJobs = await Job.findAll({
+			where: { driverId, status: "completed" },
+			order: [["updatedAt", "DESC"]],
+			// Only pull the columns the dashboard needs — keeps payload small
+			attributes: ["id", "serviceType", "estimatedCost", "finalCost", "updatedAt"],
+		});
+
+		// Today's earnings: sum finalCost (fall back to estimatedCost) for jobs
+		// completed since midnight local time.
+		const startOfToday = new Date();
+		startOfToday.setHours(0, 0, 0, 0);
+
+		const todayJobs = completedJobs.filter(j => new Date(j.updatedAt) >= startOfToday);
+
+		const sumJob = j => parseFloat(j.finalCost ?? j.estimatedCost ?? "0");
+
+		const todayTotal = todayJobs.reduce((acc, j) => acc + sumJob(j), 0);
+
+		// Shape each job for the frontend
+		const { normalizeJob } = require("../services/driverService");
+		const jobList = completedJobs.map(j => ({
+			id: String(j.id),
+			serviceType: j.serviceType,
+			amount: sumJob(j),
+			completedAt: j.updatedAt,
+		}));
+
+		return res.status(200).json({
+			data: {
+				today: parseFloat(todayTotal.toFixed(2)),
+				completedJobs: jobList,
+			},
+		});
+	} catch (error) {
+		console.error("Error fetching earnings:", error);
+		return res.status(500).json({ message: "Server error while fetching earnings." });
+	}
+};
+
+// ── updateStatus (driver online/offline toggle) ───────────────────────────────
 const updateStatus = async (req, res) => {
 	try {
 		const driverId = req.user.id;
@@ -70,8 +147,7 @@ const updateStatus = async (req, res) => {
 			return res.status(400).json({ message: "isActive must be a boolean." });
 		}
 
-		// isActive now lives on the users table
-		const updated = await User.update({ isActive }, { where: { id: driverId } });
+		await User.update({ isActive }, { where: { id: driverId } });
 		return res.status(200).json({ isActive });
 	} catch (error) {
 		console.error("Failed to update driver status:", error);
@@ -79,18 +155,13 @@ const updateStatus = async (req, res) => {
 	}
 };
 
-// @desc    Store Expo push token
-// @route   POST /api/driver/store-push-token
-// @access  DRIVER
+// ── storePushToken ────────────────────────────────────────────────────────────
 const storePushToken = async (req, res) => {
 	try {
 		const { token: pushToken } = req.body;
-
 		if (!pushToken || !pushToken.startsWith("ExponentPushToken")) {
 			return res.status(400).json({ message: "Invalid push token." });
 		}
-
-		// pushToken now on unified users table
 		await User.update({ pushToken }, { where: { id: req.user.id } });
 		return res.status(200).json({ message: "Push token saved successfully." });
 	} catch (error) {
@@ -99,9 +170,7 @@ const storePushToken = async (req, res) => {
 	}
 };
 
-// @desc    Remove Expo push token (on logout)
-// @route   DELETE /api/driver/remove-push-token
-// @access  DRIVER
+// ── removePushToken ───────────────────────────────────────────────────────────
 const removePushToken = async (req, res) => {
 	try {
 		await User.update({ pushToken: null }, { where: { id: req.user.id } });
@@ -112,9 +181,7 @@ const removePushToken = async (req, res) => {
 	}
 };
 
-// @desc    Create Stripe Connect onboarding link for driver
-// @route   POST /api/driver/stripe-onboarding
-// @access  DRIVER
+// ── createStripeOnboardingLink ────────────────────────────────────────────────
 const createStripeOnboardingLink = async (req, res) => {
 	try {
 		const driverId = req.user.id;
@@ -131,7 +198,9 @@ const createStripeOnboardingLink = async (req, res) => {
 module.exports = {
 	getAvailableJobs,
 	acceptJob,
+	updateJobStatus,
 	completeJob,
+	getEarnings, // ← new
 	updateStatus,
 	storePushToken,
 	removePushToken,
