@@ -4,11 +4,11 @@ import {
 	Text,
 	StyleSheet,
 	TextInput,
-	SafeAreaView,
 	KeyboardAvoidingView,
 	Platform,
 	ScrollView,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useJob } from "../context/JobContext";
 import { useTheme } from "../context/ThemeContext";
 import { api } from "../services/api";

@@ -5,9 +5,9 @@ import {
 	StyleSheet,
 	ScrollView,
 	TouchableOpacity,
-	SafeAreaView,
 	RefreshControl,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useDriver } from "../context/DriverContext";
 import { useTheme } from "../context/ThemeContext";
 import { Card } from "../components/Card";

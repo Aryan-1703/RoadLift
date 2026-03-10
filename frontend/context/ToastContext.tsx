@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
-import { View, Text, StyleSheet, Platform, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 type ToastType = 'success' | 'error' | 'info';
 

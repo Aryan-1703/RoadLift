@@ -5,9 +5,9 @@ import {
 	StyleSheet,
 	ScrollView,
 	TouchableOpacity,
-	SafeAreaView,
 	Animated,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useJob } from "../context/JobContext";
 import { useTheme } from "../context/ThemeContext";
 import { SERVICES } from "../constants";

@@ -3,11 +3,11 @@ import {
 	View,
 	Text,
 	StyleSheet,
-	SafeAreaView,
 	ScrollView,
 	ActivityIndicator,
 	TouchableOpacity,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useStripe } from "@stripe/stripe-react-native";
 import { useJob } from "../context/JobContext";
 import { useTheme } from "../context/ThemeContext";

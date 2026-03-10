@@ -15,7 +15,6 @@ import {
 	Dimensions,
 	StatusBar,
 } from "react-native";
-// ✅ Fix 1: replaced deprecated SafeAreaView with useSafeAreaInsets
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import MapView, { Marker, PROVIDER_GOOGLE, MapPressEvent } from "react-native-maps";
 import * as Location from "expo-location";
