@@ -3,12 +3,12 @@ import {
 	View,
 	Text,
 	StyleSheet,
-	SafeAreaView,
 	ActivityIndicator,
 	Alert,
 	Linking,
 	TouchableOpacity,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import * as Location from "expo-location";
 import { useJob } from "../context/JobContext";
 import { useTheme } from "../context/ThemeContext";
@@ -17,7 +17,7 @@ import { PrimaryButton } from "../components/PrimaryButton";
 import { Ionicons } from "@expo/vector-icons";
 
 export const LiveTrackingScreen = () => {
-	const { job, providerLocation, eta, cancelJob, setCustomerLocation, searchTimedOut } =
+	const { job, providerLocation, eta, cancelJob, setCustomerLocation, searchTimedOut, travelFee, searchMessage } =
 		useJob();
 	const { colors } = useTheme();
 	const [locationError, setLocationError] = useState(false);
@@ -113,6 +113,9 @@ export const LiveTrackingScreen = () => {
 
 	// ── Searching state ──────────────────────────────────────────────────────
 	if (job.status === "searching") {
+		const displayPrice = job.currentPrice ?? job.estimatedPrice;
+		const isExpanding  = (job.dispatchStage ?? 0) > 0;
+
 		return (
 			<SafeAreaView style={[styles.searchingContainer, { backgroundColor: colors.background }]}>
 				<View style={styles.searchingContent}>
@@ -124,11 +127,42 @@ export const LiveTrackingScreen = () => {
 					<Text style={[styles.searchingTitle, { color: colors.text }]}>
 						Finding a Provider
 					</Text>
-					<Text style={[styles.searchingDesc, { color: colors.textMuted }]}>
-						We're locating the nearest available truck in the GTA for you.
-					</Text>
+
+					{/* Dynamic radius / price message */}
+					{searchMessage ? (
+						<View style={[styles.radiusBadge, { backgroundColor: colors.primary + "18" }]}>
+							<Ionicons name="radio-outline" size={16} color={colors.primary} style={{ marginRight: 6 }} />
+							<Text style={[styles.radiusText, { color: colors.primary }]}>
+								{searchMessage}
+							</Text>
+						</View>
+					) : (
+						<Text style={[styles.searchingDesc, { color: colors.textMuted }]}>
+							We're locating the nearest available provider for you.
+						</Text>
+					)}
+
+					{/* Show updated price only when a travel fee has been added */}
+					{isExpanding && displayPrice != null && (
+						<View style={[styles.priceRow, { borderColor: colors.border }]}>
+							<Text style={[styles.priceLabel, { color: colors.textMuted }]}>
+								Updated estimate
+							</Text>
+							<Text style={[styles.priceValue, { color: colors.text }]}>
+								${displayPrice.toFixed(2)}
+								{travelFee > 0 && (
+									<Text style={{ color: colors.amber ?? "#F59E0B", fontSize: 13 }}>
+										{" "}(+${travelFee} travel fee)
+									</Text>
+								)}
+							</Text>
+						</View>
+					)}
+
 					<Text style={[styles.searchingHint, { color: colors.textMuted }]}>
-						This usually takes 1–3 minutes.
+						{isExpanding
+							? `Searching within ${job.currentRadius ?? 5} km radius...`
+							: "This usually takes 1–3 minutes."}
 					</Text>
 				</View>
 				<View style={styles.cancelWrap}>
@@ -256,6 +290,26 @@ const styles = StyleSheet.create({
 	searchingTitle:  { fontSize: 24, fontWeight: "bold", marginBottom: 12, textAlign: "center" },
 	searchingDesc:   { fontSize: 16, textAlign: "center", lineHeight: 24 },
 	searchingHint:   { fontSize: 13, textAlign: "center", marginTop: 12, fontStyle: "italic" },
+	radiusBadge: {
+		flexDirection:  "row",
+		alignItems:     "center",
+		paddingHorizontal: 14,
+		paddingVertical:   8,
+		borderRadius:   20,
+		marginTop:      16,
+		marginBottom:   4,
+	},
+	radiusText: { fontSize: 14, fontWeight: "600" },
+	priceRow: {
+		marginTop:    16,
+		paddingVertical: 12,
+		paddingHorizontal: 20,
+		borderWidth:  1,
+		borderRadius: 12,
+		alignItems:   "center",
+	},
+	priceLabel: { fontSize: 11, fontWeight: "600", marginBottom: 4, textTransform: "uppercase" },
+	priceValue: { fontSize: 22, fontWeight: "bold" },
 	cancelWrap:      { padding: 24 },
 	container:       { flex: 1 },
 	map:             { flex: 1 },

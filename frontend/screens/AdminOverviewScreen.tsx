@@ -5,9 +5,9 @@ import {
 	StyleSheet,
 	ScrollView,
 	TouchableOpacity,
-	SafeAreaView,
 	Alert,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
@@ -297,12 +297,7 @@ export const AdminOverviewScreen = () => {
 
 										{/* Badge (optional) */}
 										{row.badge && (
-											<View
-												style={[
-													styles.badge,
-													{ backgroundColor: colors.primary },
-												]}
-											>
+											<View style={[styles.badge, { backgroundColor: colors.primary }]}>
 												<Text style={styles.badgeText}>{row.badge}</Text>
 											</View>
 										)}
@@ -312,11 +307,7 @@ export const AdminOverviewScreen = () => {
 											<View
 												style={[styles.arrowWrap, { backgroundColor: colors.arrowBg }]}
 											>
-												<Ionicons
-													name="chevron-forward"
-													size={14}
-													color={arrowColor}
-												/>
+												<Ionicons name="chevron-forward" size={14} color={arrowColor} />
 											</View>
 										)}
 									</TouchableOpacity>

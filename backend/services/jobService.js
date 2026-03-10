@@ -50,10 +50,11 @@ async function createJob(body, userId) {
 		status: "pending",
 	});
 
-	// Lazy require avoids circular dependency
+	// Lazy require avoids circular dependency.
+	// Pass lat/lng explicitly so dispatchService never needs to parse WKB geometry.
 	const { startDispatch } = require("./dispatchService");
-	startDispatch(job).catch(err =>
-		console.warn("[jobService] Failed to start dispatch:", err.message),
+	startDispatch(job, parseFloat(pickupLatitude), parseFloat(pickupLongitude)).catch(err =>
+		console.error("[jobService] Dispatch failed to start:", err.message),
 	);
 
 	return getNormalize()(job);

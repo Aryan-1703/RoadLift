@@ -12,8 +12,9 @@ import socketClient from "../services/socket";
 import { api } from "../services/api";
 import { useAuth } from "./AuthContext";
 
-// How long to wait for a driver before giving up (ms)
-const SEARCH_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes
+// Safety-net timeout — backend's job-no-driver-found event fires first (~6.7 min).
+// This is only a last-resort fallback if the socket event is somehow missed.
+const SEARCH_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
 
 interface JobContextType {
 	job: Job;
@@ -143,6 +144,8 @@ export const JobProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 		socketClient.on("driver-location-updated", handleLocationUpdate);
 		socketClient.on("job-completed",           handleJobCompleted);
 		socketClient.on("job-status-updated",      handleJobStatusUpdated);
+		// Stage 0 confirmation + stage 1-4 expansions use the same handler
+		socketClient.on("job-search-started",      handleExpandingRadius);
 		socketClient.on("job-expanding-radius",    handleExpandingRadius);
 		socketClient.on("job-no-driver-found",     handleNoDriverFound);
 
@@ -151,6 +154,7 @@ export const JobProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 			socketClient.off("driver-location-updated", handleLocationUpdate);
 			socketClient.off("job-completed",           handleJobCompleted);
 			socketClient.off("job-status-updated",      handleJobStatusUpdated);
+			socketClient.off("job-search-started",      handleExpandingRadius);
 			socketClient.off("job-expanding-radius",    handleExpandingRadius);
 			socketClient.off("job-no-driver-found",     handleNoDriverFound);
 		};
