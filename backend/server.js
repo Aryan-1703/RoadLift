@@ -6,6 +6,7 @@ const cors = require("cors");
 const { Job, User } = require("./models");
 const db = require("./models");
 const io = require("./socket");
+const driverLocationStore = require("./services/driverLocationStore");
 
 // --- SERVER AND APP SETUP ---
 const app = express();
@@ -55,6 +56,9 @@ io.on("connection", socket => {
 		if (!userId) return;
 		const userRoom = String(userId);
 		socket.join(userRoom);
+		// Persist on socket so other handlers can identify who this socket belongs to
+		socket.data.userId = String(userId);
+		socket.data.role   = role;
 		console.log(`[Socket] User ${userId} (${role}) joined room '${userRoom}'`);
 
 		if (role === "DRIVER" || role === "driver") {
@@ -78,6 +82,12 @@ io.on("connection", socket => {
 		if (!jobId || !location) return;
 
 		try {
+			// Update in-memory location store so dispatchService can geo-query it
+			const driverId = socket.data.userId;
+			if (driverId && location.latitude != null && location.longitude != null) {
+				driverLocationStore.update(driverId, location.latitude, location.longitude);
+			}
+
 			const job = await Job.findByPk(jobId, { attributes: ["userId"] });
 			if (!job) return;
 
@@ -100,10 +110,16 @@ io.on("connection", socket => {
 
 	socket.on("driver-offline", ({ driverId }) => {
 		socket.leave("drivers");
+		const id = driverId ?? socket.data.userId;
+		if (id) driverLocationStore.remove(id);
 	});
 
 	socket.on("disconnect", () => {
 		console.log(`[Socket] Disconnected: ${socket.id}`);
+		// Clean up driver location if they disconnect without going offline first
+		if (socket.data.userId) {
+			driverLocationStore.remove(socket.data.userId);
+		}
 	});
 });
 

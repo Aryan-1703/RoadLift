@@ -66,7 +66,7 @@ const submitReview = async (req, res) => {
 	try {
 		const { jobId } = req.params;
 		const reviewData = req.body; // { rating, comment }
-		const author = { id: req.user.id, role: req.role };
+		const author = { id: req.user.id, role: req.user.role };
 
 		const review = await jobService.submitReview(jobId, reviewData, author);
 		res.status(201).json(review);

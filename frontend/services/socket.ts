@@ -10,8 +10,10 @@ class SocketClient {
 
 		try {
 			const storedUser = await AsyncStorage.getItem("@roadlift_user");
-			const token = storedUser ? JSON.parse(storedUser).token : null;
+			if (!storedUser) return;
 
+			const user = JSON.parse(storedUser);
+			const token = user.token;
 			if (!token) return;
 
 			this.ioSocket = io(BACKEND_URL, {
@@ -21,6 +23,14 @@ class SocketClient {
 
 			this.ioSocket.on("connect", () => {
 				console.log("[Socket] Connected to backend");
+				// Join personal room so backend can send targeted events (job-accepted,
+				// job-completed, job-status-updated etc.) to this specific user.
+				if (user.id) {
+					this.ioSocket!.emit("join-room", {
+						userId: String(user.id),
+						role: user.role,
+					});
+				}
 			});
 
 			this.ioSocket.on("connect_error", err => {

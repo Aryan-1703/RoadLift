@@ -51,9 +51,9 @@ async function createJob(body, userId) {
 	});
 
 	// Lazy require avoids circular dependency
-	const { notifyAvailableDrivers } = require("./driverService");
-	notifyAvailableDrivers(job).catch(err =>
-		console.warn("[jobService] Failed to notify drivers:", err.message),
+	const { startDispatch } = require("./dispatchService");
+	startDispatch(job).catch(err =>
+		console.warn("[jobService] Failed to start dispatch:", err.message),
 	);
 
 	return getNormalize()(job);

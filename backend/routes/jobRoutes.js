@@ -31,8 +31,8 @@ router.get("/history", protect, async (req, res) => {
 			limit: 100,
 		});
 
-		// Normalize through jobService so frontend gets consistent shape
-		const { normalizeJob } = require("./driverService");
+		// Normalize through driverService so frontend gets consistent shape
+		const { normalizeJob } = require("../services/driverService");
 		res.json(jobs.map(normalizeJob));
 	} catch (err) {
 		console.error("[jobRoutes] /history error:", err);

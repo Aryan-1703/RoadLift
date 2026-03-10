@@ -18,6 +18,8 @@ const SEARCH_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes
 interface JobContextType {
 	job: Job;
 	searchTimedOut: boolean;
+	travelFee: number;
+	searchMessage: string | null;
 	setJobStatus: (status: JobStatus) => void;
 	selectService: (type: ServiceTypeId, price: number) => void;
 	setCustomerLocation: (loc: Location) => void;
@@ -42,6 +44,8 @@ export const JobProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 	const [providerLocation, setProviderLocation] = useState<Location | null>(null);
 	const [eta,            setEta]            = useState<number | null>(null);
 	const [searchTimedOut, setSearchTimedOut] = useState(false);
+	const [travelFee,      setTravelFee]      = useState<number>(0);
+	const [searchMessage,  setSearchMessage]  = useState<string | null>(null);
 	const { user } = useAuth();
 
 	const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -59,6 +63,8 @@ export const JobProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 		setJob(initialJobState);
 		setProviderLocation(null);
 		setEta(null);
+		setTravelFee(0);
+		setSearchMessage(null);
 	}, [clearSearchTimeout]);
 
 	useEffect(() => {
@@ -70,6 +76,7 @@ export const JobProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 		const handleProviderAssigned = (data: { jobId: string; provider: Provider }) => {
 			clearSearchTimeout();
 			setSearchTimedOut(false);
+			setSearchMessage(null);
 			socketClient.emit("join-job", data.jobId);
 			setJob(prev => ({
 				...prev,
@@ -92,18 +99,60 @@ export const JobProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 			if (data.eta) setEta(data.eta);
 		};
 
-		const handleJobCompleted = (data: { finalPrice: number }) => {
-			setJob(prev => ({ ...prev, status: "payment", finalPrice: data.finalPrice }));
+		const handleJobCompleted = (data: { finalPrice: number | null }) => {
+			setJob(prev => ({ ...prev, status: "payment", finalPrice: data.finalPrice ?? undefined }));
+		};
+
+		// Driver marked ARRIVED or IN_PROGRESS — update job status so UI can reflect it
+		const handleJobStatusUpdated = (data: { jobId: string; status: string }) => {
+			if (data.status === "arrived" || data.status === "in_progress") {
+				setJob(prev => ({ ...prev, status: data.status as JobStatus }));
+			}
+		};
+
+		// Dispatch radius expanded — update price and search message
+		const handleExpandingRadius = (data: {
+			jobId: string;
+			stage: number;
+			radiusKm: number;
+			travelFee: number;
+			currentPrice: number;
+			message: string;
+		}) => {
+			setTravelFee(data.travelFee);
+			setSearchMessage(data.message);
+			setJob(prev => ({
+				...prev,
+				currentPrice:  data.currentPrice,
+				travelFee:     data.travelFee,
+				searchMessage: data.message,
+				dispatchStage: data.stage,
+				currentRadius: data.radiusKm,
+			}));
+		};
+
+		// No drivers found after all stages exhausted
+		const handleNoDriverFound = (data: { jobId: string; message: string }) => {
+			clearSearchTimeout();
+			setSearchTimedOut(true);
+			setSearchMessage(data.message);
+			setJob(prev => ({ ...prev, status: "idle" }));
 		};
 
 		socketClient.on("provider-assigned",      handleProviderAssigned);
 		socketClient.on("driver-location-updated", handleLocationUpdate);
 		socketClient.on("job-completed",           handleJobCompleted);
+		socketClient.on("job-status-updated",      handleJobStatusUpdated);
+		socketClient.on("job-expanding-radius",    handleExpandingRadius);
+		socketClient.on("job-no-driver-found",     handleNoDriverFound);
 
 		return () => {
 			socketClient.off("provider-assigned",      handleProviderAssigned);
 			socketClient.off("driver-location-updated", handleLocationUpdate);
 			socketClient.off("job-completed",           handleJobCompleted);
+			socketClient.off("job-status-updated",      handleJobStatusUpdated);
+			socketClient.off("job-expanding-radius",    handleExpandingRadius);
+			socketClient.off("job-no-driver-found",     handleNoDriverFound);
 		};
 	}, [clearSearchTimeout]);
 
@@ -133,32 +182,29 @@ export const JobProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 		if (!job.customerLocation || !job.serviceType || !user) return;
 
 		setSearchTimedOut(false);
+		setSearchMessage(null);
+		setTravelFee(0);
 		setJob(prev => ({ ...prev, status: "searching" }));
 
 		try {
-			// BUG WAS: sent pickupLatitude/pickupLongitude without address or price.
-			// Backend PostGIS model expects these field names.
-			// We also send pickupAddress so drivers see the human-readable location,
-			// and estimatedCost so the receipt shows the right price.
 			const response = await api.post<any>("/jobs", {
 				serviceType:    job.serviceType,
 				pickupLatitude:  job.customerLocation.latitude,
 				pickupLongitude: job.customerLocation.longitude,
-				pickupAddress:   job.customerLocation.address ?? null,   // ← NEW
-				estimatedCost:   job.estimatedPrice            ?? null,   // ← NEW
+				pickupAddress:   job.customerLocation.address ?? null,
+				estimatedCost:   job.estimatedPrice            ?? null,
 				notes:           job.notes                     ?? null,
 			});
 
 			// Backend returns { message, job: { id, ... } }
-			// BUG WAS: response.data.data?.id was never found — field is response.data.job.id
 			const jobId =
 				response.data.job?.id ??
 				response.data.id      ??
-				response.data.data?.id;   // fallback for any legacy shape
+				response.data.data?.id;
 
 			setJob(prev => ({ ...prev, id: jobId }));
 
-			// "No drivers" timeout — cancel silently if nobody accepts
+			// Fallback timeout in case dispatchService's job-no-driver-found is missed
 			searchTimeoutRef.current = setTimeout(async () => {
 				setJob(current => {
 					if (current.status !== "searching") return current;
@@ -198,6 +244,8 @@ export const JobProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 			value={{
 				job,
 				searchTimedOut,
+				travelFee,
+				searchMessage,
 				setJobStatus,
 				selectService,
 				setCustomerLocation,

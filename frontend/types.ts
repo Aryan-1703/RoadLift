@@ -77,7 +77,7 @@ export interface Provider {
 	name: string;
 	rating: number;
 	vehicle: string;
-	location: Location;
+	location: Location | null;
 	phone?: string; // ← needed for call button in LiveTrackingScreen
 }
 
@@ -87,6 +87,8 @@ export type JobStatus =
 	| "confirming"
 	| "searching"
 	| "tracking"
+	| "arrived"      // driver has arrived at customer location
+	| "in_progress"  // service actively being performed
 	| "completed"
 	| "payment"
 	| "rating";
@@ -103,7 +105,13 @@ export interface Job {
 	// Customer-facing fields
 	provider?: Provider;
 	estimatedPrice?: number;
+	currentPrice?: number;  // estimatedPrice + travelFee for current dispatch stage
+	travelFee?: number;     // extra fee added as search radius expands
 	finalPrice?: number;
+	// Dispatch search state
+	searchMessage?: string; // shown while searching ("Expanding to 10 km...")
+	dispatchStage?: number;
+	currentRadius?: number;
 }
 
 // --- Admin / Settings Types ---

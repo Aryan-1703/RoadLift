@@ -17,6 +17,8 @@ export const JobFlowScreen = () => {
 			return <RequestConfirmationScreen />;
 		case "searching":
 		case "tracking":
+		case "arrived":
+		case "in_progress":
 			return <LiveTrackingScreen />;
 		case "payment":
 			return <PaymentScreen />;

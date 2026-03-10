@@ -39,6 +39,12 @@ function normalizeJob(job) {
 			: null,
 
 		estimatedPrice: raw.estimatedCost != null ? parseFloat(raw.estimatedCost) : null,
+		currentPrice:   raw.currentPrice  != null ? parseFloat(raw.currentPrice)  : null,
+		travelFee:      raw.currentPrice  != null && raw.estimatedCost != null
+			? Math.max(0, parseFloat(raw.currentPrice) - parseFloat(raw.estimatedCost))
+			: 0,
+		dispatchStage:  raw.dispatchStage  ?? 0,
+		currentRadius:  raw.currentRadius  ?? 5,
 		finalPrice: raw.finalCost != null ? parseFloat(raw.finalCost) : null,
 
 		customerId: raw.userId ?? null,
@@ -111,11 +117,7 @@ async function acceptJob(jobId, driverId) {
 		job.status = "accepted";
 		await job.save({ transaction: t });
 
-		io.to(String(job.userId)).emit("job-accepted", {
-			jobId: job.id,
-			message: "A driver has accepted your request and is on the way!",
-			driverId,
-		});
+		// Broadcast to other drivers that this job is taken
 		io.to("drivers").emit("job-taken", { jobId: job.id });
 
 		return job;
@@ -125,6 +127,32 @@ async function acceptJob(jobId, driverId) {
 	const jobWithCustomer = await Job.findByPk(result.id, {
 		include: [CUSTOMER_INCLUDE],
 	});
+
+	// Fetch driver info so we can send a rich provider-assigned event to the customer
+	const driver = await User.findByPk(driverId, {
+		attributes: ["id", "name", "phoneNumber"],
+	});
+	const driverProfileRecord = await DriverProfile.findOne({
+		where: { userId: driverId },
+	});
+
+	// Stop dispatch timers — job is no longer available
+	const { stopDispatch } = require("./dispatchService");
+	stopDispatch(result.id);
+
+	// Emit "provider-assigned" — matches the event name the frontend JobContext listens for
+	io.to(String(result.userId)).emit("provider-assigned", {
+		jobId: String(result.id),
+		provider: {
+			id:       String(driverId),
+			name:     driver?.name     ?? "Driver",
+			phone:    driver?.phoneNumber ?? null,
+			vehicle:  driverProfileRecord?.vehicleType ?? "Tow Truck",
+			rating:   5.0,
+			location: null, // will be populated by driver-location-update events
+		},
+	});
+
 	return normalizeJob(jobWithCustomer);
 }
 
@@ -144,6 +172,7 @@ async function completeJob(jobId, driverId) {
 
 	io.to(String(job.userId)).emit("job-completed", {
 		jobId: job.id,
+		finalPrice: job.finalCost ? parseFloat(String(job.finalCost)) : null,
 		message: "Your service is complete!",
 	});
 
@@ -190,6 +219,10 @@ async function createStripeOnboardingLink(driverId) {
 // notifyAvailableDrivers  (called from jobService via lazy require)
 // ─────────────────────────────────────────────────────────────────────────────
 async function notifyAvailableDrivers(job) {
+	// Real-time broadcast to all drivers connected via socket (online toggle = joined 'drivers' room)
+	io.to("drivers").emit("new-job-available", { jobId: String(job.id) });
+
+	// Push notifications for drivers that are offline / app backgrounded
 	const drivers = await User.findAll({
 		where: {
 			role: "DRIVER",

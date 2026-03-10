@@ -112,7 +112,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
 	const registerUser = async (data: RegisterDTO) => {
 		const endpoint =
-			data.role === "DRIVER" ? "/auth/register/driver" : "/auth/register/user";
+			data.role === "DRIVER" ? "/auth/register/driver" : "/auth/register/customer";
 		const response = await api.post<any>(endpoint, {
 			name: data.name,
 			phoneNumber: data.phone,

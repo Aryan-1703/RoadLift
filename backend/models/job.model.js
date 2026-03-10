@@ -77,6 +77,21 @@ module.exports = sequelize => {
 				type:      DataTypes.INTEGER,
 				allowNull: true,
 			},
+			// Dispatch tracking fields
+			dispatchStage: {
+				type:         DataTypes.INTEGER,
+				allowNull:    true,
+				defaultValue: 0,
+			},
+			currentRadius: {
+				type:         DataTypes.INTEGER,
+				allowNull:    true,
+				defaultValue: 5,
+			},
+			currentPrice: {
+				type:      DataTypes.DECIMAL(10, 2),
+				allowNull: true,
+			},
 		},
 		{
 			tableName: "Jobs",

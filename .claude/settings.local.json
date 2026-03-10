@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e \"const pkg = require\\(''d:/Repo/RoadLift/backend/node_modules/node-fetch/package.json''\\); console.log\\(pkg.version, pkg.type\\)\")",
+      "Bash(node -e \":*)"
+    ]
+  }
+}

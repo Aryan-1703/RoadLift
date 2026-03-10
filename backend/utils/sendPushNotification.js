@@ -1,6 +1,4 @@
-const fetch = (...args) =>
-	import("node-fetch").then(({ default: fetch }) => fetch(...args));
-
+// Node 18+ includes fetch globally — no need for node-fetch
 async function sendPushNotification(expoPushToken, jobDetails) {
 	try {
 		await fetch("https://exp.host/--/api/v2/push/send", {

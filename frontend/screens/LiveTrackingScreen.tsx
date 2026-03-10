@@ -138,6 +138,33 @@ export const LiveTrackingScreen = () => {
 		);
 	}
 
+	// ── Banner config per status ─────────────────────────────────────────────
+	const bannerConfig = (() => {
+		if (job.status === "arrived") {
+			return {
+				label: "DRIVER ARRIVED",
+				etaValue: "Here",
+				etaLabel: "Provider On-Site",
+				badgeColor: colors.green ?? "#059669",
+			};
+		}
+		if (job.status === "in_progress") {
+			return {
+				label: "SERVICE IN PROGRESS",
+				etaValue: "Active",
+				etaLabel: "Work Underway",
+				badgeColor: colors.amber ?? "#F59E0B",
+			};
+		}
+		// default: tracking (en route)
+		return {
+			label: "PROVIDER EN ROUTE",
+			etaValue: eta ? `${eta} min` : "--",
+			etaLabel: "Estimated Arrival",
+			badgeColor: colors.primary,
+		};
+	})();
+
 	// ── Tracking state ───────────────────────────────────────────────────────
 	return (
 		<View style={styles.container}>
@@ -149,15 +176,15 @@ export const LiveTrackingScreen = () => {
 					]}
 				>
 					<Text style={[styles.bannerTitle, { color: colors.textMuted }]}>
-						PROVIDER EN ROUTE
+						{bannerConfig.label}
 					</Text>
 					<View style={styles.bannerRow}>
 						<View>
-							<Text style={[styles.etaText, { color: colors.primary }]}>
-								{eta ? `${eta} min` : "--"}
+							<Text style={[styles.etaText, { color: bannerConfig.badgeColor }]}>
+								{bannerConfig.etaValue}
 							</Text>
 							<Text style={[styles.etaLabel, { color: colors.text }]}>
-								Estimated Arrival
+								{bannerConfig.etaLabel}
 							</Text>
 						</View>
 						<View style={[styles.vehicleBadge, { backgroundColor: colors.background }]}>
