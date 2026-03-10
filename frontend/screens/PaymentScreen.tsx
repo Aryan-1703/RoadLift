@@ -6,9 +6,10 @@ import {
 	ScrollView,
 	ActivityIndicator,
 	TouchableOpacity,
+	Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useStripe } from "@stripe/stripe-react-native";
+import { useStripe, ApplePay, ApplePayButton } from "@stripe/stripe-react-native";
 import { useJob } from "../context/JobContext";
 import { useTheme } from "../context/ThemeContext";
 import { useToast } from "../context/ToastContext";
@@ -38,6 +39,7 @@ export const PaymentScreen = () => {
 	const { colors } = useTheme();
 	const { showToast } = useToast();
 	const { initPaymentSheet, presentPaymentSheet } = useStripe();
+	const { isApplePaySupported, presentApplePay, confirmApplePayPayment } = useApplePay();
 
 	const [isProcessing, setIsProcessing] = useState(false);
 	const [isLoadingCard, setIsLoadingCard] = useState(true);
@@ -113,7 +115,72 @@ export const PaymentScreen = () => {
 				return;
 			}
 
-			// 4. Payment succeeded — move to rating
+			// 4. Payment succeeded — confirm on backend then move to rating
+			await api.post("/payments/confirm-payment", {
+				jobId:  job.id,
+				amount: Math.round(total * 100),
+			});
+			showToast("Payment successful! 🎉", "success");
+			setJobStatus("rating");
+		} catch (err: any) {
+			const msg =
+				err?.response?.data?.message ||
+				err?.message ||
+				"Payment failed. Please try again.";
+			showToast(msg, "error");
+		} finally {
+			setIsProcessing(false);
+		}
+	};
+
+	// ── Apple Pay ────────────────────────────────────────────────────────────
+	const handleApplePay = async () => {
+		setIsProcessing(true);
+		try {
+			const { error: presentError } = await presentApplePay({
+				cartItems: [
+					{
+						label: service?.title ?? "Roadside Service",
+						amount: subtotal.toFixed(2),
+						paymentType: "Immediate",
+					},
+					{
+						label: "Taxes & Fees (13%)",
+						amount: tax.toFixed(2),
+						paymentType: "Immediate",
+					},
+					{
+						label: "RoadLift",
+						amount: total.toFixed(2),
+						paymentType: "Immediate",
+					},
+				],
+				country: "CA",
+				currency: "CAD",
+			});
+
+			if (presentError) {
+				if (presentError.code !== "Canceled") {
+					showToast(presentError.message || "Apple Pay failed", "error");
+				}
+				return;
+			}
+
+			// Create PaymentIntent after Apple Pay sheet is authorised
+			const intentRes = await api.post<{ paymentIntentClientSecret: string }>(
+				"/payments/create-payment-intent",
+				{ jobId: job.id, amount: Math.round(total * 100) },
+			);
+
+			const { error: confirmError } = await confirmApplePayPayment(
+				intentRes.data.paymentIntentClientSecret,
+			);
+
+			if (confirmError) {
+				showToast(confirmError.message || "Payment failed", "error");
+				return;
+			}
+
 			showToast("Payment successful! 🎉", "success");
 			setJobStatus("rating");
 		} catch (err: any) {
@@ -248,8 +315,25 @@ export const PaymentScreen = () => {
 
 			{/* CTA */}
 			<View style={[styles.footer, { backgroundColor: colors.background }]}>
+				{Platform.OS === "ios" && isApplePaySupported && (
+					<>
+						<ApplePayButton
+							onPress={handleApplePay}
+							type="plain"
+							buttonStyle="automatic"
+							borderRadius={12}
+							style={[styles.applePayBtn, { opacity: isProcessing ? 0.5 : 1 }]}
+							disabled={isProcessing}
+						/>
+						<View style={styles.dividerRow}>
+							<View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+							<Text style={[styles.dividerText, { color: colors.textMuted }]}>or</Text>
+							<View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+						</View>
+					</>
+				)}
 				<PrimaryButton
-					title={isProcessing ? "Processing…" : `Pay $${total.toFixed(2)}`}
+					title={isProcessing ? "Processing…" : `Pay with Card  $${total.toFixed(2)}`}
 					onPress={handlePayment}
 					isLoading={isProcessing}
 					disabled={isLoadingCard || isProcessing || !defaultCard}
@@ -318,4 +402,12 @@ const styles = StyleSheet.create({
 		justifyContent: "center",
 	},
 	footer: { padding: 16, paddingBottom: 32 },
+	applePayBtn: { height: 50, marginBottom: 12 },
+	dividerRow: {
+		flexDirection: "row",
+		alignItems: "center",
+		marginBottom: 12,
+	},
+	dividerLine: { flex: 1, height: 1 },
+	dividerText: { marginHorizontal: 12, fontSize: 13 },
 });

@@ -1,5 +1,6 @@
 const paymentService = require("../services/paymentService");
-const { User } = require("../models");
+const { User, Job } = require("../models");
+const io = require("../socket");
 
 const createSetupIntent = async (req, res) => {
 	try {
@@ -61,10 +62,44 @@ const createPaymentIntent = async (req, res) => {
 	}
 };
 
+// Called by PaymentScreen after Stripe Payment Sheet succeeds — records finalCost
+// and notifies the driver via socket that payment was received.
+const confirmPayment = async (req, res) => {
+	try {
+		const { jobId, amount } = req.body; // amount in cents
+		if (!jobId) return res.status(400).json({ message: "jobId is required." });
+
+		const job = await Job.findByPk(jobId);
+		if (!job) return res.status(404).json({ message: "Job not found." });
+		if (job.userId !== req.user.id)
+			return res.status(403).json({ message: "Forbidden." });
+
+		// Persist the final paid amount (cents → dollars)
+		if (amount && !job.finalCost) {
+			job.finalCost = (Number(amount) / 100).toFixed(2);
+			await job.save();
+		}
+
+		// Notify driver in real time
+		if (job.driverId) {
+			io.to(String(job.driverId)).emit("payment-received", {
+				jobId:  String(job.id),
+				amount: parseFloat(job.finalCost ?? job.estimatedCost ?? "0"),
+			});
+		}
+
+		return res.status(200).json({ message: "Payment confirmed." });
+	} catch (error) {
+		console.error("Error confirming payment:", error);
+		return res.status(500).json({ message: "Failed to confirm payment." });
+	}
+};
+
 module.exports = {
 	createSetupIntent,
 	getPaymentMethods,
 	setAsDefault,
 	deletePaymentMethod,
 	createPaymentIntent,
+	confirmPayment,
 };
