@@ -11,6 +11,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useDriver } from "../context/DriverContext";
 import { useTheme } from "../context/ThemeContext";
 import { Card } from "../components/Card";
+import { Skeleton } from "../components/Skeleton";
 import { Ionicons } from "@expo/vector-icons";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { useNavigation } from "@react-navigation/native";
@@ -29,10 +30,20 @@ export const DriverDashboardScreen = () => {
 	const { colors, isDarkMode } = useTheme();
 	const navigation = useNavigation<any>();
 	const [refreshing, setRefreshing] = useState(false);
+	const [checkingForJobs, setCheckingForJobs] = useState(false);
 
 	useEffect(() => {
 		fetchEarnings();
 	}, [fetchEarnings]);
+
+	// When going online, briefly show skeleton cards while jobs load in
+	useEffect(() => {
+		if (isOnline) {
+			setCheckingForJobs(true);
+			const t = setTimeout(() => setCheckingForJobs(false), 1800);
+			return () => clearTimeout(t);
+		}
+	}, [isOnline]);
 
 	const onRefresh = async () => {
 		setRefreshing(true);
@@ -41,10 +52,10 @@ export const DriverDashboardScreen = () => {
 		setRefreshing(false);
 	};
 
-	const onlineColor = isDarkMode ? "#34d399" : "#0B7B56";
-	const onlineBg = isDarkMode ? "rgba(52,211,153,0.12)" : "rgba(11,123,86,0.08)";
-	const onlineBorder = isDarkMode ? "rgba(52,211,153,0.25)" : "rgba(11,123,86,0.18)";
-	const offlineBg = isDarkMode ? "rgba(255,255,255,0.05)" : "rgba(27,25,22,0.05)";
+	const onlineColor  = colors.green;
+	const onlineBg     = colors.greenBg;
+	const onlineBorder = colors.greenBorder;
+	const offlineBg    = isDarkMode ? "rgba(255,255,255,0.05)" : "rgba(27,25,22,0.05)";
 	const offlineBorder = colors.border;
 
 	return (
@@ -189,7 +200,23 @@ export const DriverDashboardScreen = () => {
 							Switch online to see available requests in your area.
 						</Text>
 					</View>
-				) : availableJobs.length === 0 ? (
+				) : checkingForJobs ? (
+				<>
+					{[0, 1].map(i => (
+						<View key={i} style={[styles.skeletonCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+							<View style={styles.skeletonHeader}>
+								<Skeleton style={styles.skeletonBadge} />
+								<Skeleton style={styles.skeletonPrice} />
+							</View>
+							<View style={styles.skeletonRow}>
+								<Skeleton style={styles.skeletonDot} />
+								<Skeleton style={styles.skeletonLine} />
+							</View>
+							<Skeleton style={styles.skeletonBtn} />
+						</View>
+					))}
+				</>
+			) : availableJobs.length === 0 ? (
 					<View style={[styles.emptyState, { borderColor: colors.border }]}>
 						<View style={[styles.emptyIcon, { backgroundColor: colors.surface }]}>
 							<Ionicons name="search-outline" size={32} color={colors.textMuted} />
@@ -384,4 +411,19 @@ const styles = StyleSheet.create({
 	},
 	jobAddress: { flex: 1, fontSize: 13, lineHeight: 18, paddingTop: 5 },
 	acceptBtn: { marginTop: 0 },
+
+	// Skeleton cards
+	skeletonCard: {
+		borderRadius: 20,
+		borderWidth: 1,
+		padding: 16,
+		marginBottom: 12,
+	},
+	skeletonHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
+	skeletonBadge:  { height: 28, width: 110, borderRadius: 10 },
+	skeletonPrice:  { height: 28, width: 60, borderRadius: 8 },
+	skeletonRow:    { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 16 },
+	skeletonDot:    { width: 28, height: 28, borderRadius: 8, flexShrink: 0 },
+	skeletonLine:   { flex: 1, height: 16, borderRadius: 6 },
+	skeletonBtn:    { height: 46, borderRadius: 12 },
 });

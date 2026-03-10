@@ -189,7 +189,7 @@ export const ActiveJobScreen = () => {
 								styles.callBtn,
 								{
 									backgroundColor: customerPhone
-										? "#10B98120"
+										? colors.greenBg
 										: colors.border,
 								},
 							]}
@@ -199,7 +199,7 @@ export const ActiveJobScreen = () => {
 							<Ionicons
 								name="call"
 								size={20}
-								color={customerPhone ? "#10B981" : colors.textMuted}
+								color={customerPhone ? colors.green : colors.textMuted}
 							/>
 						</TouchableOpacity>
 					</View>

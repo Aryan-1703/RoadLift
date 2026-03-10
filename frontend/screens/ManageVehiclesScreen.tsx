@@ -6,6 +6,7 @@ import {
 	FlatList,
 	TouchableOpacity,
 	ActivityIndicator,
+	Alert,
 	Modal,
 	TextInput,
 	KeyboardAvoidingView,
@@ -65,6 +66,17 @@ export const ManageVehiclesScreen = () => {
 		} finally {
 			setLoading(false);
 		}
+	};
+
+	const confirmDelete = (id: string | number, name: string) => {
+		Alert.alert(
+			"Remove Vehicle",
+			`Remove ${name} from your vehicles?`,
+			[
+				{ text: "Cancel", style: "cancel" },
+				{ text: "Remove", style: "destructive", onPress: () => deleteVehicle(id) },
+			],
+		);
 	};
 
 	const deleteVehicle = async (id: string | number) => {
@@ -133,12 +145,12 @@ export const ManageVehiclesScreen = () => {
 						{item.year} {item.make} {item.model}
 					</Text>
 					{item.isDefault && (
-						<View style={styles.badge}>
-							<Text style={styles.badgeText}>Default</Text>
+						<View style={[styles.badge, { backgroundColor: colors.accentBg }]}>
+							<Text style={[styles.badgeText, { color: colors.accentText }]}>Default</Text>
 						</View>
 					)}
 				</View>
-				<TouchableOpacity onPress={() => deleteVehicle(item.id)}>
+				<TouchableOpacity onPress={() => confirmDelete(item.id, item.year + " " + item.make + " " + item.model)}>
 					<Ionicons name="trash-outline" size={20} color={colors.danger} />
 				</TouchableOpacity>
 			</View>
@@ -165,7 +177,7 @@ export const ManageVehiclesScreen = () => {
 			) : (
 				<FlatList
 					data={vehicles}
-					keyExtractor={item => item.id}
+					keyExtractor={item => String(item.id)}
 					renderItem={renderItem}
 					contentContainerStyle={styles.listContent}
 					ListEmptyComponent={
@@ -308,13 +320,12 @@ const styles = StyleSheet.create({
 	titleRow: { flexDirection: "row", alignItems: "center" },
 	vehicleTitle: { fontSize: 16, fontWeight: "bold" },
 	badge: {
-		backgroundColor: "#DBEAFE",
 		paddingHorizontal: 6,
 		paddingVertical: 2,
 		borderRadius: 4,
 		marginLeft: 8,
 	},
-	badgeText: { color: "#1E40AF", fontSize: 10, fontWeight: "bold" },
+	badgeText: { fontSize: 10, fontWeight: "bold" },
 	vehicleDetails: { fontSize: 14, marginBottom: 8 },
 	setDefaultBtn: { marginTop: 8, alignSelf: "flex-start" },
 	setDefaultText: { fontSize: 14, fontWeight: "600" },

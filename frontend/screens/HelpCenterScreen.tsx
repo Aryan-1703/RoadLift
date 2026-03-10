@@ -5,6 +5,7 @@ import {
 	StyleSheet,
 	ScrollView,
 	TouchableOpacity,
+	TextInput,
 	Linking,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -86,11 +87,20 @@ const FaqRow: React.FC<{ item: FaqItem }> = ({ item }) => {
 
 export const HelpCenterScreen = () => {
 	const { colors } = useTheme();
+	const [query, setQuery] = useState("");
 
 	const handleEmail = () =>
 		Linking.openURL("mailto:support@roadlift.com?subject=RoadLift Support").catch(() => {});
 	const handlePhone = () =>
 		Linking.openURL("tel:18007623454").catch(() => {}); // 1-800-ROADLIFT
+
+	const filteredFAQ = query.trim()
+		? FAQ.filter(
+				item =>
+					item.q.toLowerCase().includes(query.toLowerCase()) ||
+					item.a.toLowerCase().includes(query.toLowerCase()),
+		  )
+		: FAQ;
 
 	return (
 		<SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -105,17 +115,43 @@ export const HelpCenterScreen = () => {
 					<Text style={[styles.heroSub, { color: colors.textMuted }]}>
 						Find answers below or reach our team directly.
 					</Text>
+					{/* Search */}
+					<View style={[styles.searchWrap, { backgroundColor: colors.card, borderColor: colors.border }]}>
+						<Ionicons name="search-outline" size={16} color={colors.textMuted} style={{ marginRight: 8 }} />
+						<TextInput
+							style={[styles.searchInput, { color: colors.text }]}
+							placeholder="Search FAQs…"
+							placeholderTextColor={colors.textMuted}
+							value={query}
+							onChangeText={setQuery}
+							returnKeyType="search"
+						/>
+						{query.length > 0 && (
+							<TouchableOpacity onPress={() => setQuery("")} activeOpacity={0.7}>
+								<Ionicons name="close-circle" size={16} color={colors.textMuted} />
+							</TouchableOpacity>
+						)}
+					</View>
 				</View>
 
 				{/* FAQ */}
 				<Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
-					FREQUENTLY ASKED QUESTIONS
+					{query.trim() ? `${filteredFAQ.length} RESULT${filteredFAQ.length !== 1 ? "S" : ""}` : "FREQUENTLY ASKED QUESTIONS"}
 				</Text>
-				<View style={[styles.faqCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-					{FAQ.map((item, i) => (
-						<FaqRow key={i} item={item} />
-					))}
-				</View>
+				{filteredFAQ.length > 0 ? (
+					<View style={[styles.faqCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+						{filteredFAQ.map((item, i) => (
+							<FaqRow key={i} item={item} />
+						))}
+					</View>
+				) : (
+					<View style={[styles.noResults, { backgroundColor: colors.card, borderColor: colors.border }]}>
+						<Ionicons name="search-outline" size={28} color={colors.textMuted} />
+						<Text style={[styles.noResultsText, { color: colors.textMuted }]}>
+							No results for "{query}"
+						</Text>
+					</View>
+				)}
 
 				{/* Contact */}
 				<Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
@@ -227,4 +263,25 @@ const styles = StyleSheet.create({
 	contactValue: { fontSize: 15, fontWeight: "600" },
 	divider:      { height: 1, marginLeft: 74 },
 	note:         { fontSize: 12, textAlign: "center", lineHeight: 18 },
+	searchWrap: {
+		flexDirection: "row",
+		alignItems: "center",
+		borderWidth: 1,
+		borderRadius: 12,
+		paddingHorizontal: 12,
+		paddingVertical: 10,
+		marginTop: 16,
+		width: "100%",
+	},
+	searchInput: { flex: 1, fontSize: 14 },
+	noResults: {
+		alignItems: "center",
+		justifyContent: "center",
+		gap: 10,
+		padding: 36,
+		borderRadius: 16,
+		borderWidth: 1,
+		marginBottom: 28,
+	},
+	noResultsText: { fontSize: 14, textAlign: "center" },
 });

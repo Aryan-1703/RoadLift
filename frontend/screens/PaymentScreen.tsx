@@ -185,8 +185,8 @@ export const PaymentScreen = () => {
 			<ScrollView contentContainerStyle={styles.content}>
 				{/* Header */}
 				<View style={styles.header}>
-					<View style={[styles.iconBox, { backgroundColor: "#D1FAE5" }]}>
-						<Ionicons name="checkmark-circle" size={48} color="#059669" />
+					<View style={[styles.iconBox, { backgroundColor: colors.greenBg }]}>
+						<Ionicons name="checkmark-circle" size={48} color={colors.green} />
 					</View>
 					<Text style={[styles.title, { color: colors.text }]}>Job Completed</Text>
 					<Text style={[styles.subtitle, { color: colors.textMuted }]}>
