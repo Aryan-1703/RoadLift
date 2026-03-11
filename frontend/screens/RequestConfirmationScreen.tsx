@@ -30,7 +30,7 @@ export const RequestConfirmationScreen = () => {
 
   const [allCards, setAllCards]           = useState<PaymentMethod[]>([]);
   const [selectedCard, setSelectedCard]   = useState<PaymentMethod | null>(null);
-  const [paymentMode, setPaymentMode]     = useState<PaymentMode>('card');
+  const [paymentMode, setPaymentMode]     = useState<PaymentMode>(Platform.OS === 'ios' ? 'apple_pay' : 'card');
   const [showPicker, setShowPicker]       = useState(false);
 
   // Stores the paymentIntentId created before Apple Pay sheet opens
@@ -64,12 +64,12 @@ export const RequestConfirmationScreen = () => {
       .finally(() => setIsLoadingCard(false));
   }, []);
 
-  // Default to Apple Pay on iOS when no cards saved
+  // Default to Apple Pay on iOS whenever it's supported
   useEffect(() => {
-    if (Platform.OS === 'ios' && applePaySupported && !isLoadingCard && allCards.length === 0) {
+    if (Platform.OS === 'ios' && applePaySupported) {
       setPaymentMode('apple_pay');
     }
-  }, [applePaySupported, isLoadingCard, allCards.length]);
+  }, [applePaySupported]);
 
   // ── Confirm ────────────────────────────────────────────────────────────────
   const handleConfirm = async () => {
