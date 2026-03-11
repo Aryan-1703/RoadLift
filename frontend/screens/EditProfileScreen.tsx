@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { useToast } from "../context/ToastContext";
@@ -582,6 +583,7 @@ export const EditProfileScreen = () => {
 							: user?.driverProfile,
 				};
 				setUser(updated);
+				await AsyncStorage.setItem("@roadlift_user", JSON.stringify(updated));
 				showToast("Profile updated!", "success");
 				navigation.goBack();
 			}
@@ -605,13 +607,16 @@ export const EditProfileScreen = () => {
 		setTimeout(() => setShowOtpModal(true), 350);
 	};
 
-	const handleOtpSuccess = (type: "phone" | "email", newValue: string) => {
+	const handleOtpSuccess = async (type: "phone" | "email", newValue: string) => {
 		setShowOtpModal(false);
 		setPendingNewValue(null);
 
 		const updated =
-			type === "phone" ? { ...user!, phone: newValue } : { ...user!, email: newValue };
+			type === "phone"
+				? { ...user!, phone: newValue, phoneNumber: newValue }
+				: { ...user!, email: newValue };
 		setUser(updated);
+		await AsyncStorage.setItem("@roadlift_user", JSON.stringify(updated));
 		showToast(
 			type === "phone" ? "Phone number updated!" : "Email address updated!",
 			"success",

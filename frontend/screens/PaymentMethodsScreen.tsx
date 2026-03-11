@@ -97,8 +97,18 @@ export const PaymentMethodsScreen = () => {
 			}
 
 			// 4. Card saved — reload the list
+			const freshRes = await api.get<PaymentMethod[]>("/payments/methods");
+			const freshMethods = Array.isArray(freshRes.data) ? freshRes.data : [];
+			setPayments(freshMethods);
+
+			// Auto-set as default if no default exists yet (e.g. first card added)
+			if (freshMethods.length > 0 && !freshMethods.some(m => m.isDefault)) {
+				const newDefaultId = freshMethods[0].id;
+				await api.put("/payments/set-default", { paymentMethodId: newDefaultId });
+				setPayments(freshMethods.map(m => ({ ...m, isDefault: m.id === newDefaultId })));
+			}
+
 			showToast("Card added successfully!", "success");
-			await loadPayments();
 		} catch (e: any) {
 			showToast(e?.response?.data?.message || "Failed to add card", "error");
 		} finally {

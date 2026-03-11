@@ -1,10 +1,11 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { View, ActivityIndicator } from "react-native";
-import { NavigationContainer } from "@react-navigation/native";
+import { NavigationContainer, NavigationContainerRef } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { StripeProvider } from "@stripe/stripe-react-native";
+import * as Notifications from "expo-notifications";
 
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { JobProvider } from "./context/JobContext";
@@ -69,6 +70,29 @@ const RootNavigator = () => {
 };
 
 export default function App() {
+	const navigationRef = useRef<NavigationContainerRef<any>>(null);
+
+	useEffect(() => {
+		// Handle notification taps while the app is running (foreground/background)
+		const subscription = Notifications.addNotificationResponseReceivedListener(response => {
+			const data = response.notification.request.content.data as any;
+			if (data?.screen === "DriverDashboardScreen" && navigationRef.current) {
+				navigationRef.current.navigate("DriverFlow");
+			}
+		});
+
+		// Handle cold-start: app opened by tapping a notification
+		Notifications.getLastNotificationResponseAsync().then(response => {
+			if (!response) return;
+			const data = response.notification.request.content.data as any;
+			if (data?.screen === "DriverDashboardScreen" && navigationRef.current) {
+				navigationRef.current.navigate("DriverFlow");
+			}
+		});
+
+		return () => subscription.remove();
+	}, []);
+
 	return (
 		<GestureHandlerRootView style={{ flex: 1 }}>
 			<SafeAreaProvider>
@@ -82,7 +106,7 @@ export default function App() {
 							<AuthProvider>
 								<JobProvider>
 									<DriverProvider>
-										<NavigationContainer>
+										<NavigationContainer ref={navigationRef}>
 											<RootNavigator />
 										</NavigationContainer>
 									</DriverProvider>

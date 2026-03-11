@@ -3,7 +3,22 @@ const { User } = require("../models");
 
 // ── Ensure Stripe Customer exists, return their ID ────────────────────────────
 async function ensureStripeCustomer(user) {
-	if (user.stripeCustomerId) return user.stripeCustomerId;
+	if (user.stripeCustomerId) {
+		// Verify the customer still exists in Stripe (guards against stale IDs
+		// after key rotation or test-data cleanup)
+		try {
+			await stripe.customers.retrieve(user.stripeCustomerId);
+			return user.stripeCustomerId;
+		} catch (err) {
+			if (err?.raw?.code === "resource_missing") {
+				// Stale ID — fall through to create a new customer below
+				user.stripeCustomerId = null;
+				await User.update({ stripeCustomerId: null, defaultPaymentMethodId: null }, { where: { id: user.id } });
+			} else {
+				throw err;
+			}
+		}
+	}
 
 	const customer = await stripe.customers.create({
 		name: user.name,
@@ -13,7 +28,7 @@ async function ensureStripeCustomer(user) {
 	});
 
 	await User.update({ stripeCustomerId: customer.id }, { where: { id: user.id } });
-	user.stripeCustomerId = customer.id; // update in-memory
+	user.stripeCustomerId = customer.id;
 	return customer.id;
 }
 
@@ -160,8 +175,32 @@ async function createPaymentIntentForJob(job, customerUser) {
 async function authorizePayment(job, customer) {
 	const customerId = await ensureStripeCustomer(customer);
 
-	if (!customer.defaultPaymentMethodId) {
+	let paymentMethodId = customer.defaultPaymentMethodId;
+
+	if (!paymentMethodId) {
+		// Tier 1: check Stripe customer's invoice default
+		try {
+			const stripeCustomer = await stripe.customers.retrieve(customerId);
+			paymentMethodId = stripeCustomer.invoice_settings?.default_payment_method ?? null;
+		} catch (e) { /* ignore — fall through to Tier 2 */ }
+	}
+
+	if (!paymentMethodId) {
+		// Tier 2: use any attached card on the customer
+		try {
+			const pmList = await stripe.paymentMethods.list({ customer: customerId, type: "card", limit: 1 });
+			paymentMethodId = pmList.data[0]?.id ?? null;
+		} catch (e) { /* ignore — fall through to error */ }
+	}
+
+	if (!paymentMethodId) {
 		throw new Error("NO_PAYMENT_METHOD");
+	}
+
+	// Sync the resolved PM back to DB so future requests skip the fallback
+	if (paymentMethodId !== customer.defaultPaymentMethodId) {
+		await User.update({ defaultPaymentMethodId: paymentMethodId }, { where: { id: customer.id } });
+		customer.defaultPaymentMethodId = paymentMethodId;
 	}
 
 	// Authorize estimated cost + 13% tax (in cents)
@@ -169,11 +208,30 @@ async function authorizePayment(job, customer) {
 		? Math.round(parseFloat(job.estimatedCost) * 1.13 * 100)
 		: 5000;
 
+	// Ensure the PM is attached to this customer before off-session use.
+	// If it was ever used without a customer it becomes unattachable — surface
+	// a friendly error so the user knows to remove and re-add their card.
+	try {
+		await stripe.paymentMethods.attach(customer.defaultPaymentMethodId, {
+			customer: customerId,
+		});
+	} catch (attachErr) {
+		if (attachErr?.raw?.code !== "payment_method_already_attached") {
+			const err = new Error(
+				"Your saved card could not be used. Please remove it and add it again.",
+			);
+			err.isPaymentError = true;
+			throw err;
+		}
+		// already attached to this customer — that's the expected happy path
+	}
+
 	const paymentIntent = await stripe.paymentIntents.create({
 		amount:                   estimatedCents,
 		currency:                 "cad",
 		customer:                 customerId,
 		payment_method:           customer.defaultPaymentMethodId,
+		payment_method_types:     ["card"],
 		capture_method:           "manual",
 		confirm:                  true,
 		off_session:              true,

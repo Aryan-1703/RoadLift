@@ -29,10 +29,7 @@ async function createJob(body, userId) {
 	if (!pickupLongitude) throw new Error("pickupLongitude is required.");
 
 	const customer = await User.findByPk(userId);
-	// If no Apple Pay pre-auth, customer needs a saved default card
-	if (!preAuthorizedIntentId && !customer?.defaultPaymentMethodId) {
-		throw new Error("NO_PAYMENT_METHOD");
-	}
+	if (!customer) throw new Error("User not found.");
 
 	const pickupLocation = {
 		type: "Point",

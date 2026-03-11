@@ -100,8 +100,13 @@ export const JobProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 			if (data.eta) setEta(data.eta);
 		};
 
-		const handleJobCompleted = (data: { finalPrice: number | null }) => {
-			setJob(prev => ({ ...prev, status: "payment", finalPrice: data.finalPrice ?? undefined }));
+		const handleJobCompleted = (data: { finalPrice: number | null; capturedTotal: number | null }) => {
+			setJob(prev => ({
+				...prev,
+				status:        "payment",
+				finalPrice:    data.finalPrice    ?? undefined,
+				capturedTotal: data.capturedTotal ?? undefined,
+			}));
 		};
 
 		// Driver marked ARRIVED or IN_PROGRESS — update job status so UI can reflect it

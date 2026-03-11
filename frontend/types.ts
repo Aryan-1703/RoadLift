@@ -108,6 +108,7 @@ export interface Job {
 	currentPrice?: number;  // estimatedPrice + travelFee for current dispatch stage
 	travelFee?: number;     // extra fee added as search radius expands
 	finalPrice?: number;
+	capturedTotal?: number;  // actual amount charged by Stripe (includes tax); null = capture failed/pending
 	// Dispatch search state
 	searchMessage?: string; // shown while searching ("Expanding to 10 km...")
 	dispatchStage?: number;
