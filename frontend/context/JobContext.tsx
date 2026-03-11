@@ -25,7 +25,7 @@ interface JobContextType {
 	selectService: (type: ServiceTypeId, price: number) => void;
 	setCustomerLocation: (loc: Location) => void;
 	setNotes: (notes: string) => void;
-	requestService: (preAuthorizedIntentId?: string) => Promise<void>;
+	requestService: (preAuthorizedIntentId?: string, vehicleId?: number | string | null) => Promise<void>;
 	cancelJob: () => void;
 	resetJob: () => void;
 	providerLocation: Location | null;
@@ -187,7 +187,7 @@ export const JobProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 	}, []);
 
 	// ── requestService ──────────────────────────────────────────────────────
-	const requestService = useCallback(async (preAuthorizedIntentId?: string) => {
+	const requestService = useCallback(async (preAuthorizedIntentId?: string, vehicleId?: number | string | null) => {
 		if (!job.customerLocation || !job.serviceType || !user) return;
 
 		setSearchTimedOut(false);
@@ -203,6 +203,7 @@ export const JobProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 				pickupAddress:   job.customerLocation.address ?? null,
 				estimatedCost:   job.estimatedPrice            ?? null,
 				notes:           job.notes                     ?? null,
+				vehicleId:       vehicleId ?? user.defaultVehicleId ?? null,
 				...(preAuthorizedIntentId ? { paymentIntentId: preAuthorizedIntentId } : {}),
 			});
 

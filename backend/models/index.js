@@ -44,7 +44,7 @@ db.User.hasMany(db.Vehicle, { foreignKey: "userId" });
 db.Vehicle.belongsTo(db.User, { foreignKey: "userId" });
 
 // Vehicle → Jobs
-db.Vehicle.hasMany(db.Job, { foreignKey: "vehicleId" });
-db.Job.belongsTo(db.Vehicle, { foreignKey: "vehicleId" });
+db.Vehicle.hasMany(db.Job, { foreignKey: "vehicleId", as: "jobs" });
+db.Job.belongsTo(db.Vehicle, { foreignKey: "vehicleId", as: "vehicle" });
 
 module.exports = db;

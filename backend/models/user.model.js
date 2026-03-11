@@ -76,6 +76,12 @@ module.exports = sequelize => {
 				type: DataTypes.INTEGER,
 				allowNull: true,
 			},
+			// Notification preferences — stored as JSONB
+			preferences: {
+				type: DataTypes.JSONB,
+				allowNull: true,
+				defaultValue: null,
+			},
 			// Soft delete / suspension support
 			deletedAt: {
 				type: DataTypes.DATE,

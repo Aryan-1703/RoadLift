@@ -13,6 +13,7 @@ import {
 	Platform,
 	ScrollView,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { useToast } from "../context/ToastContext";
@@ -82,7 +83,25 @@ export const ManageVehiclesScreen = () => {
 	const deleteVehicle = async (id: string | number) => {
 		try {
 			await api.delete(`/vehicles/${id}`);
-			setVehicles(prev => prev.filter(v => String(v.id) !== String(id)));
+			const remaining = vehicles.filter(v => String(v.id) !== String(id));
+			setVehicles(remaining);
+
+			// If we deleted the default, clear it (and auto-set next available)
+			if (String(user?.defaultVehicleId) === String(id)) {
+				const nextDefault = remaining[0] ?? null;
+				if (nextDefault) {
+					await api.put("/vehicles/set-default", { vehicleId: nextDefault.id });
+					const updated = { ...user!, defaultVehicleId: nextDefault.id };
+					setUser(updated);
+					await AsyncStorage.setItem("@roadlift_user", JSON.stringify(updated));
+					setVehicles(remaining.map(v => ({ ...v, isDefault: String(v.id) === String(nextDefault.id) })));
+				} else {
+					const updated = { ...user!, defaultVehicleId: null };
+					setUser(updated as any);
+					await AsyncStorage.setItem("@roadlift_user", JSON.stringify(updated));
+				}
+			}
+
 			showToast("Vehicle deleted", "success");
 		} catch (e) {
 			console.warn("Failed to delete vehicle", e);
@@ -93,13 +112,10 @@ export const ManageVehiclesScreen = () => {
 	const setDefaultVehicle = async (id: string | number) => {
 		try {
 			await api.put("/vehicles/set-default", { vehicleId: id });
-			setUser(prev => (prev ? { ...prev, defaultVehicleId: id } : prev));
-			setVehicles(prev =>
-				prev.map(v => ({
-					...v,
-					isDefault: String(v.id) === String(id),
-				})),
-			);
+			const updated = { ...user!, defaultVehicleId: id };
+			setUser(updated);
+			await AsyncStorage.setItem("@roadlift_user", JSON.stringify(updated));
+			setVehicles(prev => prev.map(v => ({ ...v, isDefault: String(v.id) === String(id) })));
 			showToast("Default vehicle updated", "success");
 		} catch (e) {
 			console.warn("Failed to set default vehicle", e);
@@ -121,9 +137,19 @@ export const ManageVehiclesScreen = () => {
 		setIsSubmitting(true);
 		try {
 			const res = await api.post("/vehicles", newVehicle);
+			const isFirstVehicle = vehicles.length === 0;
+
+			// Auto-set as default if it's the first vehicle
+			if (isFirstVehicle) {
+				await api.put("/vehicles/set-default", { vehicleId: res.data.id });
+				const updated = { ...user!, defaultVehicleId: res.data.id };
+				setUser(updated);
+				await AsyncStorage.setItem("@roadlift_user", JSON.stringify(updated));
+			}
+
 			const addedVehicle = {
 				...res.data,
-				isDefault: String(res.data.id) === String(user?.defaultVehicleId),
+				isDefault: isFirstVehicle || String(res.data.id) === String(user?.defaultVehicleId),
 			};
 			setVehicles(prev => [...prev, addedVehicle]);
 			setIsModalVisible(false);

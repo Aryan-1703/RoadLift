@@ -1,4 +1,4 @@
-const { Job, User, DriverProfile, sequelize } = require("../models");
+const { Job, User, DriverProfile, Vehicle, sequelize } = require("../models");
 const io = require("../socket");
 const stripe = require("../config/stripe");
 const paymentService = require("./paymentService");
@@ -54,6 +54,17 @@ function normalizeJob(job) {
 		driverName: raw.driver?.name ?? null,
 		driverPhone: raw.driver?.phoneNumber ?? null,
 
+		vehicle: raw.vehicle
+			? {
+					id:           raw.vehicle.id,
+					make:         raw.vehicle.make,
+					model:        raw.vehicle.model,
+					year:         raw.vehicle.year,
+					color:        raw.vehicle.color ?? null,
+					licensePlate: raw.vehicle.licensePlate ?? null,
+				}
+			: null,
+
 		createdAt: raw.createdAt,
 		updatedAt: raw.updatedAt,
 	};
@@ -68,13 +79,20 @@ const CUSTOMER_INCLUDE = {
 	attributes: ["id", "name", "phoneNumber"],
 };
 
+const VEHICLE_INCLUDE = {
+	model: Vehicle,
+	as: "vehicle",
+	attributes: ["id", "make", "model", "year", "color", "licensePlate"],
+	required: false,
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // getAvailableJobs
 // ─────────────────────────────────────────────────────────────────────────────
 async function getAvailableJobs() {
 	const jobs = await Job.findAll({
 		where: { status: "pending" },
-		include: [CUSTOMER_INCLUDE],
+		include: [CUSTOMER_INCLUDE, VEHICLE_INCLUDE],
 		order: [["createdAt", "DESC"]],
 	});
 	return jobs.map(normalizeJob);
@@ -107,9 +125,9 @@ async function acceptJob(jobId, driverId) {
 		return job;
 	});
 
-	// Re-fetch with customer JOIN so normalizeJob has name/phone
+	// Re-fetch with customer + vehicle JOINs so normalizeJob has name/phone/vehicle
 	const jobWithCustomer = await Job.findByPk(result.id, {
-		include: [CUSTOMER_INCLUDE],
+		include: [CUSTOMER_INCLUDE, VEHICLE_INCLUDE],
 	});
 
 	// Fetch driver info so we can send a rich provider-assigned event to the customer
@@ -179,7 +197,7 @@ async function completeJob(jobId, driverId) {
 		message:      "Your service is complete! Payment has been processed.",
 	});
 
-	const jobWithCustomer = await Job.findByPk(job.id, { include: [CUSTOMER_INCLUDE] });
+	const jobWithCustomer = await Job.findByPk(job.id, { include: [CUSTOMER_INCLUDE, VEHICLE_INCLUDE] });
 	return normalizeJob(jobWithCustomer);
 }
 

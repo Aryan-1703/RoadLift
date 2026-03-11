@@ -22,6 +22,18 @@ async function deleteVehicle(userId, vehicleId) {
 		throw new Error("Vehicle not found or you are not authorized to delete it.");
 	}
 	await vehicle.destroy();
+
+	// If this was the user's default vehicle, clear it in the DB
+	const user = await User.findByPk(userId);
+	if (user && String(user.defaultVehicleId) === String(vehicleId)) {
+		// Auto-promote next available vehicle, or clear if none left
+		const next = await Vehicle.findOne({ where: { userId } });
+		await User.update(
+			{ defaultVehicleId: next ? next.id : null },
+			{ where: { id: userId } },
+		);
+	}
+
 	return { message: "Vehicle deleted." };
 }
 

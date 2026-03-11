@@ -8,6 +8,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useJob } from '../context/JobContext';
 import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../context/ToastContext';
+import { useAuth } from '../context/AuthContext';
 import { SERVICES } from '../constants';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { Card } from '../components/Card';
@@ -18,20 +19,37 @@ import { usePlatformPay, PlatformPay } from '@stripe/stripe-react-native';
 
 type PaymentMode = 'card' | 'apple_pay';
 
+interface VehicleItem {
+  id: string | number;
+  make: string;
+  model: string;
+  year: number | string;
+  color?: string;
+  licensePlate?: string;
+}
+
 export const RequestConfirmationScreen = () => {
   const { job, setJobStatus, setNotes, requestService } = useJob();
   const { colors } = useTheme();
   const { showToast } = useToast();
+  const { user } = useAuth();
   const navigation = useNavigation<any>();
 
   const [localNotes, setLocalNotes]       = useState(job.notes || '');
   const [isSubmitting, setIsSubmitting]   = useState(false);
   const [isLoadingCard, setIsLoadingCard] = useState(true);
 
+  // ── Payment state ──────────────────────────────────────────────────────────
   const [allCards, setAllCards]           = useState<PaymentMethod[]>([]);
   const [selectedCard, setSelectedCard]   = useState<PaymentMethod | null>(null);
   const [paymentMode, setPaymentMode]     = useState<PaymentMode>(Platform.OS === 'ios' ? 'apple_pay' : 'card');
-  const [showPicker, setShowPicker]       = useState(false);
+  const [showPaymentPicker, setShowPaymentPicker] = useState(false);
+
+  // ── Vehicle state ──────────────────────────────────────────────────────────
+  const [allVehicles, setAllVehicles]         = useState<VehicleItem[]>([]);
+  const [selectedVehicle, setSelectedVehicle] = useState<VehicleItem | null>(null);
+  const [isLoadingVehicles, setIsLoadingVehicles] = useState(true);
+  const [showVehiclePicker, setShowVehiclePicker] = useState(false);
 
   // Stores the paymentIntentId created before Apple Pay sheet opens
   const applePayIntentIdRef  = useRef<string | null>(null);
@@ -64,6 +82,22 @@ export const RequestConfirmationScreen = () => {
       .finally(() => setIsLoadingCard(false));
   }, []);
 
+  // ── Load vehicles ──────────────────────────────────────────────────────────
+  useEffect(() => {
+    api.get<VehicleItem[]>('/vehicles')
+      .then(res => {
+        const vehicles = Array.isArray(res.data) ? res.data : [];
+        setAllVehicles(vehicles);
+        // Default to user's default vehicle, else first in list
+        const def = vehicles.find(v => String(v.id) === String(user?.defaultVehicleId))
+          ?? vehicles[0]
+          ?? null;
+        setSelectedVehicle(def);
+      })
+      .catch(() => {})
+      .finally(() => setIsLoadingVehicles(false));
+  }, [user?.defaultVehicleId]);
+
   // Default to Apple Pay on iOS whenever it's supported
   useEffect(() => {
     if (Platform.OS === 'ios' && applePaySupported) {
@@ -78,15 +112,12 @@ export const RequestConfirmationScreen = () => {
 
     try {
       if (paymentMode === 'apple_pay') {
-        // 1. Create a manual-capture PI on backend
-        const preAuthRes = await api.post('/payments/apple-pay-pre-auth', {
+        const preAuthRes = await api.post<{ clientSecret: string; paymentIntentId: string }>('/payments/apple-pay-pre-auth', {
           estimatedCost: estimatedCostRef.current,
         });
         const { clientSecret, paymentIntentId } = preAuthRes.data;
         applePayIntentIdRef.current = paymentIntentId;
 
-        // 2. Present Apple Pay sheet and confirm the PI in one call
-        //    On success the PI enters requires_capture (hold placed, no charge yet)
         const { error: applePayErr } = await confirmPlatformPayPayment(clientSecret, {
           applePay: {
             cartItems: [{
@@ -103,15 +134,14 @@ export const RequestConfirmationScreen = () => {
           return;
         }
 
-        // 3. Create job, skip off-session auth (PI already authorized via Apple Pay)
-        await requestService(paymentIntentId);
+        await requestService(paymentIntentId, selectedVehicle?.id ?? null);
 
       } else {
         if (!selectedCard) {
           showToast('Please add a payment method before requesting service.', 'error');
           return;
         }
-        await requestService();
+        await requestService(undefined, selectedVehicle?.id ?? null);
       }
     } catch (err: any) {
       const msg =
@@ -129,9 +159,9 @@ export const RequestConfirmationScreen = () => {
   const renderPaymentRow = () => {
     if (isLoadingCard) {
       return (
-        <View style={styles.cardRow}>
+        <View style={styles.selectorRow}>
           <ActivityIndicator size="small" color={colors.primary} />
-          <Text style={[styles.cardText, { color: colors.textMuted, marginLeft: 12, flex: 1 }]}>
+          <Text style={[styles.selectorText, { color: colors.textMuted, marginLeft: 12, flex: 1 }]}>
             Loading payment method…
           </Text>
         </View>
@@ -140,29 +170,29 @@ export const RequestConfirmationScreen = () => {
 
     return (
       <TouchableOpacity
-        style={styles.cardRow}
-        onPress={() => setShowPicker(true)}
+        style={styles.selectorRow}
+        onPress={() => setShowPaymentPicker(true)}
         disabled={isSubmitting}
         activeOpacity={0.7}
       >
         {paymentMode === 'apple_pay' ? (
           <>
             <Ionicons name="logo-apple" size={20} color={colors.text} />
-            <Text style={[styles.cardText, { color: colors.text, marginLeft: 12, flex: 1 }]}>
+            <Text style={[styles.selectorText, { color: colors.text, marginLeft: 12, flex: 1 }]}>
               Apple Pay
             </Text>
           </>
         ) : selectedCard ? (
           <>
             <Ionicons name="card" size={20} color={colors.green} />
-            <Text style={[styles.cardText, { color: colors.text, marginLeft: 12, flex: 1 }]}>
-              {selectedCard.brand.charAt(0).toUpperCase() + selectedCard.brand.slice(1)} •••• {selectedCard.last4} will be held
+            <Text style={[styles.selectorText, { color: colors.text, marginLeft: 12, flex: 1 }]}>
+              {selectedCard.brand.charAt(0).toUpperCase() + selectedCard.brand.slice(1)} •••• {selectedCard.last4}
             </Text>
           </>
         ) : (
           <>
             <Ionicons name="alert-circle" size={20} color={colors.danger} />
-            <Text style={[styles.cardText, { color: colors.danger, marginLeft: 12, flex: 1 }]}>
+            <Text style={[styles.selectorText, { color: colors.danger, marginLeft: 12, flex: 1 }]}>
               No payment method on file
             </Text>
           </>
@@ -172,86 +202,180 @@ export const RequestConfirmationScreen = () => {
     );
   };
 
-  // ── Payment picker bottom sheet ────────────────────────────────────────────
-  const renderPicker = () => (
+  // ── Vehicle row ────────────────────────────────────────────────────────────
+  const renderVehicleRow = () => {
+    if (isLoadingVehicles) {
+      return (
+        <View style={styles.selectorRow}>
+          <ActivityIndicator size="small" color={colors.primary} />
+          <Text style={[styles.selectorText, { color: colors.textMuted, marginLeft: 12, flex: 1 }]}>
+            Loading vehicles…
+          </Text>
+        </View>
+      );
+    }
+
+    return (
+      <TouchableOpacity
+        style={styles.selectorRow}
+        onPress={() => setShowVehiclePicker(true)}
+        disabled={isSubmitting}
+        activeOpacity={0.7}
+      >
+        {selectedVehicle ? (
+          <>
+            <Ionicons name="car-outline" size={20} color={colors.primary} />
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Text style={[styles.selectorText, { color: colors.text }]}>
+                {selectedVehicle.year} {selectedVehicle.make} {selectedVehicle.model}
+              </Text>
+              {selectedVehicle.licensePlate ? (
+                <Text style={[styles.selectorSub, { color: colors.textMuted }]}>
+                  {selectedVehicle.licensePlate}
+                </Text>
+              ) : null}
+            </View>
+          </>
+        ) : (
+          <>
+            <Ionicons name="car-outline" size={20} color={colors.textMuted} />
+            <Text style={[styles.selectorText, { color: colors.textMuted, marginLeft: 12, flex: 1 }]}>
+              No vehicle selected
+            </Text>
+          </>
+        )}
+        <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+      </TouchableOpacity>
+    );
+  };
+
+  // ── Payment picker modal ───────────────────────────────────────────────────
+  const renderPaymentPicker = () => (
     <Modal
-      visible={showPicker}
+      visible={showPaymentPicker}
       transparent
       animationType="slide"
-      onRequestClose={() => setShowPicker(false)}
+      onRequestClose={() => setShowPaymentPicker(false)}
     >
-      <Pressable style={styles.overlay} onPress={() => setShowPicker(false)} />
+      <Pressable style={styles.overlay} onPress={() => setShowPaymentPicker(false)} />
       <View style={[styles.sheet, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <View style={[styles.handle, { backgroundColor: colors.border }]} />
         <Text style={[styles.sheetTitle, { color: colors.text }]}>Payment Method</Text>
 
-        {/* Apple Pay — iOS only */}
         {Platform.OS === 'ios' && applePaySupported && (
           <TouchableOpacity
-            style={[
-              styles.option,
-              { borderColor: colors.border },
-              paymentMode === 'apple_pay' && { backgroundColor: colors.primary + '12' },
-            ]}
-            onPress={() => { setPaymentMode('apple_pay'); setShowPicker(false); }}
+            style={[styles.option, { borderColor: colors.border }, paymentMode === 'apple_pay' && { backgroundColor: colors.primary + '12' }]}
+            onPress={() => { setPaymentMode('apple_pay'); setShowPaymentPicker(false); }}
             activeOpacity={0.7}
           >
             <View style={[styles.optionIcon, { backgroundColor: colors.text + '15' }]}>
               <Ionicons name="logo-apple" size={18} color={colors.text} />
             </View>
             <Text style={[styles.optionLabel, { color: colors.text, flex: 1 }]}>Apple Pay</Text>
-            {paymentMode === 'apple_pay' && (
-              <Ionicons name="checkmark-circle" size={22} color={colors.primary} />
-            )}
+            {paymentMode === 'apple_pay' && <Ionicons name="checkmark-circle" size={22} color={colors.primary} />}
           </TouchableOpacity>
         )}
 
-        {/* Saved cards */}
         {allCards.map(card => {
           const isSelected = paymentMode === 'card' && selectedCard?.id === card.id;
           const brand = card.brand.charAt(0).toUpperCase() + card.brand.slice(1);
           return (
             <TouchableOpacity
               key={card.id}
-              style={[
-                styles.option,
-                { borderColor: colors.border },
-                isSelected && { backgroundColor: colors.primary + '12' },
-              ]}
-              onPress={() => { setPaymentMode('card'); setSelectedCard(card); setShowPicker(false); }}
+              style={[styles.option, { borderColor: colors.border }, isSelected && { backgroundColor: colors.primary + '12' }]}
+              onPress={() => { setPaymentMode('card'); setSelectedCard(card); setShowPaymentPicker(false); }}
               activeOpacity={0.7}
             >
               <View style={[styles.optionIcon, { backgroundColor: colors.primary + '15' }]}>
                 <Ionicons name="card" size={18} color={colors.primary} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.optionLabel, { color: colors.text }]}>
-                  {brand} •••• {card.last4}
-                </Text>
-                <Text style={[styles.optionSub, { color: colors.textMuted }]}>
-                  Expires {card.expMonth}/{card.expYear}
-                </Text>
+                <Text style={[styles.optionLabel, { color: colors.text }]}>{brand} •••• {card.last4}</Text>
+                <Text style={[styles.optionSub, { color: colors.textMuted }]}>Expires {card.expMonth}/{card.expYear}</Text>
               </View>
-              {isSelected && (
-                <Ionicons name="checkmark-circle" size={22} color={colors.primary} />
-              )}
+              {isSelected && <Ionicons name="checkmark-circle" size={22} color={colors.primary} />}
             </TouchableOpacity>
           );
         })}
 
-        {/* Add card */}
         <TouchableOpacity
           style={[styles.option, styles.optionLast, { borderColor: colors.border }]}
-          onPress={() => {
-            setShowPicker(false);
-            navigation.navigate('SettingsNav', { screen: 'PaymentMethods' });
-          }}
+          onPress={() => { setShowPaymentPicker(false); navigation.navigate('SettingsNav', { screen: 'PaymentMethods' }); }}
           activeOpacity={0.7}
         >
           <View style={[styles.optionIcon, { backgroundColor: colors.green + '20' }]}>
             <Ionicons name="add" size={20} color={colors.green} />
           </View>
           <Text style={[styles.optionLabel, { color: colors.green, flex: 1 }]}>Add Card</Text>
+        </TouchableOpacity>
+      </View>
+    </Modal>
+  );
+
+  // ── Vehicle picker modal ───────────────────────────────────────────────────
+  const renderVehiclePicker = () => (
+    <Modal
+      visible={showVehiclePicker}
+      transparent
+      animationType="slide"
+      onRequestClose={() => setShowVehiclePicker(false)}
+    >
+      <Pressable style={styles.overlay} onPress={() => setShowVehiclePicker(false)} />
+      <View style={[styles.sheet, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View style={[styles.handle, { backgroundColor: colors.border }]} />
+        <Text style={[styles.sheetTitle, { color: colors.text }]}>Select Vehicle</Text>
+
+        {allVehicles.length === 0 ? (
+          <View style={styles.emptyVehicle}>
+            <Ionicons name="car-outline" size={36} color={colors.textMuted} />
+            <Text style={[styles.optionSub, { color: colors.textMuted, textAlign: 'center', marginTop: 8 }]}>
+              No vehicles saved yet.{'\n'}Add one from your profile.
+            </Text>
+          </View>
+        ) : (
+          allVehicles.map((vehicle, idx) => {
+            const isSelected = String(selectedVehicle?.id) === String(vehicle.id);
+            return (
+              <TouchableOpacity
+                key={vehicle.id}
+                style={[
+                  styles.option,
+                  { borderColor: colors.border },
+                  idx === allVehicles.length - 1 && { borderBottomWidth: 0 },
+                  isSelected && { backgroundColor: colors.primary + '12' },
+                ]}
+                onPress={() => { setSelectedVehicle(vehicle); setShowVehiclePicker(false); }}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.optionIcon, { backgroundColor: colors.primary + '15' }]}>
+                  <Ionicons name="car-outline" size={18} color={colors.primary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.optionLabel, { color: colors.text }]}>
+                    {vehicle.year} {vehicle.make} {vehicle.model}
+                  </Text>
+                  {(vehicle.color || vehicle.licensePlate) && (
+                    <Text style={[styles.optionSub, { color: colors.textMuted }]}>
+                      {[vehicle.color, vehicle.licensePlate].filter(Boolean).join(' · ')}
+                    </Text>
+                  )}
+                </View>
+                {isSelected && <Ionicons name="checkmark-circle" size={22} color={colors.primary} />}
+              </TouchableOpacity>
+            );
+          })
+        )}
+
+        {/* Add vehicle shortcut */}
+        <TouchableOpacity
+          style={[styles.option, styles.optionLast, { borderColor: colors.border }]}
+          onPress={() => { setShowVehiclePicker(false); navigation.navigate('SettingsNav', { screen: 'ManageVehicles' }); }}
+          activeOpacity={0.7}
+        >
+          <View style={[styles.optionIcon, { backgroundColor: colors.green + '20' }]}>
+            <Ionicons name="add" size={20} color={colors.green} />
+          </View>
+          <Text style={[styles.optionLabel, { color: colors.green, flex: 1 }]}>Add Vehicle</Text>
         </TouchableOpacity>
       </View>
     </Modal>
@@ -290,6 +414,13 @@ export const RequestConfirmationScreen = () => {
             <Text style={[styles.locationText, { color: colors.text }]}>{job.customerLocation?.address}</Text>
           </View>
 
+          {/* Vehicle selector */}
+          <Text style={[styles.sectionTitle, { color: colors.textMuted, marginTop: 14, marginBottom: 6 }]}>
+            VEHICLE
+          </Text>
+          {renderVehicleRow()}
+
+          {/* Payment selector */}
           <Text style={[styles.sectionTitle, { color: colors.textMuted, marginTop: 14, marginBottom: 6 }]}>
             PAYMENT
           </Text>
@@ -323,7 +454,8 @@ export const RequestConfirmationScreen = () => {
         />
       </View>
 
-      {renderPicker()}
+      {renderPaymentPicker()}
+      {renderVehiclePicker()}
     </SafeAreaView>
   );
 };
@@ -345,8 +477,11 @@ const styles = StyleSheet.create({
   locationRow:  { flexDirection: 'row', alignItems: 'center', paddingBottom: 12, borderBottomWidth: 1, marginBottom: 4 },
   locIcon:      { marginRight: 12 },
   locationText: { flex: 1, fontSize: 14, lineHeight: 20 },
-  cardRow:      { flexDirection: 'row', alignItems: 'center', paddingVertical: 6 },
-  cardText:     { fontSize: 14, fontWeight: '600' },
+
+  selectorRow:  { flexDirection: 'row', alignItems: 'center', paddingVertical: 6 },
+  selectorText: { fontSize: 14, fontWeight: '600' },
+  selectorSub:  { fontSize: 12, marginTop: 1 },
+
   input:        { borderWidth: 1, borderRadius: 12, padding: 12, fontSize: 14, minHeight: 100, textAlignVertical: 'top' },
   footer:       { padding: 16, borderTopWidth: 1 },
   disclaimer:   { fontSize: 12, textAlign: 'center', marginBottom: 16, lineHeight: 18 },
@@ -388,5 +523,9 @@ const styles = StyleSheet.create({
   },
   optionSub: {
     fontSize: 12, marginTop: 2,
+  },
+  emptyVehicle: {
+    alignItems: 'center',
+    paddingVertical: 24,
   },
 });

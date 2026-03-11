@@ -21,6 +21,7 @@ async function createJob(body, userId) {
 		dropoffLongitude,
 		estimatedCost,
 		notes,
+		vehicleId,
 		paymentIntentId: preAuthorizedIntentId, // set when Apple Pay pre-auth already done
 	} = body;
 
@@ -52,6 +53,7 @@ async function createJob(body, userId) {
 		pickupAddress: pickupAddress || null,
 		estimatedCost: estimatedCost || null,
 		notes: notes || null,
+		vehicleId: vehicleId || null,
 		status: "pending",
 	});
 
