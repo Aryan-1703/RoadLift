@@ -216,6 +216,7 @@ const OtpModal: React.FC<OtpModalProps> = ({
 						}}
 						keyboardType="number-pad"
 						maxLength={OTP_LENGTH}
+						textContentType="oneTimeCode"
 						autoFocus
 					/>
 
@@ -410,6 +411,7 @@ const ChangeContactModal: React.FC<ChangeContactModalProps> = ({
 							}}
 							keyboardType={isPhone ? "phone-pad" : "email-address"}
 							autoCapitalize="none"
+							textContentType={isPhone ? "telephoneNumber" : "emailAddress"}
 							autoFocus
 							placeholder={isPhone ? "+1 416 000 0000" : "you@example.com"}
 							placeholderTextColor={colors.textMuted}
