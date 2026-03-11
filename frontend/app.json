@@ -28,6 +28,9 @@
 		},
 		"ios": {
 			"bundleIdentifier": "com.aryan1703.RoadLift",
+			"entitlements": {
+				"com.apple.developer.in-app-payments": ["merchant.com.aryan1703.RoadLift"]
+			},
 			"infoPlist": {
 				"ITSAppUsesNonExemptEncryption": false,
 				"NSLocationWhenInUseUsageDescription": "We need your location to show the driver where you are and to track your route.",

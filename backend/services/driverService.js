@@ -97,22 +97,6 @@ async function acceptJob(jobId, driverId) {
 		const customer = job.customer;
 		if (!customer) throw new Error("Could not find customer for this job.");
 
-		if (!job.paymentIntentId) {
-			try {
-				const paymentIntent = await paymentService.createPaymentIntentForJob(
-					job,
-					customer,
-				);
-				job.paymentIntentId = paymentIntent.id;
-				job.paymentMethodId = paymentIntent.payment_method;
-			} catch (payErr) {
-				console.warn(
-					"[driverService] Failed to pre-create payment intent:",
-					payErr.message,
-				);
-			}
-		}
-
 		job.driverId = driverId;
 		job.status = "accepted";
 		await job.save({ transaction: t });
@@ -167,13 +151,32 @@ async function completeJob(jobId, driverId) {
 		throw new Error("This job cannot be completed in its current state.");
 	}
 
+	// Capture the authorized payment server-side
+	const baseCost       = job.finalCost ?? job.estimatedCost ?? "0";
+	const finalAmountCents = Math.round(parseFloat(String(baseCost)) * 1.13 * 100);
+	let   capturedTotal    = null;
+
+	if (job.paymentIntentId) {
+		try {
+			const captured = await paymentService.capturePayment(
+				job.paymentIntentId,
+				finalAmountCents,
+			);
+			capturedTotal = captured.amount_received / 100;
+			job.finalCost = (capturedTotal / 1.13).toFixed(2);
+		} catch (payErr) {
+			console.error("[completeJob] Payment capture failed:", payErr.message);
+		}
+	}
+
 	job.status = "completed";
 	await job.save();
 
 	io.to(String(job.userId)).emit("job-completed", {
-		jobId: job.id,
-		finalPrice: job.finalCost ? parseFloat(String(job.finalCost)) : null,
-		message: "Your service is complete!",
+		jobId:        job.id,
+		finalPrice:   job.finalCost ? parseFloat(String(job.finalCost)) : null,
+		capturedTotal,
+		message:      "Your service is complete! Payment has been processed.",
 	});
 
 	const jobWithCustomer = await Job.findByPk(job.id, { include: [CUSTOMER_INCLUDE] });

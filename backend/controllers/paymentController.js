@@ -1,4 +1,5 @@
 const paymentService = require("../services/paymentService");
+const stripe = require("../config/stripe");
 const { User, Job } = require("../models");
 const io = require("../socket");
 
@@ -95,6 +96,36 @@ const confirmPayment = async (req, res) => {
 	}
 };
 
+// Creates a manual-capture PI for Apple Pay pre-authorization.
+// Frontend calls this before presenting the Apple Pay sheet, then calls
+// confirmApplePayPayment(clientSecret) to authorize the hold.
+const createApplePayPreAuth = async (req, res) => {
+	try {
+		const { estimatedCost } = req.body;
+		const user = await User.findByPk(req.user.id);
+		if (!user) return res.status(404).json({ message: "User not found." });
+
+		const customerId = await paymentService.ensureStripeCustomer(user);
+		const amountCents = estimatedCost
+			? Math.round(parseFloat(estimatedCost) * 1.13 * 100)
+			: 5000;
+
+		const pi = await stripe.paymentIntents.create({
+			amount:               amountCents,
+			currency:             "cad",
+			customer:             customerId,
+			capture_method:       "manual",
+			payment_method_types: ["card"],
+			metadata:             { userId: String(req.user.id) },
+		});
+
+		return res.json({ clientSecret: pi.client_secret, paymentIntentId: pi.id });
+	} catch (err) {
+		console.error("createApplePayPreAuth error:", err);
+		return res.status(500).json({ message: "Failed to create Apple Pay pre-authorization." });
+	}
+};
+
 module.exports = {
 	createSetupIntent,
 	getPaymentMethods,
@@ -102,4 +133,5 @@ module.exports = {
 	deletePaymentMethod,
 	createPaymentIntent,
 	confirmPayment,
+	createApplePayPreAuth,
 };

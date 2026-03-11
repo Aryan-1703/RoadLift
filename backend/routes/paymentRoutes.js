@@ -7,6 +7,7 @@ const {
 	deletePaymentMethod,
 	createPaymentIntent,
 	confirmPayment,
+	createApplePayPreAuth,
 } = require("../controllers/paymentController");
 const { protect } = require("../middleware/authMiddleware");
 
@@ -15,7 +16,7 @@ router.get("/methods",                 protect, getPaymentMethods);
 router.put("/set-default",             protect, setAsDefault);
 router.delete("/methods/:paymentMethodId", protect, deletePaymentMethod);
 router.post("/create-payment-intent",  protect, createPaymentIntent);
-// Called by PaymentScreen after Stripe confirms the charge
 router.post("/confirm-payment",        protect, confirmPayment);
+router.post("/apple-pay-pre-auth",     protect, createApplePayPreAuth);
 
 module.exports = router;

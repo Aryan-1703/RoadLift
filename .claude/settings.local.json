@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(node -e \"const pkg = require\\(''d:/Repo/RoadLift/backend/node_modules/node-fetch/package.json''\\); console.log\\(pkg.version, pkg.type\\)\")",
-      "Bash(node -e \":*)"
+      "Bash(node -e \":*)",
+      "Bash(grep -r \"useApplePay\\\\|ApplePay\\\\|applePayButton\" d:/Repo/RoadLift/frontend/node_modules/@stripe/stripe-react-native/src --include=*.ts --include=*.tsx -l)"
     ]
   }
 }

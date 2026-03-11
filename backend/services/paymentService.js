@@ -156,11 +156,62 @@ async function createPaymentIntentForJob(job, customerUser) {
 	return paymentIntent;
 }
 
+// ── authorizePayment — places a hold on customer's default card at job request ─
+async function authorizePayment(job, customer) {
+	const customerId = await ensureStripeCustomer(customer);
+
+	if (!customer.defaultPaymentMethodId) {
+		throw new Error("NO_PAYMENT_METHOD");
+	}
+
+	// Authorize estimated cost + 13% tax (in cents)
+	const estimatedCents = job.estimatedCost
+		? Math.round(parseFloat(job.estimatedCost) * 1.13 * 100)
+		: 5000;
+
+	const paymentIntent = await stripe.paymentIntents.create({
+		amount:                   estimatedCents,
+		currency:                 "cad",
+		customer:                 customerId,
+		payment_method:           customer.defaultPaymentMethodId,
+		capture_method:           "manual",
+		confirm:                  true,
+		off_session:              true,
+		error_on_requires_action: true,
+		metadata: { jobId: String(job.id) },
+	});
+
+	return paymentIntent;
+}
+
+// ── capturePayment — captures the held amount when driver completes the job ────
+async function capturePayment(paymentIntentId, finalAmountCents) {
+	const intent = await stripe.paymentIntents.retrieve(paymentIntentId);
+	// Cannot capture more than the authorized amount
+	const amountToCapture = Math.min(finalAmountCents, intent.amount);
+	return stripe.paymentIntents.capture(paymentIntentId, {
+		amount_to_capture: amountToCapture,
+	});
+}
+
+// ── cancelAuthorization — releases the hold when job is cancelled ─────────────
+async function cancelAuthorization(paymentIntentId) {
+	try {
+		await stripe.paymentIntents.cancel(paymentIntentId);
+	} catch (err) {
+		console.warn("[paymentService] Could not cancel authorization:", err.message);
+	}
+}
+
 module.exports = {
+	ensureStripeCustomer,
 	createSetupIntent,
 	getPaymentMethods,
 	setAsDefault,
 	deletePaymentMethod,
 	createPaymentIntent,
 	createPaymentIntentForJob,
+	authorizePayment,
+	capturePayment,
+	cancelAuthorization,
 };

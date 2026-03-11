@@ -1,4 +1,5 @@
 const { Job, User, Review, sequelize } = require("../models");
+const paymentService = require("./paymentService");
 
 // normalizeJob lives in driverService (inlined there to avoid circular deps).
 // jobService imports it lazily inside each function — DO NOT top-level require
@@ -20,11 +21,18 @@ async function createJob(body, userId) {
 		dropoffLongitude,
 		estimatedCost,
 		notes,
+		paymentIntentId: preAuthorizedIntentId, // set when Apple Pay pre-auth already done
 	} = body;
 
 	if (!serviceType) throw new Error("serviceType is required.");
 	if (!pickupLatitude) throw new Error("pickupLatitude is required.");
 	if (!pickupLongitude) throw new Error("pickupLongitude is required.");
+
+	const customer = await User.findByPk(userId);
+	// If no Apple Pay pre-auth, customer needs a saved default card
+	if (!preAuthorizedIntentId && !customer?.defaultPaymentMethodId) {
+		throw new Error("NO_PAYMENT_METHOD");
+	}
 
 	const pickupLocation = {
 		type: "Point",
@@ -50,8 +58,26 @@ async function createJob(body, userId) {
 		status: "pending",
 	});
 
-	// Lazy require avoids circular dependency.
-	// Pass lat/lng explicitly so dispatchService never needs to parse WKB geometry.
+	if (preAuthorizedIntentId) {
+		// Apple Pay: hold already placed, just associate the PI with the job
+		job.paymentIntentId = preAuthorizedIntentId;
+		await job.save();
+	} else {
+		// Saved card: place a hold off-session — no hold, no dispatch
+		try {
+			const paymentIntent = await paymentService.authorizePayment(job, customer);
+			job.paymentIntentId = paymentIntent.id;
+			await job.save();
+		} catch (payErr) {
+			job.status = "cancelled";
+			await job.save();
+			const err = new Error(payErr.message || "Payment authorization failed.");
+			err.isPaymentError = true;
+			err.stripeCode = payErr.code ?? null;
+			throw err;
+		}
+	}
+
 	const { startDispatch } = require("./dispatchService");
 	startDispatch(job, parseFloat(pickupLatitude), parseFloat(pickupLongitude)).catch(err =>
 		console.error("[jobService] Dispatch failed to start:", err.message),
@@ -83,6 +109,10 @@ async function cancelJob(jobId, userId) {
 	if (job.userId !== userId) throw new Error("Forbidden");
 	if (["accepted", "in_progress"].includes(job.status)) {
 		throw new Error("This job has already been accepted by a driver.");
+	}
+	// Release the payment hold
+	if (job.paymentIntentId) {
+		await paymentService.cancelAuthorization(job.paymentIntentId);
 	}
 	job.status = "cancelled";
 	await job.save();

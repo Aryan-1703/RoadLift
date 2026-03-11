@@ -16,6 +16,15 @@ const createJob = async (req, res) => {
 			job: newJob,
 		});
 	} catch (error) {
+		if (error.message === "NO_PAYMENT_METHOD") {
+			return res.status(402).json({
+				message: "No payment method on file. Please add a card before requesting service.",
+				code: "NO_PAYMENT_METHOD",
+			});
+		}
+		if (error.isPaymentError) {
+			return res.status(402).json({ message: error.message, code: error.stripeCode });
+		}
 		console.error("❌ Error in createJob controller:", error);
 		res.status(500).json({ message: "Server error while creating job." });
 	}
