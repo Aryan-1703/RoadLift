@@ -22,7 +22,8 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 // After any successful auth, register Expo push token on the backend so
 // drivers receive job notifications and customers get status updates.
 // ─────────────────────────────────────────────────────────────────────────────
-async function storePushToken() {
+async function storePushToken(role: string) {
+	if (role !== "DRIVER") return; // only drivers need push tokens for job dispatch
 	try {
 		const token = await registerForPushNotifications();
 		if (token) {
@@ -43,10 +44,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 			try {
 				const storedUser = await AsyncStorage.getItem("@roadlift_user");
 				if (storedUser) {
-					setUser(JSON.parse(storedUser));
+					const parsed = JSON.parse(storedUser);
+					setUser(parsed);
 					await socketClient.connect();
 					// Re-register push token on session restore (token may have rotated)
-					storePushToken();
+					storePushToken(parsed.role);
 				}
 			} catch (e) {
 				console.error("Failed to parse stored user", e);
@@ -107,7 +109,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 		setUser(loggedInUser);
 		await AsyncStorage.setItem("@roadlift_user", JSON.stringify(loggedInUser));
 		await socketClient.connect();
-		storePushToken(); // fire-and-forget
+		storePushToken(loggedInUser.role); // fire-and-forget
 	};
 
 	const registerUser = async (data: RegisterDTO) => {
@@ -155,7 +157,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 		setUser(loggedInUser);
 		await AsyncStorage.setItem("@roadlift_user", JSON.stringify(loggedInUser));
 		await socketClient.connect();
-		storePushToken(); // fire-and-forget
+		storePushToken(loggedInUser.role); // fire-and-forget
 	};
 
 	const logout = async () => {
