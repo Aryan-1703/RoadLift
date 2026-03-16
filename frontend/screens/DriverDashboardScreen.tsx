@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
 	View,
 	Text,
@@ -6,6 +6,7 @@ import {
 	ScrollView,
 	TouchableOpacity,
 	RefreshControl,
+	Animated,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Location from "expo-location";
@@ -77,6 +78,12 @@ export const DriverDashboardScreen = () => {
 	const [driverLat, setDriverLat] = useState<number | null>(null);
 	const [driverLng, setDriverLng] = useState<number | null>(null);
 
+	// ── New-job glow tracking ─────────────────────────────────────────────────
+	const NEW_JOB_GLOW_MS = 45_000;
+	const [newJobIds, setNewJobIds] = useState<Set<string>>(new Set());
+	const prevJobIdsRef = useRef<Set<string>>(new Set());
+	const badgeAnim    = useRef(new Animated.Value(1)).current;
+
 	useEffect(() => {
 		fetchEarnings();
 	}, [fetchEarnings]);
@@ -106,6 +113,49 @@ export const DriverDashboardScreen = () => {
 			return () => clearTimeout(t);
 		}
 	}, [isOnline]);
+
+	// Detect newly arrived jobs and mark them as "new" for NEW_JOB_GLOW_MS
+	useEffect(() => {
+		const currentIds = new Set(availableJobs.map(j => String(j.id)));
+		const addedIds: string[] = [];
+		currentIds.forEach(id => {
+			if (!prevJobIdsRef.current.has(id)) addedIds.push(id);
+		});
+		prevJobIdsRef.current = currentIds;
+		if (addedIds.length === 0) return;
+
+		setNewJobIds(prev => {
+			const next = new Set(prev);
+			addedIds.forEach(id => next.add(id));
+			return next;
+		});
+
+		const timer = setTimeout(() => {
+			setNewJobIds(prev => {
+				const next = new Set(prev);
+				addedIds.forEach(id => next.delete(id));
+				return next;
+			});
+		}, NEW_JOB_GLOW_MS);
+
+		return () => clearTimeout(timer);
+	}, [availableJobs]);
+
+	// Pulse the NEW badge while any new jobs are present
+	useEffect(() => {
+		if (newJobIds.size > 0) {
+			const pulse = Animated.loop(
+				Animated.sequence([
+					Animated.timing(badgeAnim, { toValue: 0.25, duration: 550, useNativeDriver: true }),
+					Animated.timing(badgeAnim, { toValue: 1,    duration: 550, useNativeDriver: true }),
+				]),
+			);
+			pulse.start();
+			return () => pulse.stop();
+		} else {
+			badgeAnim.setValue(1);
+		}
+	}, [newJobIds.size, badgeAnim]);
 
 	const onRefresh = async () => {
 		setRefreshing(true);
@@ -292,13 +342,34 @@ export const DriverDashboardScreen = () => {
 					</View>
 				) : (
 					availableJobs.map(job => {
-						const eta = calcEta(driverLat, driverLng, job);
-						const v = job.customerVehicle;
+						const eta   = calcEta(driverLat, driverLng, job);
+						const v     = job.customerVehicle;
 						const vehicleLabel = v
 							? [v.year, v.make, v.model, v.color ? '· ' + v.color : ''].filter(Boolean).join(' ')
 							: null;
+						const isNew = newJobIds.has(String(job.id));
 						return (
-						<Card key={job.id} style={styles.jobCard}>
+						<Card
+							key={job.id}
+							style={[
+								styles.jobCard,
+								isNew && {
+									borderColor:   colors.primary,
+									borderWidth:   2,
+									shadowColor:   colors.primary,
+									shadowOpacity: 0.35,
+									shadowRadius:  10,
+									shadowOffset:  { width: 0, height: 0 },
+									elevation:     8,
+								},
+							]}
+						>
+							{/* NEW badge */}
+							{isNew && (
+								<Animated.View style={[styles.newBadge, { backgroundColor: colors.primary, opacity: badgeAnim }]}>
+									<Text style={styles.newBadgeText}>NEW</Text>
+								</Animated.View>
+							)}
 							{/* Job type + price */}
 							<View style={styles.jobHeader}>
 								<View
@@ -463,6 +534,21 @@ const styles = StyleSheet.create({
 
 	// Job card
 	jobCard: { marginBottom: 12, padding: 16 },
+	newBadge: {
+		position:          "absolute",
+		top:               12,
+		right:             12,
+		paddingHorizontal: 8,
+		paddingVertical:   3,
+		borderRadius:      8,
+		zIndex:            10,
+	},
+	newBadgeText: {
+		color:         "#fff",
+		fontSize:      10,
+		fontWeight:    "800",
+		letterSpacing: 1,
+	},
 	jobHeader: {
 		flexDirection: "row",
 		justifyContent: "space-between",
