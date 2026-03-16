@@ -10,6 +10,7 @@ const {
 	storePushToken,
 	createStripeOnboardingLink,
 	removePushToken,
+	getPayoutStatus,
 } = require("../controllers/driverController");
 const { protect, protectDriver } = require("../middleware/authMiddleware");
 
@@ -31,5 +32,6 @@ router.delete("/remove-push-token", protect, protectDriver, removePushToken);
 
 // Stripe Connect
 router.post("/stripe-onboarding", protect, protectDriver, createStripeOnboardingLink);
+router.get("/payout-status",      protect, protectDriver, getPayoutStatus);
 
 module.exports = router;

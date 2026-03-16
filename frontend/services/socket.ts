@@ -40,6 +40,10 @@ class SocketClient {
 						userId: String(user.id),
 						role: user.role,
 					});
+					// If driver was online before disconnect, re-join the drivers room
+					if (user.role === "DRIVER" && user.isActive) {
+						this.ioSocket!.emit("driver-online", { driverId: String(user.id) });
+					}
 				}
 			});
 

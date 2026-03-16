@@ -26,6 +26,7 @@ export interface User {
 	token: string;
 	defaultVehicleId?: string | number;
 	defaultPaymentMethodId?: string; // ← was missing; needed by PaymentScreen
+	isActive?: boolean; // driver online/offline — persisted in DB, restored on app restart
 }
 
 export interface RegisterDTO {
@@ -93,6 +94,15 @@ export type JobStatus =
 	| "payment"
 	| "rating";
 
+export interface JobVehicle {
+	id: number;
+	make: string;
+	model: string;
+	year: string;
+	color?: string | null;
+	licensePlate?: string | null;
+}
+
 export interface Job {
 	id?: string;
 	serviceType: ServiceTypeId | null;
@@ -102,6 +112,7 @@ export interface Job {
 	// Driver-facing fields (populated when driver accepts job)
 	customerName?: string;  // ← was missing — shown in ActiveJobScreen
 	customerPhone?: string; // ← was missing — used for call button
+	customerVehicle?: JobVehicle | null; // vehicle the job is for
 	// Customer-facing fields
 	provider?: Provider;
 	estimatedPrice?: number;

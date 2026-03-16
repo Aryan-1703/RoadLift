@@ -6,11 +6,17 @@
 		"version": "1.0.0",
 		"sdkVersion": "54.0.0",
 		"platforms": ["ios", "android"],
+		"icon": "./assets/icon.png",
+		"splash": {
+			"image": "./assets/icon.png",
+			"resizeMode": "contain",
+			"backgroundColor": "#ffffff"
+		},
 		"plugins": [
 			[
 				"expo-notifications",
 				{
-					"icon": "./assets/notification-icon.png",
+					"icon": "./assets/icon.png",
 					"color": "#1A6BFF",
 					"sounds": []
 				}

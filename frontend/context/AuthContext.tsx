@@ -98,6 +98,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 			token: payload.token,
 			defaultVehicleId: payload.user.defaultVehicleId,
 			defaultPaymentMethodId: payload.user.defaultPaymentMethodId,
+			isActive: payload.user.isActive ?? false,
 		};
 
 		if (rememberPhone) {

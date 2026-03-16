@@ -195,14 +195,44 @@ const createStripeOnboardingLink = async (req, res) => {
 	}
 };
 
+// ── getPayoutStatus — checks live Stripe account state ───────────────────────
+// GET /api/driver/payout-status
+// Returns: { status: "not_connected"|"pending"|"active", payoutsEnabled, detailsSubmitted, requirementsCount }
+const stripe = require("../config/stripe");
+const getPayoutStatus = async (req, res) => {
+	try {
+		const driver = await User.findByPk(req.user.id);
+		if (!driver?.stripeAccountId) {
+			return res.status(200).json({ status: "not_connected", payoutsEnabled: false, detailsSubmitted: false, requirementsCount: 0 });
+		}
+
+		const account = await stripe.accounts.retrieve(driver.stripeAccountId);
+		const payoutsEnabled     = account.payouts_enabled ?? false;
+		const detailsSubmitted   = account.details_submitted ?? false;
+		const requirementsCount  = account.requirements?.currently_due?.length ?? 0;
+
+		// Sync DB flag if it changed
+		if (payoutsEnabled !== driver.stripePayoutsEnabled) {
+			await User.update({ stripePayoutsEnabled: payoutsEnabled }, { where: { id: driver.id } });
+		}
+
+		const status = payoutsEnabled ? "active" : detailsSubmitted ? "pending" : "incomplete";
+		return res.status(200).json({ status, payoutsEnabled, detailsSubmitted, requirementsCount });
+	} catch (error) {
+		console.error("Failed to fetch payout status:", error);
+		return res.status(500).json({ message: "Server error while fetching payout status." });
+	}
+};
+
 module.exports = {
 	getAvailableJobs,
 	acceptJob,
 	updateJobStatus,
 	completeJob,
-	getEarnings, // ← new
+	getEarnings,
 	updateStatus,
 	storePushToken,
 	removePushToken,
 	createStripeOnboardingLink,
+	getPayoutStatus,
 };

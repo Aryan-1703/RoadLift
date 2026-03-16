@@ -158,6 +158,9 @@ async function acceptJob(jobId, driverId) {
 	return normalizeJob(jobWithCustomer);
 }
 
+// Platform keeps this % of the pre-tax job amount; driver receives the rest.
+const PLATFORM_FEE_PERCENT = 20;
+
 // ─────────────────────────────────────────────────────────────────────────────
 // completeJob
 // ─────────────────────────────────────────────────────────────────────────────
@@ -170,7 +173,7 @@ async function completeJob(jobId, driverId) {
 	}
 
 	// Capture the authorized payment server-side
-	const baseCost       = job.finalCost ?? job.estimatedCost ?? "0";
+	const baseCost         = job.finalCost ?? job.estimatedCost ?? "0";
 	const finalAmountCents = Math.round(parseFloat(String(baseCost)) * 1.13 * 100);
 	let   capturedTotal    = null;
 
@@ -180,8 +183,8 @@ async function completeJob(jobId, driverId) {
 				job.paymentIntentId,
 				finalAmountCents,
 			);
-			capturedTotal = captured.amount_received / 100;
-			job.finalCost = (capturedTotal / 1.13).toFixed(2);
+			capturedTotal      = captured.amount_received / 100;
+			job.finalCost      = (capturedTotal / 1.13).toFixed(2);
 		} catch (payErr) {
 			console.error("[completeJob] Payment capture failed:", payErr.message);
 		}
@@ -189,6 +192,45 @@ async function completeJob(jobId, driverId) {
 
 	job.status = "completed";
 	await job.save();
+
+	// ── Transfer driver's share to their Stripe Connect account ──────────────
+	if (capturedTotal !== null && job.finalCost) {
+		try {
+			const driver = await User.findByPk(driverId);
+			if (driver?.stripeAccountId) {
+				// Re-check live payout eligibility from Stripe (don't trust stale DB flag)
+				const account = await stripe.accounts.retrieve(driver.stripeAccountId);
+				if (account.payouts_enabled) {
+					// Driver gets (100 - platform fee)% of pre-tax amount
+					const preTaxAmount    = parseFloat(String(job.finalCost));
+					const driverShare     = preTaxAmount * (1 - PLATFORM_FEE_PERCENT / 100);
+					const driverShareCents = Math.round(driverShare * 100);
+
+					await stripe.transfers.create({
+						amount:         driverShareCents,
+						currency:       "cad",
+						destination:    driver.stripeAccountId,
+						transfer_group: `job_${jobId}`,
+						metadata:       { jobId: String(jobId), driverId: String(driverId) },
+					});
+					console.log(`[completeJob] Transferred $${driverShare.toFixed(2)} to driver ${driverId}`);
+
+					// Keep DB flag in sync
+					if (!driver.stripePayoutsEnabled) {
+						await User.update({ stripePayoutsEnabled: true }, { where: { id: driverId } });
+					}
+				} else {
+					console.warn(`[completeJob] Driver ${driverId} payouts not enabled — skipping transfer`);
+				}
+			} else {
+				console.warn(`[completeJob] Driver ${driverId} has no stripeAccountId — skipping transfer`);
+			}
+		} catch (transferErr) {
+			// Non-fatal: job is already completed and customer charged.
+			// Log it so it can be manually reconciled.
+			console.error("[completeJob] Transfer to driver failed:", transferErr.message);
+		}
+	}
 
 	io.to(String(job.userId)).emit("job-completed", {
 		jobId:        job.id,
@@ -214,7 +256,7 @@ async function createStripeOnboardingLink(driverId) {
 		const [firstName, ...rest] = driver.name.split(" ");
 		const account = await stripe.accounts.create({
 			type: "express",
-			email: driver.email,
+			...(driver.email ? { email: driver.email } : {}),
 			business_type: "individual",
 			individual: {
 				first_name: firstName,
@@ -226,11 +268,13 @@ async function createStripeOnboardingLink(driverId) {
 		await User.update({ stripeAccountId: accountId }, { where: { id: driverId } });
 	}
 
+	const backendUrl = (process.env.BACKEND_URL || "http://localhost:3000").replace(/\/$/, "");
 	const accountLink = await stripe.accountLinks.create({
-		account: accountId,
-		refresh_url: "https://roadlift.ca/stripe/refresh",
-		return_url: "https://roadlift.ca/stripe/success",
-		type: "account_onboarding",
+		account:     accountId,
+		// Stripe requires https:// URLs. Backend routes redirect to the app deep link.
+		refresh_url: `${backendUrl}/stripe/refresh`,
+		return_url:  `${backendUrl}/stripe/return`,
+		type:        "account_onboarding",
 	});
 
 	return { url: accountLink.url };

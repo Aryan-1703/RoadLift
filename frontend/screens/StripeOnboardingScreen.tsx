@@ -1,12 +1,12 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
 	View,
 	Text,
 	StyleSheet,
 	ScrollView,
 	Linking,
-	Alert,
 	ActivityIndicator,
+	AppState,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "../context/ThemeContext";
@@ -15,6 +15,8 @@ import { api } from "../services/api";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { Card } from "../components/Card";
 import { Ionicons } from "@expo/vector-icons";
+
+type PayoutStatus = "not_connected" | "incomplete" | "pending" | "active";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Feature rows
@@ -48,30 +50,49 @@ const FEATURES = [
 export const StripeOnboardingScreen = () => {
 	const { colors, isDarkMode } = useTheme();
 	const { showToast } = useToast();
-	const [loading, setLoading] = useState(false);
+	const [loading, setLoading]           = useState(false);
+	const [statusLoading, setStatusLoading] = useState(true);
+	const [payoutStatus, setPayoutStatus] = useState<PayoutStatus>("not_connected");
+	const [requirementsCount, setRequirementsCount] = useState(0);
+
+	const fetchPayoutStatus = useCallback(async () => {
+		try {
+			const res = await api.get<{ status: PayoutStatus; requirementsCount: number }>(
+				"/driver/payout-status",
+			);
+			setPayoutStatus(res.data.status);
+			setRequirementsCount(res.data.requirementsCount);
+		} catch {
+			// non-fatal — show default state
+		} finally {
+			setStatusLoading(false);
+		}
+	}, []);
+
+	// Load status on mount
+	useEffect(() => {
+		fetchPayoutStatus();
+	}, [fetchPayoutStatus]);
+
+	// Re-check status when driver returns from Stripe in browser
+	useEffect(() => {
+		const sub = AppState.addEventListener("change", state => {
+			if (state === "active") fetchPayoutStatus();
+		});
+		return () => sub.remove();
+	}, [fetchPayoutStatus]);
 
 	const handleStartOnboarding = async () => {
 		setLoading(true);
 		try {
-			// Calls POST /api/driver/stripe-onboarding → returns { url: "https://connect.stripe.com/..." }
 			const res = await api.post<{ url: string }>("/driver/stripe-onboarding");
 			const url = res.data?.url;
-
-			if (!url) {
-				throw new Error("No onboarding URL returned from server.");
-			}
-
-			// Open in system browser so Stripe can verify identity docs etc.
-			const canOpen = await Linking.canOpenURL(url);
-			if (!canOpen) {
-				throw new Error("Unable to open Stripe onboarding page.");
-			}
+			if (!url) throw new Error("No onboarding URL returned from server.");
 			await Linking.openURL(url);
 		} catch (e: any) {
 			const msg =
 				e?.response?.data?.message || e?.message || "Failed to start Stripe onboarding.";
 			showToast(msg, "error");
-			console.warn("[StripeOnboarding]", e);
 		} finally {
 			setLoading(false);
 		}
@@ -80,6 +101,15 @@ export const StripeOnboardingScreen = () => {
 	const handleLearnMore = () => {
 		Linking.openURL("https://stripe.com/en-ca/connect");
 	};
+
+	// ── Status banner config ─────────────────────────────────────────────────
+	const statusConfig: Record<PayoutStatus, { icon: string; color: string; bg: string; border: string; label: string; hint: string }> = {
+		not_connected: { icon: "alert-circle-outline",    color: colors.textMuted, bg: colors.surface,    border: colors.border,      label: "Not Connected",    hint: "Set up your bank account to receive payouts." },
+		incomplete:    { icon: "time-outline",            color: "#F59E0B",        bg: "#FEF3C7",         border: "#FDE68A",           label: "Setup Incomplete", hint: "You have pending requirements. Tap below to finish." },
+		pending:       { icon: "hourglass-outline",       color: "#3B82F6",        bg: "#EFF6FF",         border: "#BFDBFE",           label: "Under Review",     hint: "Stripe is reviewing your account. This usually takes 1–2 business days." },
+		active:        { icon: "checkmark-circle-outline", color: colors.green,    bg: colors.greenBg,    border: colors.greenBorder,  label: "Payouts Active",   hint: "Your earnings will be transferred automatically after each job." },
+	};
+	const sc = statusConfig[payoutStatus];
 
 	// ── Derived colors ───────────────────────────────────────────────────────
 	const stripePurple = "#635BFF";
@@ -113,7 +143,25 @@ export const StripeOnboardingScreen = () => {
 					</Text>
 				</View>
 
-				{/* ── Stripe badge ──────────────────────────────────────────── */}
+				{/* ── Payout status banner ──────────────────────────────────── */}
+			{statusLoading ? (
+				<ActivityIndicator color={colors.primary} style={{ marginBottom: 16 }} />
+			) : (
+				<View style={[styles.statusBanner, { backgroundColor: sc.bg, borderColor: sc.border }]}>
+					<Ionicons name={sc.icon as any} size={20} color={sc.color} />
+					<View style={{ flex: 1 }}>
+						<Text style={[styles.statusLabel, { color: sc.color }]}>{sc.label}</Text>
+						<Text style={[styles.statusHint, { color: colors.textMuted }]}>{sc.hint}</Text>
+					</View>
+					{requirementsCount > 0 && (
+						<View style={[styles.reqBadge, { backgroundColor: sc.color }]}>
+							<Text style={styles.reqBadgeText}>{requirementsCount}</Text>
+						</View>
+					)}
+				</View>
+			)}
+
+			{/* ── Stripe badge ──────────────────────────────────────────── */}
 				<View
 					style={[
 						styles.stripeBadge,
@@ -203,7 +251,13 @@ export const StripeOnboardingScreen = () => {
 				]}
 			>
 				<PrimaryButton
-					title={loading ? "Opening Stripe…" : "Connect with Stripe"}
+					title={
+						loading            ? "Opening Stripe…"
+						: payoutStatus === "active"     ? "Manage Stripe Account"
+						: payoutStatus === "pending"    ? "Check Stripe Status"
+						: payoutStatus === "incomplete" ? "Complete Setup"
+						: "Connect with Stripe"
+					}
 					onPress={handleStartOnboarding}
 					disabled={loading}
 				/>
@@ -253,6 +307,24 @@ const styles = StyleSheet.create({
 		textAlign: "center",
 		maxWidth: 320,
 	},
+
+	// Status banner
+	statusBanner: {
+		flexDirection: "row",
+		alignItems: "flex-start",
+		gap: 12,
+		borderWidth: 1,
+		borderRadius: 14,
+		padding: 14,
+		marginBottom: 16,
+	},
+	statusLabel: { fontSize: 13, fontWeight: "700", marginBottom: 2 },
+	statusHint:  { fontSize: 12, lineHeight: 17 },
+	reqBadge: {
+		width: 20, height: 20, borderRadius: 10,
+		alignItems: "center", justifyContent: "center",
+	},
+	reqBadgeText: { color: "#fff", fontSize: 11, fontWeight: "800" },
 
 	// Stripe badge
 	stripeBadge: {

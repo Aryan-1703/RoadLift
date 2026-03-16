@@ -46,6 +46,11 @@ app.use("/api/users", userRoutes);
 // --- HEALTH CHECK ---
 app.get("/", (req, res) => res.send("RoadLift API is running..."));
 
+// --- STRIPE CONNECT REDIRECTS ---
+// Stripe requires https:// URLs; these routes bounce the driver back into the app via deep link.
+app.get("/stripe/return",  (req, res) => res.redirect("roadlift://stripe-return"));
+app.get("/stripe/refresh", (req, res) => res.redirect("roadlift://stripe-refresh"));
+
 // --- SOCKET.IO ---
 io.on("connection", socket => {
 	console.log(`[Socket] Connected: ${socket.id}`);

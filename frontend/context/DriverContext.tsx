@@ -7,6 +7,7 @@ import React, {
 	useEffect,
 	useRef,
 } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Job, Location } from "../types";
 import { api } from "../services/api";
 import socketClient from "../services/socket";
@@ -71,6 +72,7 @@ function mapApiJob(raw: any): Job {
 		// Driver sees these customer details
 		customerName:    raw.customerName  ?? raw.customer?.name        ?? null,
 		customerPhone:   raw.customerPhone ?? raw.customer?.phoneNumber ?? null,
+		customerVehicle: raw.vehicle ?? null,
 	};
 }
 
@@ -78,12 +80,21 @@ export const DriverProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 	const { user } = useAuth();
 	const { showToast } = useToast();
 
-	const [isOnline,       setIsOnline]       = useState(false);
+	const [isOnline,       setIsOnline]       = useState(() =>
+		user?.role === "DRIVER" && (user?.isActive ?? false)
+	);
 	const [availableJobs,  setAvailableJobs]  = useState<Job[]>([]);
 	const [activeJob,      setActiveJob]      = useState<Job | null>(null);
 	const [earnings,       setEarnings]       = useState({ today: 0, completedJobs: [] });
 
 	const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+	// ── Sync isOnline when user object loads / changes (e.g. session restore) ─
+	useEffect(() => {
+		if (user?.role === "DRIVER") {
+			setIsOnline(user.isActive ?? false);
+		}
+	}, [user?.id]); // only re-run when the logged-in user changes, not on every update
 
 	// ── Reset on logout ──────────────────────────────────────────────────────
 	useEffect(() => {
@@ -112,14 +123,10 @@ export const DriverProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 	useEffect(() => {
 		if (user?.role !== "DRIVER") return;
 
-		const handleNewJob = (job: any) => {
-			if (!activeJob) {
-				const mapped = mapApiJob(job);
-				setAvailableJobs(prev => {
-					if (prev.find(j => j.id === mapped.id)) return prev;
-					return [...prev, mapped];
-				});
-			}
+		const handleNewJob = () => {
+			// Socket payload only has { jobId, radiusKm, travelFee } — not full job data.
+			// Fetch the full list so the card renders with all fields populated.
+			if (!activeJob) fetchAvailableJobs();
 		};
 
 		const handleJobCancelled = (data: { jobId: string }) => {
@@ -167,6 +174,12 @@ export const DriverProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 		setIsOnline(true);
 		try {
 			await api.put("/driver/status", { isActive: true });
+			// Persist so session restore knows the driver was online
+			const stored = await AsyncStorage.getItem("@roadlift_user");
+			if (stored) {
+				const parsed = JSON.parse(stored);
+				await AsyncStorage.setItem("@roadlift_user", JSON.stringify({ ...parsed, isActive: true }));
+			}
 			await fetchAvailableJobs();
 		} catch (err) {
 			console.error("Failed to go online", err);
@@ -178,6 +191,12 @@ export const DriverProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 		setAvailableJobs([]);
 		try {
 			await api.put("/driver/status", { isActive: false });
+			// Persist so session restore knows the driver was offline
+			const stored = await AsyncStorage.getItem("@roadlift_user");
+			if (stored) {
+				const parsed = JSON.parse(stored);
+				await AsyncStorage.setItem("@roadlift_user", JSON.stringify({ ...parsed, isActive: false }));
+			}
 		} catch (err) {
 			console.error("Failed to go offline", err);
 		}

@@ -8,6 +8,7 @@ import {
 	RefreshControl,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import * as Location from "expo-location";
 import { useDriver } from "../context/DriverContext";
 import { useTheme } from "../context/ThemeContext";
 import { Card } from "../components/Card";
@@ -15,6 +16,48 @@ import { Skeleton } from "../components/Skeleton";
 import { Ionicons } from "@expo/vector-icons";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { useNavigation } from "@react-navigation/native";
+import { Job } from "../types";
+
+/** Strips street number, keeps street name + city. "12 Main St, Toronto, ON" → "Main St area, Toronto" */
+function maskAddress(address: string | null | undefined): string {
+	if (!address) return "Unknown area";
+	// Split on commas — first part is street, rest is city/province/postal
+	const parts = address.split(",").map(p => p.trim());
+	const street = parts[0] ?? "";
+	const city   = parts[1] ?? "";
+	// Remove leading digits (the house number)
+	const streetNoNumber = street.replace(/^\d+\s*/, "").trim();
+	const area = streetNoNumber ? `${streetNoNumber} area` : "Nearby area";
+	return city ? `${area}, ${city}` : area;
+}
+
+/** Haversine distance in km between two lat/lng points */
+function distanceKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+	const R = 6371;
+	const dLat = ((lat2 - lat1) * Math.PI) / 180;
+	const dLng = ((lng2 - lng1) * Math.PI) / 180;
+	const a =
+		Math.sin(dLat / 2) ** 2 +
+		Math.cos((lat1 * Math.PI) / 180) *
+		Math.cos((lat2 * Math.PI) / 180) *
+		Math.sin(dLng / 2) ** 2;
+	return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+/** Returns "~X min" ETA string, or null if location unavailable */
+function calcEta(
+	driverLat: number | null,
+	driverLng: number | null,
+	job: Job,
+): string | null {
+	if (driverLat == null || driverLng == null) return null;
+	const jobLat = job.customerLocation?.latitude;
+	const jobLng = job.customerLocation?.longitude;
+	if (jobLat == null || jobLng == null) return null;
+	const km = distanceKm(driverLat, driverLng, jobLat, jobLng);
+	const minutes = Math.round((km / 40) * 60); // assume 40 km/h average city speed
+	return minutes <= 1 ? "< 1 min" : `~${minutes} min`;
+}
 
 export const DriverDashboardScreen = () => {
 	const {
@@ -31,10 +74,29 @@ export const DriverDashboardScreen = () => {
 	const navigation = useNavigation<any>();
 	const [refreshing, setRefreshing] = useState(false);
 	const [checkingForJobs, setCheckingForJobs] = useState(false);
+	const [driverLat, setDriverLat] = useState<number | null>(null);
+	const [driverLng, setDriverLng] = useState<number | null>(null);
 
 	useEffect(() => {
 		fetchEarnings();
 	}, [fetchEarnings]);
+
+	// Track driver location for ETA calculation
+	useEffect(() => {
+		let sub: Location.LocationSubscription | null = null;
+		(async () => {
+			const { status } = await Location.requestForegroundPermissionsAsync();
+			if (status !== "granted") return;
+			sub = await Location.watchPositionAsync(
+				{ accuracy: Location.Accuracy.Balanced, distanceInterval: 50 },
+				loc => {
+					setDriverLat(loc.coords.latitude);
+					setDriverLng(loc.coords.longitude);
+				},
+			);
+		})();
+		return () => { sub?.remove(); };
+	}, []);
 
 	// When going online, briefly show skeleton cards while jobs load in
 	useEffect(() => {
@@ -229,7 +291,13 @@ export const DriverDashboardScreen = () => {
 						</Text>
 					</View>
 				) : (
-					availableJobs.map(job => (
+					availableJobs.map(job => {
+						const eta = calcEta(driverLat, driverLng, job);
+						const v = job.customerVehicle;
+						const vehicleLabel = v
+							? [v.year, v.make, v.model, v.color ? '· ' + v.color : ''].filter(Boolean).join(' ')
+							: null;
+						return (
 						<Card key={job.id} style={styles.jobCard}>
 							{/* Job type + price */}
 							<View style={styles.jobHeader}>
@@ -253,18 +321,34 @@ export const DriverDashboardScreen = () => {
 								</Text>
 							</View>
 
-							{/* Location */}
+							{/* Partial address + ETA */}
 							<View style={styles.jobLocationRow}>
 								<View style={[styles.locationDot, { backgroundColor: colors.primary + "20" }]}>
 									<Ionicons name="location-outline" size={14} color={colors.primary} />
 								</View>
-								<Text
-									style={[styles.jobAddress, { color: colors.textMuted }]}
-									numberOfLines={2}
-								>
-									{job.customerLocation?.address || "Unknown Location"}
-								</Text>
+								<View style={{ flex: 1 }}>
+									<Text style={[styles.jobAddress, { color: colors.textMuted }]} numberOfLines={1}>
+										{maskAddress(job.customerLocation?.address)}
+									</Text>
+									{eta && (
+										<Text style={[styles.etaText, { color: colors.primary }]}>
+											{eta} away
+										</Text>
+									)}
+								</View>
 							</View>
+
+							{/* Vehicle info */}
+							{vehicleLabel && (
+								<View style={styles.vehicleRow}>
+									<View style={[styles.locationDot, { backgroundColor: colors.surface }]}>
+										<Ionicons name="car-sport-outline" size={14} color={colors.textMuted} />
+									</View>
+									<Text style={[styles.vehicleText, { color: colors.textMuted }]} numberOfLines={1}>
+										{vehicleLabel}
+									</Text>
+								</View>
+							)}
 
 							<PrimaryButton
 								title="Accept Request"
@@ -272,7 +356,8 @@ export const DriverDashboardScreen = () => {
 								style={styles.acceptBtn}
 							/>
 						</Card>
-					))
+						);
+					})
 				)}
 			</ScrollView>
 		</SafeAreaView>
@@ -399,7 +484,7 @@ const styles = StyleSheet.create({
 		flexDirection: "row",
 		alignItems: "flex-start",
 		gap: 10,
-		marginBottom: 16,
+		marginBottom: 10,
 	},
 	locationDot: {
 		width: 28,
@@ -409,7 +494,15 @@ const styles = StyleSheet.create({
 		justifyContent: "center",
 		flexShrink: 0,
 	},
-	jobAddress: { flex: 1, fontSize: 13, lineHeight: 18, paddingTop: 5 },
+	jobAddress: { fontSize: 13, lineHeight: 18, paddingTop: 4 },
+	etaText: { fontSize: 12, fontWeight: "600", marginTop: 2 },
+	vehicleRow: {
+		flexDirection: "row",
+		alignItems: "center",
+		gap: 10,
+		marginBottom: 14,
+	},
+	vehicleText: { flex: 1, fontSize: 13, lineHeight: 18 },
 	acceptBtn: { marginTop: 0 },
 
 	// Skeleton cards

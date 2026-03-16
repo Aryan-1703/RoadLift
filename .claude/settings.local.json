@@ -8,7 +8,11 @@
       "Bash(grep -E \"\\\\.js$\")",
       "Bash(xargs grep:*)",
       "Bash(xargs wc:*)",
-      "Bash(python3 -c \":*)"
+      "Bash(python3 -c \":*)",
+      "Bash(node d:/Repo/RoadLift/patch_dashboard.js)",
+      "Bash(find /d/Repo/RoadLift/frontend -type f \\\\\\(-name *.tsx -o -name *.ts -o -name *.jsx -o -name *.js \\\\\\))",
+      "Bash(find /d/Repo/RoadLift/frontend/screens -type f -name *.tsx -o -name *.ts)",
+      "Bash(grep -r \"webhook\\\\|stripe.*hook\\\\|account.updated\\\\|payout\" /d/Repo/RoadLift/backend --include=*.js)"
     ]
   }
 }
