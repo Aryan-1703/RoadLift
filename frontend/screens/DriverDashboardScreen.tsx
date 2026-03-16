@@ -68,6 +68,7 @@ export const DriverDashboardScreen = () => {
 		availableJobs,
 		fetchAvailableJobs,
 		acceptJob,
+		rejectJob,
 		earnings,
 		fetchEarnings,
 	} = useDriver();
@@ -77,6 +78,21 @@ export const DriverDashboardScreen = () => {
 	const [checkingForJobs, setCheckingForJobs] = useState(false);
 	const [driverLat, setDriverLat] = useState<number | null>(null);
 	const [driverLng, setDriverLng] = useState<number | null>(null);
+
+	// ── Decline tracking — persists for the session so polls don't resurface jobs ──
+	const declinedJobIdsRef = useRef<Set<string>>(new Set());
+
+	const handleDecline = (jobId: string) => {
+		declinedJobIdsRef.current.add(jobId);
+		// Clean up any glow timer for this job
+		const t = glowTimerRefs.current.get(jobId);
+		if (t) { clearTimeout(t); glowTimerRefs.current.delete(jobId); }
+		setNewJobIds(prev => { const n = new Set(prev); n.delete(jobId); return n; });
+		rejectJob(jobId);
+	};
+
+	// Filter out declined jobs before rendering (survives poll refreshes)
+	const visibleJobs = availableJobs.filter(j => !declinedJobIdsRef.current.has(String(j.id)));
 
 	// ── New-job glow tracking ─────────────────────────────────────────────────
 	const NEW_JOB_GLOW_MS = 45_000;
@@ -305,10 +321,10 @@ export const DriverDashboardScreen = () => {
 					<Text style={[styles.sectionTitle, { color: colors.text }]}>
 						Available Requests
 					</Text>
-					{isOnline && availableJobs.length > 0 && (
+					{isOnline && visibleJobs.length > 0 && (
 						<View style={[styles.countBadge, { backgroundColor: colors.accentBg, borderColor: colors.accentBorder }]}>
 							<Text style={[styles.countText, { color: colors.accentText }]}>
-								{availableJobs.length}
+								{visibleJobs.length}
 							</Text>
 						</View>
 					)}
@@ -342,7 +358,7 @@ export const DriverDashboardScreen = () => {
 						</View>
 					))}
 				</>
-			) : availableJobs.length === 0 ? (
+			) : visibleJobs.length === 0 ? (
 					<View style={[styles.emptyState, { borderColor: colors.border }]}>
 						<View style={[styles.emptyIcon, { backgroundColor: colors.surface }]}>
 							<Ionicons name="search-outline" size={32} color={colors.textMuted} />
@@ -355,7 +371,7 @@ export const DriverDashboardScreen = () => {
 						</Text>
 					</View>
 				) : (
-					availableJobs.map(job => {
+					visibleJobs.map(job => {
 						const eta   = calcEta(driverLat, driverLng, job);
 						const v     = job.customerVehicle;
 						const vehicleLabel = v
@@ -435,11 +451,21 @@ export const DriverDashboardScreen = () => {
 								</View>
 							)}
 
-							<PrimaryButton
-								title="Accept Request"
-								onPress={() => acceptJob(job.id!)}
-								style={styles.acceptBtn}
-							/>
+							<View style={styles.cardActions}>
+								<TouchableOpacity
+									onPress={() => handleDecline(String(job.id))}
+									style={[styles.declineBtn, { borderColor: colors.border, backgroundColor: colors.surface }]}
+									activeOpacity={0.7}
+								>
+									<Text style={[styles.declineBtnText, { color: colors.textMuted }]}>Decline</Text>
+								</TouchableOpacity>
+								<View style={styles.acceptBtnWrap}>
+									<PrimaryButton
+										title="Accept"
+										onPress={() => acceptJob(job.id!)}
+									/>
+								</View>
+							</View>
 						</Card>
 						);
 					})
@@ -604,6 +630,12 @@ const styles = StyleSheet.create({
 	},
 	vehicleText: { flex: 1, fontSize: 13, lineHeight: 18 },
 	acceptBtn: { marginTop: 0 },
+
+	// Decline / Accept action row
+	cardActions:    { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 4 },
+	declineBtn:     { paddingHorizontal: 16, paddingVertical: 12, borderRadius: 12, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+	declineBtnText: { fontSize: 14, fontWeight: "600" },
+	acceptBtnWrap:  { flex: 1 },
 
 	// Skeleton cards
 	skeletonCard: {
