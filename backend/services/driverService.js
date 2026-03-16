@@ -4,6 +4,7 @@ const stripe = require("../config/stripe");
 const paymentService = require("./paymentService");
 const { Op } = require("sequelize");
 const { sendPushNotification } = require("../utils/sendPushNotification");
+const driverLocationStore = require("./driverLocationStore");
 
 // ─────────────────────────────────────────────────────────────────────────────
 // normalizeJob — inlined to avoid any circular-dependency / import issues.
@@ -151,7 +152,10 @@ async function acceptJob(jobId, driverId) {
 			phone:    driver?.phoneNumber ?? null,
 			vehicle:  driverProfileRecord?.vehicleType ?? "Tow Truck",
 			rating:   5.0,
-			location: null, // will be populated by driver-location-update events
+			location: (() => {
+				const loc = driverLocationStore.get(driverId);
+				return loc ? { latitude: loc.lat, longitude: loc.lng } : null;
+			})(),
 		},
 	});
 

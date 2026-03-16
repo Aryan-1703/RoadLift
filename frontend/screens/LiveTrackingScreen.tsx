@@ -14,6 +14,7 @@ import { useJob } from "../context/JobContext";
 import { useTheme } from "../context/ThemeContext";
 import { LiveMap } from "../components/LiveMap";
 import { PrimaryButton } from "../components/PrimaryButton";
+import { ChatModal } from "../components/ChatModal";
 import { Ionicons } from "@expo/vector-icons";
 
 export const LiveTrackingScreen = () => {
@@ -21,6 +22,11 @@ export const LiveTrackingScreen = () => {
 		useJob();
 	const { colors } = useTheme();
 	const [locationError, setLocationError] = useState(false);
+	const [chatOpen, setChatOpen] = useState(false);
+
+	// Local copy of the customer's GPS — used directly by LiveMap so the map
+	// always has a valid coordinate even if job.customerLocation is briefly null.
+	const [mapLocation, setMapLocation] = useState(job.customerLocation);
 
 	// ── Track customer location ──────────────────────────────────────────────
 	useEffect(() => {
@@ -41,23 +47,30 @@ export const LiveTrackingScreen = () => {
 				return;
 			}
 
+			// Use last-known first (instant, no GPS warm-up delay)
+			const last = await Location.getLastKnownPositionAsync();
+			if (last) {
+				const loc = { latitude: last.coords.latitude, longitude: last.coords.longitude };
+				setMapLocation(loc);
+				setCustomerLocation(loc);
+			}
+
+			// Then get a fresh fix
 			const location = await Location.getCurrentPositionAsync({});
-			setCustomerLocation({
-				latitude:  location.coords.latitude,
-				longitude: location.coords.longitude,
-			});
+			const fresh = { latitude: location.coords.latitude, longitude: location.coords.longitude };
+			setMapLocation(fresh);
+			setCustomerLocation(fresh);
 
 			locationSubscription = await Location.watchPositionAsync(
 				{
-					accuracy:          Location.Accuracy.High,
-					timeInterval:      5000,
-					distanceInterval:  10,
+					accuracy:         Location.Accuracy.High,
+					timeInterval:     4000,
+					distanceInterval: 0,  // fire on time interval even when stationary
 				},
 				loc => {
-					setCustomerLocation({
-						latitude:  loc.coords.latitude,
-						longitude: loc.coords.longitude,
-					});
+					const updated = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
+					setMapLocation(updated);
+					setCustomerLocation(updated);
 				},
 			);
 		};
@@ -70,6 +83,31 @@ export const LiveTrackingScreen = () => {
 			}
 		};
 	}, [setCustomerLocation]);
+
+	// ── Cancel with confirmation ─────────────────────────────────────────────
+	const handleCancelRequest = () => {
+		const driverAssigned = job.status === "tracking" || job.status === "arrived" || job.status === "in_progress";
+
+		if (driverAssigned) {
+			Alert.alert(
+				"Cancel Service?",
+				"A $5.00 cancellation fee applies since a driver has already been assigned and is on their way.",
+				[
+					{ text: "Keep Service", style: "cancel" },
+					{ text: "Cancel Anyway ($5 fee)", style: "destructive", onPress: () => cancelJob() },
+				],
+			);
+		} else {
+			Alert.alert(
+				"Cancel Request?",
+				"Are you sure you want to cancel your service request?",
+				[
+					{ text: "No", style: "cancel" },
+					{ text: "Yes, Cancel", style: "destructive", onPress: () => cancelJob() },
+				],
+			);
+		}
+	};
 
 	// ── Call driver helper ───────────────────────────────────────────────────
 	const handleCallDriver = () => {
@@ -166,7 +204,7 @@ export const LiveTrackingScreen = () => {
 					</Text>
 				</View>
 				<View style={styles.cancelWrap}>
-					<PrimaryButton title="Cancel Request" variant="danger" onPress={cancelJob} />
+					<PrimaryButton title="Cancel Request" variant="danger" onPress={handleCancelRequest} />
 				</View>
 			</SafeAreaView>
 		);
@@ -231,7 +269,7 @@ export const LiveTrackingScreen = () => {
 			</SafeAreaView>
 
 			<LiveMap
-				userLocation={job.customerLocation}
+				userLocation={mapLocation ?? job.customerLocation}
 				providerLocation={providerLocation}
 				style={styles.map}
 			/>
@@ -258,15 +296,31 @@ export const LiveTrackingScreen = () => {
 					{/* ── Call button — now wired up ── */}
 					<TouchableOpacity
 						onPress={handleCallDriver}
-						style={[styles.callBtn, { backgroundColor: colors.primary + "20" }]}
+						style={[styles.actionBtn, { backgroundColor: colors.primary + "20" }]}
 						activeOpacity={0.7}
 					>
 						<Ionicons name="call" size={20} color={colors.primary} />
 					</TouchableOpacity>
+					{/* ── Chat button ── */}
+					<TouchableOpacity
+						onPress={() => setChatOpen(true)}
+						style={[styles.actionBtn, { backgroundColor: colors.primary + "20", marginLeft: 8 }]}
+						activeOpacity={0.7}
+					>
+						<Ionicons name="chatbubble-ellipses" size={20} color={colors.primary} />
+					</TouchableOpacity>
 				</View>
 
-				<PrimaryButton title="Cancel Request" variant="secondary" onPress={cancelJob} />
+				<PrimaryButton title="Cancel Request" variant="secondary" onPress={handleCancelRequest} />
 			</View>
+
+			{job.id && (
+				<ChatModal
+					jobId={String(job.id)}
+					visible={chatOpen}
+					onClose={() => setChatOpen(false)}
+				/>
+			)}
 		</View>
 	);
 };
@@ -374,7 +428,7 @@ const styles = StyleSheet.create({
 	providerName:  { fontSize: 20, fontWeight: "bold", marginBottom: 4 },
 	ratingRow:     { flexDirection: "row", alignItems: "center" },
 	ratingText:    { fontSize: 14, fontWeight: "bold" },
-	callBtn: {
+	actionBtn: {
 		width: 48,
 		height: 48,
 		borderRadius: 24,

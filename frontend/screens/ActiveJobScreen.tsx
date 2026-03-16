@@ -16,12 +16,14 @@ import { Card } from "../components/Card";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { Ionicons } from "@expo/vector-icons";
 import { LiveMap } from "../components/LiveMap";
+import { ChatModal } from "../components/ChatModal";
 import socketClient from "../services/socket";
 
 export const ActiveJobScreen = () => {
-	const { activeJob, updateJobStatus } = useDriver();
+	const { activeJob, updateJobStatus, cancelActiveJob } = useDriver();
 	const { colors } = useTheme();
 	const [isUpdating, setIsUpdating] = useState(false);
+	const [chatOpen, setChatOpen] = useState(false);
 	const [driverLocation, setDriverLocation] = useState<{
 		latitude: number;
 		longitude: number;
@@ -48,16 +50,22 @@ export const ActiveJobScreen = () => {
 			}
 
 			const initialLocation = await Location.getCurrentPositionAsync({});
-			setDriverLocation({
+			const initialCoords = {
 				latitude:  initialLocation.coords.latitude,
 				longitude: initialLocation.coords.longitude,
+			};
+			setDriverLocation(initialCoords);
+			// Emit immediately so customer sees driver pin right away
+			socketClient.emit("driver-location-update", {
+				jobId:    activeJob.id,
+				location: initialCoords,
 			});
 
 			locationSubscription = await Location.watchPositionAsync(
 				{
 					accuracy:         Location.Accuracy.High,
-					timeInterval:     5000,
-					distanceInterval: 10,
+					timeInterval:     4000,
+					distanceInterval: 0, // fire on time interval even when stationary
 				},
 				loc => {
 					const newLocation = {
@@ -91,12 +99,13 @@ export const ActiveJobScreen = () => {
 	};
 
 	const getNextStatus = () => {
-		switch (activeJob.status) {
-			case "ACCEPTED":
+		const s = (activeJob.status as string).toLowerCase();
+		switch (s) {
+			case "accepted":
 				return { status: "ARRIVED",     label: "Mark as Arrived" };
-			case "ARRIVED":
+			case "arrived":
 				return { status: "IN_PROGRESS", label: "Start Service" };
-			case "IN_PROGRESS":
+			case "in_progress":
 				return { status: "COMPLETED",   label: "Complete Job" };
 			default:
 				return null;
@@ -133,11 +142,31 @@ export const ActiveJobScreen = () => {
 		);
 	};
 
+	const handleDriverCancel = () => {
+		Alert.alert(
+			"Cancel Job?",
+			"Are you sure you want to cancel? The customer will be matched with another driver. Frequent cancellations may affect your account standing.",
+			[
+				{ text: "Keep Job", style: "cancel" },
+				{
+					text: "Cancel Job",
+					style: "destructive",
+					onPress: async () => {
+						setIsUpdating(true);
+						await cancelActiveJob();
+						setIsUpdating(false);
+					},
+				},
+			],
+		);
+	};
+
 	const nextAction = getNextStatus();
 	const customerName  = activeJob.customerName  || "Customer";
 	const customerPhone = activeJob.customerPhone || null;
 
 	return (
+		<>
 		<SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
 			{/* Header */}
 			<View
@@ -186,7 +215,7 @@ export const ActiveJobScreen = () => {
 						<TouchableOpacity
 							onPress={handleCallCustomer}
 							style={[
-								styles.callBtn,
+								styles.actionBtn,
 								{
 									backgroundColor: customerPhone
 										? colors.greenBg
@@ -201,6 +230,14 @@ export const ActiveJobScreen = () => {
 								size={20}
 								color={customerPhone ? colors.green : colors.textMuted}
 							/>
+						</TouchableOpacity>
+						{/* Chat button */}
+						<TouchableOpacity
+							onPress={() => setChatOpen(true)}
+							style={[styles.actionBtn, { backgroundColor: colors.primary + "20", marginLeft: 8 }]}
+							activeOpacity={0.7}
+						>
+							<Ionicons name="chatbubble-ellipses" size={20} color={colors.primary} />
 						</TouchableOpacity>
 					</View>
 				</Card>
@@ -273,8 +310,26 @@ export const ActiveJobScreen = () => {
 						Waiting for customer payment…
 					</Text>
 				)}
+				{(activeJob.status === "accepted" || activeJob.status === "arrived") && (
+					<PrimaryButton
+						title="Cancel Job"
+						variant="danger"
+						onPress={handleDriverCancel}
+						disabled={isUpdating}
+						style={{ marginTop: 10 }}
+					/>
+				)}
 			</View>
 		</SafeAreaView>
+
+		{activeJob.id && (
+			<ChatModal
+				jobId={String(activeJob.id)}
+				visible={chatOpen}
+				onClose={() => setChatOpen(false)}
+			/>
+		)}
+		</>
 	);
 };
 
@@ -312,7 +367,7 @@ const styles = StyleSheet.create({
 	customerInfo:  { flex: 1 },
 	customerName:  { fontSize: 18, fontWeight: "bold", marginBottom: 4 },
 	customerPhone: { fontSize: 14 },
-	callBtn: {
+	actionBtn: {
 		width: 40,
 		height: 40,
 		borderRadius: 20,

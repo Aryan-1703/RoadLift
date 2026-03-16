@@ -11,6 +11,7 @@ import { Job, JobStatus, ServiceTypeId, Provider, Location } from "../types";
 import socketClient from "../services/socket";
 import { api } from "../services/api";
 import { useAuth } from "./AuthContext";
+import { useToast } from "./ToastContext";
 
 // Safety-net timeout — backend's job-no-driver-found event fires first (~6.7 min).
 // This is only a last-resort fallback if the socket event is somehow missed.
@@ -48,8 +49,16 @@ export const JobProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 	const [travelFee,      setTravelFee]      = useState<number>(0);
 	const [searchMessage,  setSearchMessage]  = useState<string | null>(null);
 	const { user } = useAuth();
+	const { showToast } = useToast();
 
 	const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+	// Keep a ref to the customer's current location so socket handlers can read it
+	// without needing to be re-registered every time it changes.
+	const customerLocationRef = useRef<Location | null>(null);
+	useEffect(() => {
+		customerLocationRef.current = job.customerLocation;
+	}, [job.customerLocation]);
 
 	const clearSearchTimeout = useCallback(() => {
 		if (searchTimeoutRef.current) {
@@ -72,6 +81,23 @@ export const JobProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 		if (!user) resetJob();
 	}, [user, resetJob]);
 
+	// ── Haversine ETA helper (no Maps API needed) ───────────────────────────
+	const calcEtaMinutes = (
+		from: { latitude: number; longitude: number },
+		to:   { latitude: number; longitude: number },
+	): number => {
+		const R = 6371;
+		const dLat = ((to.latitude  - from.latitude)  * Math.PI) / 180;
+		const dLon = ((to.longitude - from.longitude) * Math.PI) / 180;
+		const a =
+			Math.sin(dLat / 2) ** 2 +
+			Math.cos((from.latitude * Math.PI) / 180) *
+				Math.cos((to.latitude * Math.PI) / 180) *
+				Math.sin(dLon / 2) ** 2;
+		const km = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+		return Math.max(1, Math.round((km / 40) * 60)); // 40 km/h average
+	};
+
 	// ── Socket listeners ────────────────────────────────────────────────────
 	useEffect(() => {
 		const handleProviderAssigned = (data: { jobId: string; provider: Provider }) => {
@@ -86,6 +112,7 @@ export const JobProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 				id:       data.jobId,
 			}));
 			setProviderLocation(data.provider.location);
+			showToast("Driver found and on the way!", "success");
 		};
 
 		const handleLocationUpdate = (data: {
@@ -93,11 +120,16 @@ export const JobProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 			location: { latitude: number; longitude: number };
 			eta?:     number;
 		}) => {
-			setProviderLocation({
+			const newLoc = {
 				latitude:  data.location.latitude,
 				longitude: data.location.longitude,
-			});
-			if (data.eta) setEta(data.eta);
+			};
+			setProviderLocation(newLoc);
+			if (data.eta != null) {
+				setEta(data.eta);
+			} else if (customerLocationRef.current) {
+				setEta(calcEtaMinutes(newLoc, customerLocationRef.current));
+			}
 		};
 
 		const handleJobCompleted = (data: { finalPrice: number | null; capturedTotal: number | null }) => {
@@ -111,8 +143,12 @@ export const JobProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
 		// Driver marked ARRIVED or IN_PROGRESS — update job status so UI can reflect it
 		const handleJobStatusUpdated = (data: { jobId: string; status: string }) => {
-			if (data.status === "arrived" || data.status === "in_progress") {
-				setJob(prev => ({ ...prev, status: data.status as JobStatus }));
+			if (data.status === "arrived") {
+				setJob(prev => ({ ...prev, status: "arrived" }));
+				showToast("Your driver has arrived!", "success");
+			} else if (data.status === "in_progress") {
+				setJob(prev => ({ ...prev, status: "in_progress" }));
+				showToast("Service has started.", "info");
 			}
 		};
 
@@ -145,23 +181,47 @@ export const JobProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 			setJob(prev => ({ ...prev, status: "idle" }));
 		};
 
-		socketClient.on("provider-assigned",      handleProviderAssigned);
-		socketClient.on("driver-location-updated", handleLocationUpdate);
-		socketClient.on("job-completed",           handleJobCompleted);
-		socketClient.on("job-status-updated",      handleJobStatusUpdated);
+		// Driver cancelled — job is being re-dispatched; put customer back in searching state
+		const handleDriverCancelled = (data: { jobId: string; message: string }) => {
+			showToast(data.message || "Your driver cancelled. Finding a new one.", "error");
+			setProviderLocation(null);
+			setEta(null);
+			setSearchMessage(null);
+			setSearchTimedOut(false);
+			setJob(prev => ({
+				...prev,
+				status:   "searching",
+				provider: undefined,
+			}));
+			// Restart the safety-net timeout for the new search
+			searchTimeoutRef.current = setTimeout(() => {
+				setJob(current => {
+					if (current.status !== "searching") return current;
+					setSearchTimedOut(true);
+					return { ...current, status: "idle" };
+				});
+			}, 10 * 60 * 1000);
+		};
+
+		socketClient.on("provider-assigned",        handleProviderAssigned);
+		socketClient.on("driver-location-updated",  handleLocationUpdate);
+		socketClient.on("job-completed",            handleJobCompleted);
+		socketClient.on("job-status-updated",       handleJobStatusUpdated);
 		// Stage 0 confirmation + stage 1-4 expansions use the same handler
-		socketClient.on("job-search-started",      handleExpandingRadius);
-		socketClient.on("job-expanding-radius",    handleExpandingRadius);
-		socketClient.on("job-no-driver-found",     handleNoDriverFound);
+		socketClient.on("job-search-started",       handleExpandingRadius);
+		socketClient.on("job-expanding-radius",     handleExpandingRadius);
+		socketClient.on("job-no-driver-found",      handleNoDriverFound);
+		socketClient.on("job-cancelled-by-driver",  handleDriverCancelled);
 
 		return () => {
-			socketClient.off("provider-assigned",      handleProviderAssigned);
+			socketClient.off("provider-assigned",       handleProviderAssigned);
 			socketClient.off("driver-location-updated", handleLocationUpdate);
 			socketClient.off("job-completed",           handleJobCompleted);
 			socketClient.off("job-status-updated",      handleJobStatusUpdated);
 			socketClient.off("job-search-started",      handleExpandingRadius);
 			socketClient.off("job-expanding-radius",    handleExpandingRadius);
 			socketClient.off("job-no-driver-found",     handleNoDriverFound);
+			socketClient.off("job-cancelled-by-driver", handleDriverCancelled);
 		};
 	}, [clearSearchTimeout]);
 
@@ -234,21 +294,40 @@ export const JobProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 	}, [job.customerLocation, job.serviceType, job.notes, job.estimatedPrice, user]);
 
 	// ── Cancel job ──────────────────────────────────────────────────────────
-	const cancelJob = useCallback(() => {
+	const cancelJob = useCallback(async () => {
 		clearSearchTimeout();
 		setSearchTimedOut(false);
 
 		const currentJobId  = job.id;
 		const currentStatus = job.status;
 
-		resetJob();
-
-		if (currentJobId && (currentStatus === "searching" || currentStatus === "tracking")) {
-			api.put(`/jobs/${currentJobId}/cancel`).catch(err => {
-				console.warn("[JobContext] Failed to cancel job on backend:", err?.message);
-			});
+		if (!currentJobId) {
+			resetJob();
+			return;
 		}
-	}, [job.id, job.status, resetJob, clearSearchTimeout]);
+
+		// Optimistic cancel while still searching — no fee, fire and forget
+		if (currentStatus === "searching") {
+			resetJob();
+			api.put(`/jobs/${currentJobId}/cancel`).catch(err =>
+				console.warn("[JobContext] Failed to cancel pending job:", err?.message),
+			);
+			return;
+		}
+
+		// After driver assigned — wait for API (fee may be charged)
+		try {
+			const res = await api.put<{ cancellationFee: number }>(`/jobs/${currentJobId}/cancel`);
+			resetJob();
+			const fee = res.data?.cancellationFee ?? 0;
+			if (fee > 0) {
+				showToast(`Cancelled. A $${fee.toFixed(2)} cancellation fee was charged.`, "info");
+			}
+		} catch (err: any) {
+			const msg = err?.response?.data?.message ?? err?.message ?? "Could not cancel";
+			showToast(msg, "error");
+		}
+	}, [job.id, job.status, resetJob, clearSearchTimeout, showToast]);
 
 	return (
 		<JobContext.Provider

@@ -8,6 +8,7 @@ import {
 	Text,
 	Alert,
 	Linking,
+	Platform,
 } from "react-native";
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from "react-native-maps";
 import * as Location from "expo-location";
@@ -200,7 +201,7 @@ export const LiveMap: React.FC<LiveMapProps> = ({
 		<MapView
 			ref={mapRef}
 			style={[styles.map, style]}
-			provider={PROVIDER_GOOGLE}
+			provider={Platform.OS === "android" ? PROVIDER_GOOGLE : undefined}
 			customMapStyle={mapStyle}
 			initialRegion={{
 				latitude: activeLocation.latitude,

@@ -99,23 +99,86 @@ async function getJobById(id) {
 	return getNormalize()(job);
 }
 
+// Flat cancellation fee charged when a customer cancels after driver is assigned
+const CUSTOMER_CANCEL_FEE_CENTS = 500; // $5.00
+
 // ─────────────────────────────────────────────────────────────────────────────
-// cancelJob
+// cancelJob  (customer-initiated)
 // ─────────────────────────────────────────────────────────────────────────────
 async function cancelJob(jobId, userId) {
 	const job = await Job.findByPk(jobId);
 	if (!job) throw new Error("Job not found.");
 	if (job.userId !== userId) throw new Error("Forbidden");
-	if (["accepted", "in_progress"].includes(job.status)) {
-		throw new Error("This job has already been accepted by a driver.");
+
+	if (job.status === "in_progress") {
+		throw new Error("Cannot cancel a job that is already in progress.");
 	}
-	// Release the payment hold
-	if (job.paymentIntentId) {
-		await paymentService.cancelAuthorization(job.paymentIntentId);
+	if (!["pending", "accepted", "arrived"].includes(job.status)) {
+		throw new Error("This job cannot be cancelled.");
 	}
+
+	let cancellationFee = 0;
+
+	if (job.status === "pending") {
+		// Free cancellation — stop dispatch and void the hold
+		const { stopDispatch } = require("./dispatchService");
+		stopDispatch(job.id);
+		if (job.paymentIntentId) {
+			await paymentService.cancelAuthorization(job.paymentIntentId);
+		}
+	} else {
+		// Late cancellation (accepted / arrived) — charge $5 fee
+		if (job.paymentIntentId) {
+			try {
+				await paymentService.capturePartialAndCancel(job.paymentIntentId, CUSTOMER_CANCEL_FEE_CENTS);
+				cancellationFee = CUSTOMER_CANCEL_FEE_CENTS / 100;
+			} catch (err) {
+				console.warn("[jobService] Could not charge cancellation fee:", err.message);
+				// Still release the full hold so customer isn't left charged
+				await paymentService.cancelAuthorization(job.paymentIntentId).catch(() => {});
+			}
+		}
+	}
+
+	const driverId = job.driverId;
 	job.status = "cancelled";
+	if (cancellationFee > 0) job.finalCost = cancellationFee;
 	await job.save();
-	return job;
+
+	return { job, cancellationFee, driverId };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// driverCancelJob  (driver-initiated)
+// Re-dispatches the job so the customer is matched with another driver.
+// ─────────────────────────────────────────────────────────────────────────────
+async function driverCancelJob(jobId, driverId) {
+	const job = await Job.findByPk(jobId);
+	if (!job) throw new Error("Job not found.");
+	if (Number(job.driverId) !== Number(driverId)) throw new Error("Forbidden");
+
+	if (!["accepted", "arrived"].includes(job.status)) {
+		throw new Error("Cannot cancel this job in its current state.");
+	}
+
+	const customerId = job.userId;
+
+	// Reset job so it can be re-dispatched
+	job.driverId = null;
+	job.status   = "pending";
+	await job.save();
+
+	// Re-start the dispatch search
+	const { startDispatch } = require("./dispatchService");
+	const lat = job.pickupLocation?.coordinates?.[1];
+	const lng = job.pickupLocation?.coordinates?.[0];
+	if (lat && lng) {
+		startDispatch(job, lat, lng).catch(err =>
+			console.error("[jobService] Re-dispatch after driver cancel failed:", err.message),
+		);
+	}
+
+	return { job, customerId };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -163,6 +226,7 @@ module.exports = {
 	createJob,
 	getJobById,
 	cancelJob,
+	driverCancelJob,
 	updateJobStatus,
 	submitReview,
 };

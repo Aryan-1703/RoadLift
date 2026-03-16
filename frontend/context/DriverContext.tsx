@@ -17,17 +17,18 @@ import { useToast } from "./ToastContext";
 const POLL_INTERVAL_MS = 30_000;
 
 interface DriverContextType {
-	isOnline:          boolean;
-	availableJobs:     Job[];
-	activeJob:         Job | null;
-	earnings:          any;
-	goOnline:          () => Promise<void>;
-	goOffline:         () => Promise<void>;
-	acceptJob:         (jobId: string) => Promise<void>;
-	rejectJob:         (jobId: string) => void;
-	updateJobStatus:   (status: string) => Promise<void>;
-	fetchEarnings:     () => Promise<void>;
-	fetchAvailableJobs:() => Promise<void>;
+	isOnline:           boolean;
+	availableJobs:      Job[];
+	activeJob:          Job | null;
+	earnings:           any;
+	goOnline:           () => Promise<void>;
+	goOffline:          () => Promise<void>;
+	acceptJob:          (jobId: string) => Promise<void>;
+	rejectJob:          (jobId: string) => void;
+	updateJobStatus:    (status: string) => Promise<void>;
+	cancelActiveJob:    () => Promise<void>;
+	fetchEarnings:      () => Promise<void>;
+	fetchAvailableJobs: () => Promise<void>;
 }
 
 const DriverContext = createContext<DriverContextType | undefined>(undefined);
@@ -226,6 +227,16 @@ export const DriverProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 		setAvailableJobs(prev => prev.filter(j => j.id !== jobId));
 	}, []);
 
+	// ── Earnings ─────────────────────────────────────────────────────────────
+	const fetchEarnings = useCallback(async () => {
+		try {
+			const response = await api.get<{ data: { today: number; completedJobs: any[] } }>("/driver/earnings");
+			setEarnings(response.data.data || { today: 0, completedJobs: [] });
+		} catch (err) {
+			console.error("Failed to fetch earnings", err);
+		}
+	}, []);
+
 	// ── Update job status (ARRIVED / IN_PROGRESS / COMPLETED) ───────────────
 	const updateJobStatus = useCallback(async (status: string) => {
 		if (!activeJob?.id) return;
@@ -254,17 +265,22 @@ export const DriverProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 				"error",
 			);
 		}
-	}, [activeJob, showToast]);
+	}, [activeJob, showToast, fetchEarnings]);
 
-	// ── Earnings ─────────────────────────────────────────────────────────────
-	const fetchEarnings = useCallback(async () => {
+	// ── Cancel active job (driver-initiated) — job is re-dispatched ──────────
+	const cancelActiveJob = useCallback(async () => {
+		if (!activeJob?.id) return;
 		try {
-			const response = await api.get("/driver/earnings");
-			setEarnings(response.data.data || { today: 0, completedJobs: [] });
-		} catch (err) {
-			console.error("Failed to fetch earnings", err);
+			await api.put(`/jobs/${activeJob.id}/driver-cancel`);
+			setActiveJob(null);
+			showToast("Job cancelled. Customer is being re-matched.", "info");
+		} catch (err: any) {
+			showToast(
+				err.response?.data?.message ?? err.response?.data?.error ?? "Failed to cancel job",
+				"error",
+			);
 		}
-	}, []);
+	}, [activeJob, showToast]);
 
 	return (
 		<DriverContext.Provider
@@ -278,6 +294,7 @@ export const DriverProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 				acceptJob,
 				rejectJob,
 				updateJobStatus,
+				cancelActiveJob,
 				fetchEarnings,
 				fetchAvailableJobs,
 			}}

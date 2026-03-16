@@ -109,6 +109,35 @@ io.on("connection", socket => {
 	});
 
 	// ── driver-online / driver-offline — mirror the REST status toggle ───────
+	// ── send-message — chat between customer and driver within a job room ─────
+	socket.on("send-message", async ({ jobId, text }) => {
+		if (!jobId || !text?.trim()) return;
+		const senderId   = socket.data.userId;
+		const senderRole = socket.data.role;
+		if (!senderId || !senderRole) return;
+
+		try {
+			const { Message } = require("./models");
+			const message = await Message.create({
+				jobId:      parseInt(jobId),
+				senderId:   parseInt(senderId),
+				senderRole: senderRole.toUpperCase(),
+				text:       text.trim(),
+			});
+			io.to(`job-${jobId}`).emit("receive-message", {
+				id:         message.id,
+				jobId:      String(jobId),
+				senderId:   String(senderId),
+				senderRole: message.senderRole,
+				text:       message.text,
+				createdAt:  message.createdAt,
+			});
+		} catch (err) {
+			console.error("[Socket] send-message error:", err.message);
+		}
+	});
+
+	// ── driver-online / driver-offline — mirror the REST status toggle ───────
 	socket.on("driver-online", ({ driverId }) => {
 		if (driverId) socket.join("drivers");
 	});

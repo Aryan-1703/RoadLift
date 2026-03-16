@@ -261,6 +261,15 @@ async function cancelAuthorization(paymentIntentId) {
 	}
 }
 
+// ── capturePartialAndCancel — charges only the fee amount; Stripe auto-releases the rest ──
+async function capturePartialAndCancel(paymentIntentId, feeCents) {
+	const intent = await stripe.paymentIntents.retrieve(paymentIntentId);
+	const amountToCapture = Math.min(feeCents, intent.amount);
+	return stripe.paymentIntents.capture(paymentIntentId, {
+		amount_to_capture: amountToCapture,
+	});
+}
+
 module.exports = {
 	ensureStripeCustomer,
 	createSetupIntent,
@@ -272,4 +281,5 @@ module.exports = {
 	authorizePayment,
 	capturePayment,
 	cancelAuthorization,
+	capturePartialAndCancel,
 };

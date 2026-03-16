@@ -9,6 +9,7 @@ db.DriverProfile = require("./driverProfile.model")(sequelize);
 db.Job           = require("./job.model")(sequelize);
 db.Review        = require("./review.model")(sequelize);
 db.Vehicle       = require("./vehicle.model")(sequelize);
+db.Message       = require("./message.model")(sequelize);
 
 // ── Associations ──────────────────────────────────────────────────────────────
 
@@ -46,5 +47,13 @@ db.Vehicle.belongsTo(db.User, { foreignKey: "userId" });
 // Vehicle → Jobs
 db.Vehicle.hasMany(db.Job, { foreignKey: "vehicleId", as: "jobs" });
 db.Job.belongsTo(db.Vehicle, { foreignKey: "vehicleId", as: "vehicle" });
+
+// Job → Messages
+db.Job.hasMany(db.Message, { foreignKey: "jobId", as: "messages" });
+db.Message.belongsTo(db.Job, { foreignKey: "jobId" });
+
+// User → Messages (sender)
+db.User.hasMany(db.Message, { foreignKey: "senderId", as: "sentMessages" });
+db.Message.belongsTo(db.User, { foreignKey: "senderId", as: "sender" });
 
 module.exports = db;

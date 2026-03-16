@@ -14,7 +14,7 @@ export const getRouteCoordinates = async (
 	try {
 		// FIX: was calling Google directly; now uses backend proxy endpoint.
 		// Backend: GET /api/directions?originLat=...&originLng=...&destLat=...&destLng=...
-		const res = await api.get<{ polyline: string }>("/directions", {
+		const res = await api.get<{ polyline: string }>("/direction", {
 			params: {
 				originLat: origin.latitude,
 				originLng: origin.longitude,

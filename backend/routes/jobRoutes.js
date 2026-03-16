@@ -1,11 +1,13 @@
 const express = require("express");
 const router = express.Router();
-const { protect } = require("../middleware/authMiddleware");
+const { protect, protectDriver } = require("../middleware/authMiddleware");
 const {
 	createJob,
 	getJobById,
 	cancelJob,
+	driverCancelJob,
 	submitReview,
+	getMessages,
 } = require("../controllers/jobController");
 
 // POST   /api/jobs  — Customer creates a new job request
@@ -43,10 +45,16 @@ router.get("/history", protect, async (req, res) => {
 // GET    /api/jobs/:id  — Single job by ID
 router.get("/:id", protect, getJobById);
 
-// PUT    /api/jobs/:jobId/cancel  — Customer cancels a pending job
+// PUT    /api/jobs/:jobId/cancel        — Customer cancels (free if pending; $5 fee if driver assigned)
 router.put("/:jobId/cancel", protect, cancelJob);
+
+// PUT    /api/jobs/:jobId/driver-cancel — Driver cancels an accepted job; job is re-dispatched
+router.put("/:jobId/driver-cancel", protect, protectDriver, driverCancelJob);
 
 // POST   /api/jobs/:jobId/review  — Customer rates the completed job
 router.post("/:jobId/review", protect, submitReview);
+
+// GET    /api/jobs/:jobId/messages  — Chat history for a job
+router.get("/:jobId/messages", protect, getMessages);
 
 module.exports = router;
