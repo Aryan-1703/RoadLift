@@ -81,8 +81,9 @@ export const DriverDashboardScreen = () => {
 	// ── New-job glow tracking ─────────────────────────────────────────────────
 	const NEW_JOB_GLOW_MS = 45_000;
 	const [newJobIds, setNewJobIds] = useState<Set<string>>(new Set());
-	const prevJobIdsRef = useRef<Set<string>>(new Set());
-	const badgeAnim    = useRef(new Animated.Value(1)).current;
+	const prevJobIdsRef  = useRef<Set<string>>(new Set());
+	const glowTimerRefs  = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+	const badgeAnim      = useRef(new Animated.Value(1)).current;
 
 	useEffect(() => {
 		fetchEarnings();
@@ -114,7 +115,9 @@ export const DriverDashboardScreen = () => {
 		}
 	}, [isOnline]);
 
-	// Detect newly arrived jobs and mark them as "new" for NEW_JOB_GLOW_MS
+	// Detect newly arrived jobs and mark them as "new" for NEW_JOB_GLOW_MS.
+	// Timers are stored in glowTimerRefs so a refresh (which re-runs this effect)
+	// does NOT cancel the countdown that already started.
 	useEffect(() => {
 		const currentIds = new Set(availableJobs.map(j => String(j.id)));
 		const addedIds: string[] = [];
@@ -130,16 +133,27 @@ export const DriverDashboardScreen = () => {
 			return next;
 		});
 
-		const timer = setTimeout(() => {
-			setNewJobIds(prev => {
-				const next = new Set(prev);
-				addedIds.forEach(id => next.delete(id));
-				return next;
-			});
-		}, NEW_JOB_GLOW_MS);
-
-		return () => clearTimeout(timer);
+		// One timer per job ID — stored outside the effect so re-runs don't cancel them
+		addedIds.forEach(id => {
+			if (glowTimerRefs.current.has(id)) return; // already counting down
+			const timer = setTimeout(() => {
+				setNewJobIds(prev => {
+					const next = new Set(prev);
+					next.delete(id);
+					return next;
+				});
+				glowTimerRefs.current.delete(id);
+			}, NEW_JOB_GLOW_MS);
+			glowTimerRefs.current.set(id, timer);
+		});
 	}, [availableJobs]);
+
+	// Clear all glow timers on unmount
+	useEffect(() => {
+		return () => {
+			glowTimerRefs.current.forEach(t => clearTimeout(t));
+		};
+	}, []);
 
 	// Pulse the NEW badge while any new jobs are present
 	useEffect(() => {
