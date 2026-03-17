@@ -205,9 +205,6 @@ export const JobProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 				applyCompletion();
 			} else {
 				// Driver triggered — show confirmation before payment screen
-				const totalStr = data.capturedTotal
-					? 					: data.finalPrice
-					? 					: null;
 				const msg = data.capturedTotal
 					? `Your driver has finished the service. Total charged: ${data.capturedTotal.toFixed(2)}. Tap below to view your receipt.`
 					: data.finalPrice
