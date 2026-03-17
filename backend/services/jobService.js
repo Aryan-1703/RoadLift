@@ -228,8 +228,27 @@ async function submitReview(jobId, reviewData, author) {
 	return review;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// customerCompleteJob  (customer-initiated completion)
+// Delegates to driverService.completeJob with triggeredByCustomer flag
+// so the driver receives a job-completed-notice socket event.
+// ─────────────────────────────────────────────────────────────────────────────
+async function customerCompleteJob(jobId, userId) {
+	const job = await Job.findByPk(jobId);
+	if (!job) throw new Error("Job not found.");
+	if (Number(job.userId) !== Number(userId)) throw new Error("Forbidden");
+	if (!["accepted", "arrived", "in_progress"].includes(job.status)) {
+		throw new Error("This job cannot be completed in its current state.");
+	}
+	if (!job.driverId) throw new Error("No driver assigned to this job.");
+	// Reuse the full payment-capture + transfer + emit logic from driverService
+	const { completeJob } = require("./driverService");
+	return completeJob(jobId, job.driverId, { triggeredByCustomer: true });
+}
+
 module.exports = {
 	createJob,
+	customerCompleteJob,
 	getJobById,
 	cancelJob,
 	driverCancelJob,

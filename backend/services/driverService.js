@@ -172,7 +172,7 @@ const PLATFORM_FEE_PERCENT = 20;
 // ─────────────────────────────────────────────────────────────────────────────
 // completeJob
 // ─────────────────────────────────────────────────────────────────────────────
-async function completeJob(jobId, driverId) {
+async function completeJob(jobId, driverId, opts = {}) {
 	const job = await Job.findByPk(jobId);
 	if (!job) throw new Error("Job not found.");
 	if (job.driverId !== driverId) throw new Error("Forbidden");
@@ -244,8 +244,17 @@ async function completeJob(jobId, driverId) {
 		jobId:        job.id,
 		finalPrice:   job.finalCost ? parseFloat(String(job.finalCost)) : null,
 		capturedTotal,
+		confirmedBy:  opts.triggeredByCustomer ? "customer" : "driver",
 		message:      "Your service is complete! Payment has been processed.",
 	});
+
+	// Notify the driver when the customer triggered completion
+	if (opts.triggeredByCustomer) {
+		io.to(String(driverId)).emit("job-completed-notice", {
+			jobId:   job.id,
+			message: "Customer has confirmed job complete. Payment has been processed.",
+		});
+	}
 
 	const jobWithCustomer = await Job.findByPk(job.id, { include: [CUSTOMER_INCLUDE, VEHICLE_INCLUDE] });
 	return normalizeJob(jobWithCustomer);

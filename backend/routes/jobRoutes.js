@@ -9,6 +9,7 @@ const {
 	submitReview,
 	getMessages,
 } = require("../controllers/jobController");
+const { customerCompleteJob } = require("../services/jobService");
 
 // POST   /api/jobs  — Customer creates a new job request
 router.post("/", protect, createJob);
@@ -64,6 +65,16 @@ router.get("/active", protect, async (req, res) => {
 	} catch (err) {
 		console.error("[jobRoutes] /active error:", err);
 		res.status(500).json({ message: "Failed to fetch active job." });
+	}
+});
+
+// PUT    /api/jobs/:jobId/complete  — Customer marks job complete (triggers payment + notifies driver)
+router.put("/:jobId/complete", protect, async (req, res) => {
+	try {
+		const result = await customerCompleteJob(req.params.jobId, req.user.id);
+		res.json(result);
+	} catch (err) {
+		res.status(400).json({ message: err.message });
 	}
 });
 

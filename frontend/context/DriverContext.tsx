@@ -168,10 +168,19 @@ export const DriverProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 		// payment-received fires regardless of online/offline state
 		socketClient.on("payment-received", handlePaymentReceived);
 
+		// Job completed by customer — clear active job and notify driver
+		const handleJobCompletedNotice = (data: { jobId: string; message: string }) => {
+			showToast(data.message || "Job complete. Payment processed.", "success");
+			setActiveJob(null);
+			fetchEarnings();
+		};
+		socketClient.on("job-completed-notice", handleJobCompletedNotice);
+
 		return () => {
 			socketClient.off("new-job-available", handleNewJob);
 			socketClient.off("job-cancelled",      handleJobCancelled);
 			socketClient.off("payment-received",   handlePaymentReceived);
+			socketClient.off("job-completed-notice", handleJobCompletedNotice);
 			if (pollIntervalRef.current) {
 				clearInterval(pollIntervalRef.current);
 				pollIntervalRef.current = null;

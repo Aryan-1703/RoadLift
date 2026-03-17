@@ -1,3 +1,4 @@
+import { Alert } from "react-native";
 import React, {
 	createContext,
 	useState,
@@ -148,7 +149,7 @@ export const JobProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 				Math.cos((to.latitude * Math.PI) / 180) *
 				Math.sin(dLon / 2) ** 2;
 		const km = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-		return Math.max(1, Math.round((km / 40) * 60)); // 40 km/h average
+		return Math.max(0, Math.round((km / 40) * 60)); // 40 km/h average
 	};
 
 	// ── Socket listeners ────────────────────────────────────────────────────
@@ -185,13 +186,40 @@ export const JobProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 			}
 		};
 
-		const handleJobCompleted = (data: { finalPrice: number | null; capturedTotal: number | null }) => {
-			setJob(prev => ({
-				...prev,
-				status:        "payment",
-				finalPrice:    data.finalPrice    ?? undefined,
-				capturedTotal: data.capturedTotal ?? undefined,
-			}));
+		const handleJobCompleted = (data: {
+			finalPrice:    number | null;
+			capturedTotal: number | null;
+			confirmedBy?:  string;
+		}) => {
+			const applyCompletion = () => {
+				setJob(prev => ({
+					...prev,
+					status:        "payment",
+					finalPrice:    data.finalPrice    ?? undefined,
+					capturedTotal: data.capturedTotal ?? undefined,
+				}));
+			};
+
+			if (data.confirmedBy === "customer") {
+				// Customer triggered — go straight to payment
+				applyCompletion();
+			} else {
+				// Driver triggered — show confirmation before payment screen
+				const totalStr = data.capturedTotal
+					? 					: data.finalPrice
+					? 					: null;
+				const msg = data.capturedTotal
+					? `Your driver has finished the service. Total charged: ${data.capturedTotal.toFixed(2)}. Tap below to view your receipt.`
+					: data.finalPrice
+					? `Your driver has finished the service. Total charged: ${(data.finalPrice * 1.13).toFixed(2)}. Tap below to view your receipt.`
+					: "Your driver has finished the service. Tap below to view your receipt.";
+				Alert.alert(
+					"Job Complete",
+					msg,
+					[{ text: "View Receipt", onPress: applyCompletion }],
+					{ cancelable: false },
+				);
+			}
 		};
 
 		// Driver marked ARRIVED or IN_PROGRESS — update job status so UI can reflect it
