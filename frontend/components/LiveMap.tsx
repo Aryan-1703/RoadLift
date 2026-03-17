@@ -36,6 +36,7 @@ export const LiveMap: React.FC<LiveMapProps> = ({
 }) => {
 	const { colors, isDarkMode } = useTheme();
 	const mapRef = useRef<MapView>(null);
+	const hasFittedRef = useRef(false);
 	const [routeCoords, setRouteCoords] = useState<
 		{ latitude: number; longitude: number }[]
 	>([]);
@@ -93,17 +94,12 @@ export const LiveMap: React.FC<LiveMapProps> = ({
 	}, [activeLocation, providerLocation]);
 
 	useEffect(() => {
-		if (activeLocation && providerLocation && mapRef.current) {
+		if (!mapRef.current || hasFittedRef.current) return;
+		if (activeLocation && providerLocation) {
+			hasFittedRef.current = true;
 			mapRef.current.fitToCoordinates([activeLocation, providerLocation], {
 				edgePadding: { top: 100, right: 50, bottom: 250, left: 50 },
 				animated: true,
-			});
-		} else if (activeLocation && mapRef.current) {
-			mapRef.current.animateToRegion({
-				latitude: activeLocation.latitude,
-				longitude: activeLocation.longitude,
-				latitudeDelta: 0.01,
-				longitudeDelta: 0.01,
 			});
 		}
 	}, [activeLocation, providerLocation]);
@@ -206,8 +202,8 @@ export const LiveMap: React.FC<LiveMapProps> = ({
 			initialRegion={{
 				latitude: activeLocation.latitude,
 				longitude: activeLocation.longitude,
-				latitudeDelta: 0.01,
-				longitudeDelta: 0.01,
+				latitudeDelta: 0.05,
+				longitudeDelta: 0.05,
 			}}
 			showsUserLocation={true}
 			showsMyLocationButton={false}

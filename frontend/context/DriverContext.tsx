@@ -104,8 +104,17 @@ export const DriverProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 			setAvailableJobs([]);
 			setActiveJob(null);
 			setEarnings({ today: 0, completedJobs: [] });
+			return;
 		}
-	}, [user]);
+		// Restore any active job from the server after cold-start / crash
+		if (user.role === 'DRIVER') {
+			api.get<any>('/driver/jobs/active')
+				.then(res => {
+					if (res.data) setActiveJob(mapApiJob(res.data));
+				})
+				.catch(() => {});
+		}
+	}, [user?.id]);
 
 	// ── Fetch available jobs ─────────────────────────────────────────────────
 	const fetchAvailableJobs = useCallback(async () => {

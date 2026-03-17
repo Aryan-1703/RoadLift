@@ -38,6 +38,7 @@ interface JobContextType {
 	resetJob: () => void;
 	providerLocation: Location | null;
 	eta: number | null;
+	isRestoringJob: boolean;
 }
 
 const initialJobState: Job = {
@@ -56,6 +57,7 @@ export const JobProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 	const [travelFee,      setTravelFee]      = useState<number>(0);
 	const [searchMessage,  setSearchMessage]  = useState<string | null>(null);
 	const [thirdParty,     setThirdParty]     = useState<ThirdPartyInfo | null>(null);
+	const [isRestoringJob, setIsRestoringJob] = useState(true); // true until first restore attempt completes
 	const { user } = useAuth();
 	const { showToast } = useToast();
 
@@ -87,8 +89,50 @@ export const JobProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 	}, [clearSearchTimeout]);
 
 	useEffect(() => {
-		if (!user) resetJob();
-	}, [user, resetJob]);
+		if (!user) {
+			resetJob();
+			setIsRestoringJob(false);
+			return;
+		}
+		// Restore any in-flight job from the server after login or cold-start
+		if (user.role === 'CUSTOMER') {
+			api.get<any>('/jobs/active')
+				.then(res => {
+					const raw = res.data;
+					if (!raw) return;
+					const statusMap: Record<string, any> = {
+						pending:     'searching',
+						accepted:    'tracking',
+						arrived:     'arrived',
+						in_progress: 'in_progress',
+					};
+					const frontendStatus = statusMap[raw.status];
+					if (!frontendStatus) return;
+					setJob({
+						id:               raw.id,
+						serviceType:      raw.serviceType      ?? null,
+						customerLocation: raw.customerLocation ?? null,
+						notes:            raw.notes            ?? undefined,
+						status:           frontendStatus,
+						estimatedPrice:   raw.estimatedPrice   ?? undefined,
+						currentPrice:     raw.currentPrice     ?? undefined,
+						dispatchStage:    raw.dispatchStage    ?? undefined,
+						currentRadius:    raw.currentRadius    ?? undefined,
+						isThirdParty:     raw.isThirdParty     ?? false,
+						recipientName:    raw.recipientName    ?? undefined,
+						recipientPhone:   raw.recipientPhone   ?? undefined,
+					});
+					if (raw.isThirdParty && raw.recipientName) {
+						setThirdParty({ name: raw.recipientName, phone: raw.recipientPhone ?? '' });
+					}
+					if (raw.id) socketClient.emit('join-job', raw.id);
+				})
+				.catch(() => {}) // silent — network may be unavailable
+				.finally(() => setIsRestoringJob(false));
+		} else {
+			setIsRestoringJob(false);
+		}
+	}, [user?.id, resetJob]);
 
 	// ── Haversine ETA helper (no Maps API needed) ───────────────────────────
 	const calcEtaMinutes = (
@@ -359,6 +403,7 @@ export const JobProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 				resetJob,
 				providerLocation,
 				eta,
+				isRestoringJob,
 			}}
 		>
 			{children}

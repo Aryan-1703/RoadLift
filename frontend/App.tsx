@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { View, ActivityIndicator } from "react-native";
 import { NavigationContainer, NavigationContainerRef } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
@@ -18,6 +18,7 @@ import { RegisterScreen } from "./screens/RegisterScreen";
 import { JobFlowScreen } from "./screens/JobFlowScreen";
 import { SettingsNavigator } from "./navigation/SettingsNavigator";
 import { DriverFlowScreen } from "./screens/DriverFlowScreen";
+import { ActiveJobBanner } from "./components/ActiveJobBanner";
 
 const STRIPE_PUBLISHABLE_KEY =
 	"pk_test_51RpW2T7C4sCNpdjEa0WyFFkGanThDJKGp9fRal7rUIZhfW8QO6X34JgM7C4Dg2rZgpZgJwS9F5YLniAcZfy4A2Cy00qvB9Gwqf";
@@ -71,6 +72,7 @@ const RootNavigator = () => {
 
 export default function App() {
 	const navigationRef = useRef<NavigationContainerRef<any>>(null);
+	const [currentRoute, setCurrentRoute] = useState<string | null>(null);
 
 	useEffect(() => {
 		// Handle notification taps while the app is running (foreground/background)
@@ -106,9 +108,22 @@ export default function App() {
 							<AuthProvider>
 								<JobProvider>
 									<DriverProvider>
-										<NavigationContainer ref={navigationRef}>
+										<NavigationContainer
+											ref={navigationRef}
+											onStateChange={() => {
+												const name = navigationRef.current?.getCurrentRoute()?.name ?? null;
+												setCurrentRoute(name);
+											}}
+											onReady={() => {
+												setCurrentRoute(navigationRef.current?.getCurrentRoute()?.name ?? null);
+											}}
+										>
 											<RootNavigator />
 										</NavigationContainer>
+										<ActiveJobBanner
+											navigationRef={navigationRef}
+											currentRoute={currentRoute}
+										/>
 									</DriverProvider>
 								</JobProvider>
 							</AuthProvider>
