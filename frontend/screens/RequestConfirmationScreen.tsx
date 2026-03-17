@@ -11,11 +11,23 @@ import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import { SERVICES } from '../constants';
 import { PrimaryButton } from '../components/PrimaryButton';
-import { Card } from '../components/Card';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../services/api';
 import { PaymentMethod } from '../types';
 import { usePlatformPay, PlatformPay } from '@stripe/stripe-react-native';
+
+// Service-specific icon + colour config (mirrors ServiceSelectionScreen)
+const SERVICE_META: Record<string, {
+  icon: React.ComponentProps<typeof Ionicons>['name'];
+  dark:  { iconColor: string; iconBg: string };
+  light: { iconColor: string; iconBg: string };
+}> = {
+  towing:           { icon: 'car',          dark: { iconColor: '#60a5fa', iconBg: '#1e3a5f' }, light: { iconColor: '#1A6BFF', iconBg: '#DBEAFE' } },
+  'tire-change':    { icon: 'disc-outline', dark: { iconColor: '#f59e0b', iconBg: '#451a03' }, light: { iconColor: '#B87000', iconBg: '#FEF3C7' } },
+  'car-lockout':    { icon: 'key-outline',  dark: { iconColor: '#a78bfa', iconBg: '#2e1065' }, light: { iconColor: '#7C3AED', iconBg: '#EDE9FE' } },
+  'fuel-delivery':  { icon: 'water-outline',dark: { iconColor: '#34d399', iconBg: '#064e3b' }, light: { iconColor: '#0B7B56', iconBg: '#D1FAE5' } },
+  'battery-boost':  { icon: 'flash-outline',dark: { iconColor: '#fb7185', iconBg: '#4c0519' }, light: { iconColor: '#D93025', iconBg: '#FFE4E6' } },
+};
 
 type PaymentMode = 'card' | 'apple_pay';
 
@@ -30,7 +42,7 @@ interface VehicleItem {
 
 export const RequestConfirmationScreen = () => {
   const { job, setJobStatus, setNotes, requestService } = useJob();
-  const { colors } = useTheme();
+  const { colors, isDarkMode } = useTheme();
   const { showToast } = useToast();
   const { user } = useAuth();
   const navigation = useNavigation<any>();
@@ -386,51 +398,76 @@ export const RequestConfirmationScreen = () => {
     isLoadingCard ||
     (paymentMode === 'card' && !selectedCard);
 
+  const isDark = isDarkMode ?? false;
+  const cardBg     = isDark ? '#0d1424' : '#FFFFFF';
+  const cardBorder = isDark ? 'rgba(255,255,255,0.07)' : '#E2DDD6';
+  const inputBg    = isDark ? '#0a1020' : '#F7F4EF';
+  const inputBorder = isDark ? 'rgba(255,255,255,0.10)' : '#D4CFC8';
+  const svcMeta    = SERVICE_META[job.serviceType ?? 'towing'] ?? SERVICE_META['towing'];
+  const svcTheme   = isDark ? svcMeta.dark : svcMeta.light;
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { borderBottomColor: colors.border, backgroundColor: colors.card }]}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => setJobStatus('selecting')} disabled={isSubmitting}>
-          <Ionicons name="chevron-back" size={24} color={colors.text} />
-          <Text style={[styles.backText, { color: colors.text }]}>Back</Text>
+      {/* ── Header ── */}
+      <View style={[styles.header, { borderBottomColor: cardBorder, backgroundColor: cardBg }]}>
+        <TouchableOpacity
+          style={styles.backBtn}
+          onPress={() => setJobStatus('selecting')}
+          disabled={isSubmitting}
+          activeOpacity={0.7}
+        >
+          <View style={[styles.backIconWrap, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#EDE9E2' }]}>
+            <Ionicons name="chevron-back" size={18} color={colors.text} />
+          </View>
         </TouchableOpacity>
-        <Text style={[styles.title, { color: colors.text }]}>Confirm Request</Text>
+        <View style={styles.headerText}>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Confirm Request</Text>
+          <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>Review and confirm your service</Text>
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        <Card style={styles.card}>
-          <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>SERVICE DETAILS</Text>
-          <View style={[styles.serviceRow, { borderBottomColor: colors.border }]}>
+        {/* ── Service details card ── */}
+        <View style={[styles.card, { backgroundColor: cardBg, borderColor: cardBorder }]}>
+          <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>SERVICE DETAILS</Text>
+
+          <View style={[styles.serviceRow, { borderBottomColor: cardBorder }]}>
             <View style={styles.serviceLeft}>
-              <View style={[styles.iconBox, { backgroundColor: colors.primary + '20' }]}>
-                <Ionicons name="car" size={20} color={colors.primary} />
+              <View style={[styles.iconBox, { backgroundColor: svcTheme.iconBg }]}>
+                <Ionicons name={svcMeta.icon} size={20} color={svcTheme.iconColor} />
               </View>
               <Text style={[styles.serviceName, { color: colors.text }]}>{service?.title}</Text>
             </View>
             <Text style={[styles.price, { color: colors.primary }]}>${job.estimatedPrice}</Text>
           </View>
 
-          <View style={[styles.locationRow, { borderBottomColor: colors.border }]}>
-            <Ionicons name="location" size={20} color={colors.textMuted} style={styles.locIcon} />
-            <Text style={[styles.locationText, { color: colors.text }]}>{job.customerLocation?.address}</Text>
+          <View style={[styles.locationRow, { borderBottomColor: cardBorder }]}>
+            <View style={[styles.locationIconWrap, { backgroundColor: colors.surface }]}>
+              <Ionicons name="location-outline" size={15} color={colors.textMuted} />
+            </View>
+            <Text style={[styles.locationText, { color: colors.textMuted }]} numberOfLines={2}>
+              {job.customerLocation?.address}
+            </Text>
           </View>
 
           {/* Vehicle selector */}
-          <Text style={[styles.sectionTitle, { color: colors.textMuted, marginTop: 14, marginBottom: 6 }]}>
-            VEHICLE
-          </Text>
-          {renderVehicleRow()}
+          <Text style={[styles.sectionLabel, { color: colors.textMuted, marginTop: 16 }]}>VEHICLE</Text>
+          <View style={[styles.selectorBox, { backgroundColor: inputBg, borderColor: inputBorder }]}>
+            {renderVehicleRow()}
+          </View>
 
           {/* Payment selector */}
-          <Text style={[styles.sectionTitle, { color: colors.textMuted, marginTop: 14, marginBottom: 6 }]}>
-            PAYMENT
-          </Text>
-          {renderPaymentRow()}
-        </Card>
+          <Text style={[styles.sectionLabel, { color: colors.textMuted, marginTop: 14 }]}>PAYMENT</Text>
+          <View style={[styles.selectorBox, { backgroundColor: inputBg, borderColor: inputBorder }]}>
+            {renderPaymentRow()}
+          </View>
+        </View>
 
-        <Card style={styles.card}>
-          <Text style={[styles.sectionTitle, { color: colors.textMuted, marginBottom: 8 }]}>NOTE FOR PROVIDER (OPTIONAL)</Text>
+        {/* ── Notes card ── */}
+        <View style={[styles.card, { backgroundColor: cardBg, borderColor: cardBorder }]}>
+          <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>NOTE FOR PROVIDER (OPTIONAL)</Text>
           <TextInput
-            style={[styles.input, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
+            style={[styles.input, { backgroundColor: inputBg, color: colors.text, borderColor: inputBorder }]}
             multiline
             numberOfLines={4}
             placeholder="E.g., Parked in the underground garage, level P2..."
@@ -439,7 +476,7 @@ export const RequestConfirmationScreen = () => {
             onChangeText={setLocalNotes}
             editable={!isSubmitting}
           />
-        </Card>
+        </View>
       </ScrollView>
 
       <View style={[styles.footer, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
@@ -461,71 +498,77 @@ export const RequestConfirmationScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container:    { flex: 1 },
-  header:       { padding: 16, paddingBottom: 20, borderBottomWidth: 1 },
-  backBtn:      { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-  backText:     { fontSize: 16, fontWeight: 'bold' },
-  title:        { fontSize: 24, fontWeight: 'bold' },
-  content:      { padding: 16 },
-  card:         { marginBottom: 16 },
-  sectionTitle: { fontSize: 12, fontWeight: 'bold', marginBottom: 12 },
-  serviceRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 16, borderBottomWidth: 1, marginBottom: 16 },
-  serviceLeft:  { flexDirection: 'row', alignItems: 'center' },
-  iconBox:      { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
-  serviceName:  { fontSize: 18, fontWeight: 'bold' },
-  price:        { fontSize: 18, fontWeight: 'bold' },
-  locationRow:  { flexDirection: 'row', alignItems: 'center', paddingBottom: 12, borderBottomWidth: 1, marginBottom: 4 },
-  locIcon:      { marginRight: 12 },
-  locationText: { flex: 1, fontSize: 14, lineHeight: 20 },
+  container: { flex: 1 },
 
-  selectorRow:  { flexDirection: 'row', alignItems: 'center', paddingVertical: 6 },
+  // Header
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+  },
+  backBtn:       { marginRight: 14 },
+  backIconWrap:  { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  headerText:    { flex: 1 },
+  headerTitle:   { fontSize: 20, fontWeight: '800', letterSpacing: -0.4 },
+  headerSubtitle:{ fontSize: 13, marginTop: 2 },
+
+  // Content
+  content: { padding: 16, paddingBottom: 24 },
+
+  // Cards
+  card: {
+    borderRadius: 24, borderWidth: 1,
+    padding: 18, marginBottom: 14,
+  },
+
+  // Section label (UPPERCASE)
+  sectionLabel: {
+    fontSize: 10, fontWeight: '700', letterSpacing: 0.8,
+    marginBottom: 10,
+  },
+
+  // Service row
+  serviceRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 14, borderBottomWidth: 1, marginBottom: 14 },
+  serviceLeft:  { flexDirection: 'row', alignItems: 'center' },
+  iconBox:      { width: 42, height: 42, borderRadius: 13, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  serviceName:  { fontSize: 17, fontWeight: '700', letterSpacing: -0.2 },
+  price:        { fontSize: 20, fontWeight: '800', letterSpacing: -0.4 },
+
+  // Location row
+  locationRow:     { flexDirection: 'row', alignItems: 'center', paddingBottom: 14, borderBottomWidth: 1, marginBottom: 4, gap: 10 },
+  locationIconWrap:{ width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  locationText:    { flex: 1, fontSize: 13, lineHeight: 19 },
+
+  // Selector box (wraps the vehicle / payment rows)
+  selectorBox:  { borderWidth: 1.5, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 2 },
+  selectorRow:  { flexDirection: 'row', alignItems: 'center' },
   selectorText: { fontSize: 14, fontWeight: '600' },
   selectorSub:  { fontSize: 12, marginTop: 1 },
 
-  input:        { borderWidth: 1, borderRadius: 12, padding: 12, fontSize: 14, minHeight: 100, textAlignVertical: 'top' },
-  footer:       { padding: 16, borderTopWidth: 1 },
-  disclaimer:   { fontSize: 12, textAlign: 'center', marginBottom: 16, lineHeight: 18 },
+  // Notes input
+  input: { borderWidth: 1.5, borderRadius: 14, padding: 14, fontSize: 14, minHeight: 96, textAlignVertical: 'top' },
 
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-  },
+  // Footer
+  footer:     { padding: 16, paddingBottom: 20, borderTopWidth: 1 },
+  disclaimer: { fontSize: 12, textAlign: 'center', marginBottom: 14, lineHeight: 18 },
+
+  // Bottom sheet (modals)
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' },
   sheet: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    borderTopWidth: 1,
-    paddingHorizontal: 20,
-    paddingBottom: 36,
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    borderTopWidth: 1, paddingHorizontal: 20, paddingBottom: 36,
   },
-  handle: {
-    width: 40, height: 4, borderRadius: 2,
-    alignSelf: 'center',
-    marginTop: 12, marginBottom: 16,
-  },
-  sheetTitle: {
-    fontSize: 18, fontWeight: '700', marginBottom: 16,
-  },
+  handle: { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginTop: 12, marginBottom: 16 },
+  sheetTitle: { fontSize: 18, fontWeight: '700', marginBottom: 16 },
   option: {
     flexDirection: 'row', alignItems: 'center',
-    paddingVertical: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    gap: 12,
+    paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth, gap: 12,
   },
-  optionLast: {
-    borderBottomWidth: 0,
-  },
-  optionIcon: {
-    width: 36, height: 36, borderRadius: 18,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  optionLabel: {
-    fontSize: 16, fontWeight: '600',
-  },
-  optionSub: {
-    fontSize: 12, marginTop: 2,
-  },
-  emptyVehicle: {
-    alignItems: 'center',
-    paddingVertical: 24,
-  },
+  optionLast: { borderBottomWidth: 0 },
+  optionIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  optionLabel: { fontSize: 16, fontWeight: '600' },
+  optionSub:   { fontSize: 12, marginTop: 2 },
+  emptyVehicle:{ alignItems: 'center', paddingVertical: 24 },
 });

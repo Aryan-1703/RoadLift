@@ -63,21 +63,17 @@ async function createSetupIntent(userId) {
 async function getPaymentMethods(stripeCustomerId, defaultPaymentMethodId) {
 	if (!stripeCustomerId) return [];
 
-	const list = await stripe.paymentMethods.list({
-		customer: stripeCustomerId,
-		type: "card",
-	});
+	// Run both Stripe calls in parallel — cuts latency roughly in half
+	const [list, cust] = await Promise.all([
+		stripe.paymentMethods.list({ customer: stripeCustomerId, type: "card" }),
+		defaultPaymentMethodId
+			? Promise.resolve(null) // already have it, skip the extra round-trip
+			: stripe.customers.retrieve(stripeCustomerId).catch(() => null),
+	]);
 
-	// Fall back to the default stored on the Stripe Customer object
-	let defaultId = defaultPaymentMethodId;
-	if (!defaultId) {
-		try {
-			const cust = await stripe.customers.retrieve(stripeCustomerId);
-			defaultId = cust.invoice_settings?.default_payment_method ?? null;
-		} catch {
-			/* non-fatal */
-		}
-	}
+	const defaultId =
+		defaultPaymentMethodId ??
+		(cust?.invoice_settings?.default_payment_method ?? null);
 
 	return list.data.map(pm => ({
 		id: pm.id,
