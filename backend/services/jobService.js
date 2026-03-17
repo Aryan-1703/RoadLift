@@ -188,7 +188,7 @@ async function driverCancelJob(jobId, driverId) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// updateJobStatus  (ARRIVED / IN_PROGRESS)
+// updateJobStatus  (ARRIVED only — IN_PROGRESS is now auto-skipped)
 // ─────────────────────────────────────────────────────────────────────────────
 async function updateJobStatus(jobId, driverId, status) {
 	const normalized = status.toLowerCase();

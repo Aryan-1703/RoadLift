@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
 	View,
 	Text,
@@ -10,33 +10,109 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Location from "expo-location";
+import { Ionicons } from "@expo/vector-icons";
 import { useDriver } from "../context/DriverContext";
 import { useTheme } from "../context/ThemeContext";
 import { Card } from "../components/Card";
 import { PrimaryButton } from "../components/PrimaryButton";
-import { Ionicons } from "@expo/vector-icons";
 import { LiveMap } from "../components/LiveMap";
 import { ChatModal } from "../components/ChatModal";
 import socketClient from "../services/socket";
+import { Job } from "../types";
+
+// ── Arrival geo-fence ─────────────────────────────────────────────────────────
+const ARRIVAL_THRESHOLD_METERS = 150;
+
+function haversineMeters(
+	lat1: number, lon1: number,
+	lat2: number, lon2: number,
+): number {
+	const R = 6371000;
+	const dLat = ((lat2 - lat1) * Math.PI) / 180;
+	const dLon = ((lon2 - lon1) * Math.PI) / 180;
+	const a =
+		Math.sin(dLat / 2) ** 2 +
+		Math.cos((lat1 * Math.PI) / 180) *
+		Math.cos((lat2 * Math.PI) / 180) *
+		Math.sin(dLon / 2) ** 2;
+	return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// ── Status display config ─────────────────────────────────────────────────────
+function statusConfig(status: string, colors: any) {
+	switch (status.toLowerCase()) {
+		case "arrived":
+			return {
+				label:   "Arrived",
+				bg:      (colors.green ?? "#059669") + "20",
+				color:   colors.green ?? "#059669",
+			};
+		case "in_progress":
+			return {
+				label:   "In Progress",
+				bg:      (colors.amber ?? "#F59E0B") + "20",
+				color:   colors.amber ?? "#F59E0B",
+			};
+		default: // accepted
+			return {
+				label:   "En Route",
+				bg:      colors.primary + "20",
+				color:   colors.primary,
+			};
+	}
+}
 
 export const ActiveJobScreen = () => {
 	const { activeJob, updateJobStatus, cancelActiveJob } = useDriver();
-	const { colors } = useTheme();
-	const [isUpdating, setIsUpdating] = useState(false);
-	const [chatOpen, setChatOpen] = useState(false);
+	const { colors, isDarkMode } = useTheme();
+
+	const [isUpdating,   setIsUpdating]   = useState(false);
+	const [chatOpen,     setChatOpen]     = useState(false);
 	const [driverLocation, setDriverLocation] = useState<{
-		latitude: number;
-		longitude: number;
+		latitude: number; longitude: number;
 	} | null>(null);
 
-	// ── Track driver location ────────────────────────────────────────────────
+	// Ref so the location-watch closure always reads the latest job without
+	// re-registering the subscription every time the status changes.
+	const activeJobRef       = useRef<Job | null>(activeJob);
+	const updateStatusRef    = useRef(updateJobStatus);
+	const hasAutoArrivedRef  = useRef(false);
+
+	useEffect(() => { activeJobRef.current    = activeJob;       }, [activeJob]);
+	useEffect(() => { updateStatusRef.current = updateJobStatus; }, [updateJobStatus]);
+
+	// Reset arrival guard when the job ID changes (new job assigned)
+	useEffect(() => {
+		hasAutoArrivedRef.current = false;
+	}, [activeJob?.id]);
+
+	// ── Location tracking + auto-arrive check ───────────────────────────────
 	useEffect(() => {
 		let locationSubscription: Location.LocationSubscription | null = null;
+
+		const checkArrival = (coords: { latitude: number; longitude: number }) => {
+			const job = activeJobRef.current;
+			if (!job?.customerLocation)                                 return;
+			if (hasAutoArrivedRef.current)                              return;
+			if ((job.status as string).toLowerCase() !== "accepted")    return;
+
+			const dist = haversineMeters(
+				coords.latitude,  coords.longitude,
+				job.customerLocation.latitude, job.customerLocation.longitude,
+			);
+			if (dist <= ARRIVAL_THRESHOLD_METERS) {
+				hasAutoArrivedRef.current = true;
+				updateStatusRef.current("ARRIVED").catch(() => {
+					// If the call fails, allow retry on next tick
+					hasAutoArrivedRef.current = false;
+				});
+			}
+		};
 
 		const startTracking = async () => {
 			if (!activeJob) return;
 
-			let { status } = await Location.requestForegroundPermissionsAsync();
+			const { status } = await Location.requestForegroundPermissionsAsync();
 			if (status !== "granted") {
 				Alert.alert(
 					"Permission Denied",
@@ -49,103 +125,73 @@ export const ActiveJobScreen = () => {
 				return;
 			}
 
-			const initialLocation = await Location.getCurrentPositionAsync({});
+			const initial = await Location.getCurrentPositionAsync({});
 			const initialCoords = {
-				latitude:  initialLocation.coords.latitude,
-				longitude: initialLocation.coords.longitude,
+				latitude:  initial.coords.latitude,
+				longitude: initial.coords.longitude,
 			};
 			setDriverLocation(initialCoords);
-			// Emit immediately so customer sees driver pin right away
-			socketClient.emit("driver-location-update", {
-				jobId:    activeJob.id,
-				location: initialCoords,
-			});
+			socketClient.emit("driver-location-update", { jobId: activeJob.id, location: initialCoords });
+			checkArrival(initialCoords);
 
 			locationSubscription = await Location.watchPositionAsync(
-				{
-					accuracy:         Location.Accuracy.High,
-					timeInterval:     4000,
-					distanceInterval: 0, // fire on time interval even when stationary
-				},
+				{ accuracy: Location.Accuracy.High, timeInterval: 4000, distanceInterval: 0 },
 				loc => {
-					const newLocation = {
-						latitude:  loc.coords.latitude,
-						longitude: loc.coords.longitude,
-					};
-					setDriverLocation(newLocation);
-					socketClient.emit("driver-location-update", {
-						jobId:    activeJob.id,
-						location: newLocation,
-					});
+					const newCoords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
+					setDriverLocation(newCoords);
+					socketClient.emit("driver-location-update", { jobId: activeJobRef.current?.id, location: newCoords });
+					checkArrival(newCoords);
 				},
 			);
 		};
 
 		startTracking();
-
-		return () => {
-			if (locationSubscription) {
-				locationSubscription.remove();
-			}
-		};
+		return () => { locationSubscription?.remove(); };
 	}, [activeJob?.id]);
 
 	if (!activeJob) return null;
 
-	const handleStatusUpdate = async (newStatus: string) => {
+	const badge   = statusConfig(activeJob.status as string, colors);
+	const isArrived = (activeJob.status as string).toLowerCase() === "arrived" ||
+	                  (activeJob.status as string).toLowerCase() === "in_progress";
+	const canCancel = ["accepted", "arrived"].includes((activeJob.status as string).toLowerCase());
+
+	const customerName  = activeJob.customerName  || "Customer";
+	const customerPhone = activeJob.customerPhone || null;
+
+	const handleComplete = async () => {
 		setIsUpdating(true);
-		await updateJobStatus(newStatus);
+		await updateJobStatus("COMPLETED");
 		setIsUpdating(false);
 	};
 
-	const getNextStatus = () => {
-		const s = (activeJob.status as string).toLowerCase();
-		switch (s) {
-			case "accepted":
-				return { status: "ARRIVED",     label: "Mark as Arrived" };
-			case "arrived":
-				return { status: "IN_PROGRESS", label: "Start Service" };
-			case "in_progress":
-				return { status: "COMPLETED",   label: "Complete Job" };
-			default:
-				return null;
-		}
-	};
-
-	// ── Call customer (or recipient if third-party) ─────────────────────────
 	const handleCallCustomer = () => {
-		const phone = activeJob.isThirdParty ? (activeJob.recipientPhone ?? activeJob.customerPhone) : activeJob.customerPhone;
+		const phone = activeJob.isThirdParty
+			? (activeJob.recipientPhone ?? activeJob.customerPhone)
+			: activeJob.customerPhone;
 		if (!phone) {
 			Alert.alert("Contact Customer", "Customer phone number is not available.");
 			return;
 		}
 		const url = `tel:${phone.replace(/\s/g, "")}`;
 		Linking.canOpenURL(url).then(supported => {
-			if (supported) {
-				Linking.openURL(url);
-			} else {
-				Alert.alert("Cannot make call", "Your device does not support phone calls.");
-			}
+			if (supported) Linking.openURL(url);
+			else Alert.alert("Cannot make call", "Your device does not support phone calls.");
 		});
 	};
 
-	// ── Open GPS navigation to customer ─────────────────────────────────────
 	const handleNavigate = () => {
 		const loc = activeJob.customerLocation;
 		if (!loc) return;
-		const { latitude, longitude, address } = loc;
-		const label = encodeURIComponent(address || "Customer Location");
-		// Works on both iOS (Apple Maps) and Android (Google Maps)
-		const url = `https://maps.google.com/?q=${latitude},${longitude}(${label})`;
-		Linking.openURL(url).catch(() =>
-			Alert.alert("Navigation", "Could not open maps application."),
-		);
+		const label = encodeURIComponent(loc.address || "Customer Location");
+		Linking.openURL(`https://maps.google.com/?q=${loc.latitude},${loc.longitude}(${label})`)
+			.catch(() => Alert.alert("Navigation", "Could not open maps application."));
 	};
 
 	const handleDriverCancel = () => {
 		Alert.alert(
 			"Cancel Job?",
-			"Are you sure you want to cancel? The customer will be matched with another driver. Frequent cancellations may affect your account standing.",
+			"The customer will be matched with another driver. Frequent cancellations may affect your account.",
 			[
 				{ text: "Keep Job", style: "cancel" },
 				{
@@ -161,24 +207,19 @@ export const ActiveJobScreen = () => {
 		);
 	};
 
-	const nextAction = getNextStatus();
-	const customerName  = activeJob.customerName  || "Customer";
-	const customerPhone = activeJob.customerPhone || null;
-
 	return (
 		<>
 		<SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+
 			{/* Header */}
-			<View
-				style={[
-					styles.header,
-					{ borderBottomColor: colors.border, backgroundColor: colors.card },
-				]}
-			>
-				<Text style={[styles.title, { color: colors.text }]}>Active Request</Text>
-				<View style={[styles.statusBadge, { backgroundColor: colors.primary + "20" }]}>
-					<Text style={[styles.statusText, { color: colors.primary }]}>
-						{(activeJob.status as string).replace("_", " ")}
+			<View style={[styles.header, { borderBottomColor: colors.border, backgroundColor: colors.card }]}>
+				<Text style={[styles.title, { color: colors.text }]}>Active Job</Text>
+				<View style={[styles.statusBadge, { backgroundColor: badge.bg }]}>
+					{isArrived && (
+						<Ionicons name="checkmark-circle" size={13} color={badge.color} style={{ marginRight: 4 }} />
+					)}
+					<Text style={[styles.statusText, { color: badge.color }]}>
+						{badge.label}
 					</Text>
 				</View>
 			</View>
@@ -193,8 +234,27 @@ export const ActiveJobScreen = () => {
 				/>
 			</View>
 
-			<ScrollView style={styles.detailsContainer}>
-				{/* Customer / Contact details */}
+			<ScrollView style={styles.detailsContainer} contentContainerStyle={{ paddingBottom: 8 }}>
+
+				{/* Arrived banner — shown once auto-arrive triggers */}
+				{isArrived && (
+					<View style={[styles.arrivedBanner, {
+						backgroundColor: (colors.green ?? "#059669") + "18",
+						borderColor:     (colors.green ?? "#059669") + "40",
+					}]}>
+						<Ionicons name="location" size={20} color={colors.green ?? "#059669"} />
+						<View style={{ flex: 1, marginLeft: 10 }}>
+							<Text style={[styles.arrivedTitle, { color: colors.green ?? "#059669" }]}>
+								You've arrived
+							</Text>
+							<Text style={[styles.arrivedSub, { color: colors.textMuted }]}>
+								Tap "Complete Job" when the service is done
+							</Text>
+						</View>
+					</View>
+				)}
+
+				{/* Contact card */}
 				<Card style={styles.card}>
 					<Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
 						{activeJob.isThirdParty ? "CONTACT AT VEHICLE" : "CUSTOMER DETAILS"}
@@ -218,27 +278,22 @@ export const ActiveJobScreen = () => {
 								</Text>
 							)}
 						</View>
-						{/* Call button */}
 						<TouchableOpacity
 							onPress={handleCallCustomer}
-							style={[
-								styles.actionBtn,
-								{
-									backgroundColor: (activeJob.isThirdParty ? activeJob.recipientPhone : customerPhone)
-										? colors.greenBg
-										: colors.border,
-								},
-							]}
+							style={[styles.actionBtn, {
+								backgroundColor: (activeJob.isThirdParty ? activeJob.recipientPhone : customerPhone)
+									? colors.greenBg : colors.border,
+							}]}
 							activeOpacity={0.7}
 							disabled={!(activeJob.isThirdParty ? activeJob.recipientPhone : customerPhone)}
 						>
 							<Ionicons
 								name="call"
 								size={20}
-								color={(activeJob.isThirdParty ? activeJob.recipientPhone : customerPhone) ? colors.green : colors.textMuted}
+								color={(activeJob.isThirdParty ? activeJob.recipientPhone : customerPhone)
+									? colors.green : colors.textMuted}
 							/>
 						</TouchableOpacity>
-						{/* Chat button */}
 						<TouchableOpacity
 							onPress={() => setChatOpen(true)}
 							style={[styles.actionBtn, { backgroundColor: colors.primary + "20", marginLeft: 8 }]}
@@ -251,29 +306,21 @@ export const ActiveJobScreen = () => {
 
 				{/* Job details */}
 				<Card style={styles.card}>
-					<Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
-						JOB DETAILS
-					</Text>
+					<Text style={[styles.sectionTitle, { color: colors.textMuted }]}>JOB DETAILS</Text>
 
 					<View style={styles.detailRow}>
 						<Ionicons name="car-outline" size={20} color={colors.textMuted} />
 						<Text style={[styles.detailText, { color: colors.text }]}>
 							{activeJob.serviceType
 								?.split("-")
-								.map(word => word.charAt(0).toUpperCase() + word.slice(1))
+								.map(w => w.charAt(0).toUpperCase() + w.slice(1))
 								.join(" ")}
 						</Text>
 					</View>
 
-					<TouchableOpacity
-						style={styles.detailRow}
-						onPress={handleNavigate}
-						activeOpacity={0.7}
-					>
+					<TouchableOpacity style={styles.detailRow} onPress={handleNavigate} activeOpacity={0.7}>
 						<Ionicons name="navigate-outline" size={20} color={colors.primary} />
-						<Text
-							style={[styles.detailText, { color: colors.primary, textDecorationLine: "underline" }]}
-						>
+						<Text style={[styles.detailText, { color: colors.primary, textDecorationLine: "underline" }]}>
 							{activeJob.customerLocation?.address || "Tap to navigate"}
 						</Text>
 					</TouchableOpacity>
@@ -287,28 +334,19 @@ export const ActiveJobScreen = () => {
 
 					{activeJob.notes ? (
 						<View style={[styles.notesContainer, { borderTopColor: colors.border }]}>
-							<Text style={[styles.notesLabel, { color: colors.textMuted }]}>
-								Notes:
-							</Text>
-							<Text style={[styles.notesText, { color: colors.text }]}>
-								{activeJob.notes}
-							</Text>
+							<Text style={[styles.notesLabel, { color: colors.textMuted }]}>Notes:</Text>
+							<Text style={[styles.notesText, { color: colors.text }]}>{activeJob.notes}</Text>
 						</View>
 					) : null}
 				</Card>
 			</ScrollView>
 
-			{/* Footer action */}
-			<View
-				style={[
-					styles.footer,
-					{ backgroundColor: colors.card, borderTopColor: colors.border },
-				]}
-			>
-				{nextAction ? (
+			{/* Footer */}
+			<View style={[styles.footer, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
+				{(activeJob.status as string).toLowerCase() !== "payment" ? (
 					<PrimaryButton
-						title={nextAction.label}
-						onPress={() => handleStatusUpdate(nextAction.status)}
+						title="Complete Job"
+						onPress={handleComplete}
 						isLoading={isUpdating}
 						disabled={isUpdating}
 					/>
@@ -317,7 +355,7 @@ export const ActiveJobScreen = () => {
 						Waiting for customer payment…
 					</Text>
 				)}
-				{(activeJob.status === "accepted" || activeJob.status === "arrived") && (
+				{canCancel && (
 					<PrimaryButton
 						title="Cancel Job"
 						variant="danger"
@@ -327,6 +365,7 @@ export const ActiveJobScreen = () => {
 					/>
 				)}
 			</View>
+
 		</SafeAreaView>
 
 		{activeJob.id && (
@@ -343,58 +382,60 @@ export const ActiveJobScreen = () => {
 const styles = StyleSheet.create({
 	container: { flex: 1 },
 	header: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "center",
-		padding: 16,
-		paddingBottom: 20,
+		flexDirection:     "row",
+		justifyContent:    "space-between",
+		alignItems:        "center",
+		padding:           16,
+		paddingBottom:     20,
 		borderBottomWidth: 1,
 	},
 	title:       { fontSize: 24, fontWeight: "bold" },
-	statusBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 },
-	statusText:  { fontSize: 12, fontWeight: "bold", textTransform: "uppercase" },
+	statusBadge: {
+		flexDirection:    "row",
+		alignItems:       "center",
+		paddingHorizontal: 12,
+		paddingVertical:   6,
+		borderRadius:     12,
+	},
+	statusText: { fontSize: 12, fontWeight: "bold", textTransform: "uppercase" },
+
 	mapContainer:     { height: 250 },
 	detailsContainer: { flex: 1, padding: 16 },
-	card:        { marginBottom: 16, padding: 16 },
-	sectionTitle: {
-		fontSize: 12,
-		fontWeight: "bold",
-		marginBottom: 16,
-		letterSpacing: 0.5,
+
+	// Arrived banner
+	arrivedBanner: {
+		flexDirection:    "row",
+		alignItems:       "center",
+		borderRadius:     14,
+		borderWidth:      1,
+		padding:          14,
+		marginBottom:     14,
 	},
-	customerRow: { flexDirection: "row", alignItems: "center" },
+	arrivedTitle: { fontSize: 14, fontWeight: "700", marginBottom: 2 },
+	arrivedSub:   { fontSize: 12 },
+
+	card:         { marginBottom: 16, padding: 16 },
+	sectionTitle: { fontSize: 12, fontWeight: "bold", marginBottom: 16, letterSpacing: 0.5 },
+
+	customerRow:   { flexDirection: "row", alignItems: "center" },
 	avatar: {
-		width: 48,
-		height: 48,
-		borderRadius: 24,
-		alignItems: "center",
-		justifyContent: "center",
-		marginRight: 16,
+		width: 48, height: 48, borderRadius: 24,
+		alignItems: "center", justifyContent: "center", marginRight: 16,
 	},
 	customerInfo:  { flex: 1 },
 	customerName:  { fontSize: 18, fontWeight: "bold", marginBottom: 4 },
 	customerPhone: { fontSize: 14 },
 	actionBtn: {
-		width: 40,
-		height: 40,
-		borderRadius: 20,
-		alignItems: "center",
-		justifyContent: "center",
+		width: 40, height: 40, borderRadius: 20,
+		alignItems: "center", justifyContent: "center",
 	},
-	detailRow:   { flexDirection: "row", alignItems: "center", marginBottom: 12 },
-	detailText:  { fontSize: 16, marginLeft: 12, flex: 1 },
-	notesContainer: {
-		marginTop: 12,
-		paddingTop: 12,
-		borderTopWidth: 1,
-	},
+
+	detailRow:  { flexDirection: "row", alignItems: "center", marginBottom: 12 },
+	detailText: { fontSize: 16, marginLeft: 12, flex: 1 },
+	notesContainer: { marginTop: 12, paddingTop: 12, borderTopWidth: 1 },
 	notesLabel: { fontSize: 12, fontWeight: "bold", marginBottom: 4 },
 	notesText:  { fontSize: 14, fontStyle: "italic" },
+
 	footer:      { padding: 16, borderTopWidth: 1 },
-	waitingText: {
-		textAlign: "center",
-		fontSize: 16,
-		fontStyle: "italic",
-		paddingVertical: 12,
-	},
+	waitingText: { textAlign: "center", fontSize: 16, fontStyle: "italic", paddingVertical: 12 },
 });
