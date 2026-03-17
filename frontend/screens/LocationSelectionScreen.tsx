@@ -93,6 +93,7 @@ export const LocationSelectionScreen = () => {
 	const [showSuggestions, setShowSuggestions] = useState(false);
 	const [showWhoSheet, setShowWhoSheet] = useState(false);
 	const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+	const searchInputRef = useRef<import("react-native").TextInput>(null);
 
 	// User's actual GPS position — used for the 200 m third-party detection
 	const userGpsRef = useRef<{ lat: number; lng: number } | null>(null);
@@ -431,6 +432,7 @@ export const LocationSelectionScreen = () => {
 								/>
 							)}
 							<TextInput
+								ref={searchInputRef}
 								style={[styles.searchInput, { color: colors.text }]}
 								placeholder="Search address or landmark..."
 								placeholderTextColor={colors.textMuted}
@@ -656,9 +658,16 @@ export const LocationSelectionScreen = () => {
 									: (selectedLocation?.address ?? "Long press the map to set a pin")}
 							</Text>
 						</View>
-						<View style={[styles.editChip, { borderColor: colors.border }]}>
-							<Ionicons name="pencil" size={12} color={colors.textMuted} />
-						</View>
+						<TouchableOpacity
+						style={[styles.editChip, { borderColor: colors.border }]}
+						onPress={() => {
+							snapToExpanded();
+							setTimeout(() => searchInputRef.current?.focus(), 320);
+						}}
+						activeOpacity={0.7}
+					>
+						<Ionicons name="pencil" size={12} color={colors.textMuted} />
+					</TouchableOpacity>
 					</TouchableOpacity>
 
 					{/* Info chips */}
