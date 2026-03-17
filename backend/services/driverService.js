@@ -48,6 +48,10 @@ function normalizeJob(job) {
 		currentRadius:  raw.currentRadius  ?? 5,
 		finalPrice: raw.finalCost != null ? parseFloat(raw.finalCost) : null,
 
+		isThirdParty:   raw.isThirdParty   ?? false,
+		recipientName:  raw.recipientName  ?? null,
+		recipientPhone: raw.recipientPhone ?? null,
+
 		customerId: raw.userId ?? null,
 		driverId: raw.driverId ?? null,
 		customerName: raw.customer?.name ?? null,

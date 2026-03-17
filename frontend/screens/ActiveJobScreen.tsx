@@ -112,9 +112,9 @@ export const ActiveJobScreen = () => {
 		}
 	};
 
-	// ── Call customer ────────────────────────────────────────────────────────
+	// ── Call customer (or recipient if third-party) ─────────────────────────
 	const handleCallCustomer = () => {
-		const phone = activeJob.customerPhone;
+		const phone = activeJob.isThirdParty ? (activeJob.recipientPhone ?? activeJob.customerPhone) : activeJob.customerPhone;
 		if (!phone) {
 			Alert.alert("Contact Customer", "Customer phone number is not available.");
 			return;
@@ -194,10 +194,10 @@ export const ActiveJobScreen = () => {
 			</View>
 
 			<ScrollView style={styles.detailsContainer}>
-				{/* Customer details */}
+				{/* Customer / Contact details */}
 				<Card style={styles.card}>
 					<Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
-						CUSTOMER DETAILS
+						{activeJob.isThirdParty ? "CONTACT AT VEHICLE" : "CUSTOMER DETAILS"}
 					</Text>
 					<View style={styles.customerRow}>
 						<View style={[styles.avatar, { backgroundColor: colors.primary + "20" }]}>
@@ -205,11 +205,18 @@ export const ActiveJobScreen = () => {
 						</View>
 						<View style={styles.customerInfo}>
 							<Text style={[styles.customerName, { color: colors.text }]}>
-								{customerName}
+								{activeJob.isThirdParty ? (activeJob.recipientName ?? customerName) : customerName}
 							</Text>
 							<Text style={[styles.customerPhone, { color: colors.textMuted }]}>
-								{customerPhone ?? "Phone not available"}
+								{activeJob.isThirdParty
+									? (activeJob.recipientPhone ?? "Phone not available")
+									: (customerPhone ?? "Phone not available")}
 							</Text>
+							{activeJob.isThirdParty && (
+								<Text style={[styles.customerPhone, { color: colors.textMuted, marginTop: 2 }]}>
+									Requested by: {customerName}
+								</Text>
+							)}
 						</View>
 						{/* Call button */}
 						<TouchableOpacity
@@ -217,18 +224,18 @@ export const ActiveJobScreen = () => {
 							style={[
 								styles.actionBtn,
 								{
-									backgroundColor: customerPhone
+									backgroundColor: (activeJob.isThirdParty ? activeJob.recipientPhone : customerPhone)
 										? colors.greenBg
 										: colors.border,
 								},
 							]}
 							activeOpacity={0.7}
-							disabled={!customerPhone}
+							disabled={!(activeJob.isThirdParty ? activeJob.recipientPhone : customerPhone)}
 						>
 							<Ionicons
 								name="call"
 								size={20}
-								color={customerPhone ? colors.green : colors.textMuted}
+								color={(activeJob.isThirdParty ? activeJob.recipientPhone : customerPhone) ? colors.green : colors.textMuted}
 							/>
 						</TouchableOpacity>
 						{/* Chat button */}

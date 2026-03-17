@@ -109,6 +109,10 @@ export interface Job {
 	customerLocation: Location | null;
 	notes?: string;
 	status: JobStatus;
+	// Third-party request fields
+	isThirdParty?: boolean;
+	recipientName?: string;
+	recipientPhone?: string;
 	// Driver-facing fields (populated when driver accepts job)
 	customerName?: string;  // ← was missing — shown in ActiveJobScreen
 	customerPhone?: string; // ← was missing — used for call button

@@ -17,15 +17,22 @@ import { useToast } from "./ToastContext";
 // This is only a last-resort fallback if the socket event is somehow missed.
 const SEARCH_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
 
+export interface ThirdPartyInfo {
+	name: string;
+	phone: string;
+}
+
 interface JobContextType {
 	job: Job;
 	searchTimedOut: boolean;
 	travelFee: number;
 	searchMessage: string | null;
+	thirdParty: ThirdPartyInfo | null;
 	setJobStatus: (status: JobStatus) => void;
 	selectService: (type: ServiceTypeId, price: number) => void;
 	setCustomerLocation: (loc: Location) => void;
 	setNotes: (notes: string) => void;
+	setThirdParty: (data: ThirdPartyInfo | null) => void;
 	requestService: (preAuthorizedIntentId?: string, vehicleId?: number | string | null) => Promise<void>;
 	cancelJob: () => void;
 	resetJob: () => void;
@@ -48,6 +55,7 @@ export const JobProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 	const [searchTimedOut, setSearchTimedOut] = useState(false);
 	const [travelFee,      setTravelFee]      = useState<number>(0);
 	const [searchMessage,  setSearchMessage]  = useState<string | null>(null);
+	const [thirdParty,     setThirdParty]     = useState<ThirdPartyInfo | null>(null);
 	const { user } = useAuth();
 	const { showToast } = useToast();
 
@@ -75,6 +83,7 @@ export const JobProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 		setEta(null);
 		setTravelFee(0);
 		setSearchMessage(null);
+		setThirdParty(null);
 	}, [clearSearchTimeout]);
 
 	useEffect(() => {
@@ -257,13 +266,16 @@ export const JobProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
 		try {
 			const response = await api.post<any>("/jobs", {
-				serviceType:    job.serviceType,
+				serviceType:     job.serviceType,
 				pickupLatitude:  job.customerLocation.latitude,
 				pickupLongitude: job.customerLocation.longitude,
 				pickupAddress:   job.customerLocation.address ?? null,
-				estimatedCost:   job.estimatedPrice            ?? null,
-				notes:           job.notes                     ?? null,
+				estimatedCost:   job.estimatedPrice           ?? null,
+				notes:           job.notes                    ?? null,
 				vehicleId:       vehicleId ?? user.defaultVehicleId ?? null,
+				isThirdParty:    !!thirdParty,
+				recipientName:   thirdParty?.name  ?? null,
+				recipientPhone:  thirdParty?.phone ?? null,
 				...(preAuthorizedIntentId ? { paymentIntentId: preAuthorizedIntentId } : {}),
 			});
 
@@ -291,7 +303,7 @@ export const JobProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 			setJob(prev => ({ ...prev, status: "idle" }));
 			throw err;
 		}
-	}, [job.customerLocation, job.serviceType, job.notes, job.estimatedPrice, user]);
+	}, [job.customerLocation, job.serviceType, job.notes, job.estimatedPrice, user, thirdParty]);
 
 	// ── Cancel job ──────────────────────────────────────────────────────────
 	const cancelJob = useCallback(async () => {
@@ -336,10 +348,12 @@ export const JobProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 				searchTimedOut,
 				travelFee,
 				searchMessage,
+				thirdParty,
 				setJobStatus,
 				selectService,
 				setCustomerLocation,
 				setNotes,
+				setThirdParty,
 				requestService,
 				cancelJob,
 				resetJob,

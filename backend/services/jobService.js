@@ -23,6 +23,9 @@ async function createJob(body, userId) {
 		notes,
 		vehicleId,
 		paymentIntentId: preAuthorizedIntentId, // set when Apple Pay pre-auth already done
+		isThirdParty,
+		recipientName,
+		recipientPhone,
 	} = body;
 
 	if (!serviceType) throw new Error("serviceType is required.");
@@ -50,10 +53,13 @@ async function createJob(body, userId) {
 		userId,
 		pickupLocation,
 		...(dropoffLocation ? { dropoffLocation } : {}),
-		pickupAddress: pickupAddress || null,
-		estimatedCost: estimatedCost || null,
-		notes: notes || null,
-		vehicleId: vehicleId || null,
+		pickupAddress:  pickupAddress  || null,
+		estimatedCost:  estimatedCost  || null,
+		notes:          notes          || null,
+		vehicleId:      vehicleId      || null,
+		isThirdParty:   isThirdParty   ?? false,
+		recipientName:  isThirdParty ? (recipientName  || null) : null,
+		recipientPhone: isThirdParty ? (recipientPhone || null) : null,
 		status: "pending",
 	});
 

@@ -77,7 +77,22 @@ module.exports = sequelize => {
 				type:      DataTypes.INTEGER,
 				allowNull: true,
 			},
-			// Dispatch tracking fields
+			// Third-party request fields
+			isThirdParty: {
+				type:         DataTypes.BOOLEAN,
+				allowNull:    false,
+				defaultValue: false,
+			},
+			recipientName: {
+				type:      DataTypes.STRING(200),
+				allowNull: true,
+			},
+			recipientPhone: {
+				type:      DataTypes.STRING(50),
+				allowNull: true,
+			},
+
+						// Dispatch tracking fields
 			dispatchStage: {
 				type:         DataTypes.INTEGER,
 				allowNull:    true,

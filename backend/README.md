@@ -7,7 +7,6 @@ This is the Node.js/TypeScript backend for RoadLift.
 \`\`\`text
 backend/
 ├── prisma/
-│ └── schema.prisma # Database schema & models
 ├── src/
 │ ├── config/
 │ │ └── env.ts # Environment variable validation (Zod)

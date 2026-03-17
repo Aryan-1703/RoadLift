@@ -41,7 +41,7 @@ interface VehicleItem {
 }
 
 export const RequestConfirmationScreen = () => {
-  const { job, setJobStatus, setNotes, requestService } = useJob();
+  const { job, setJobStatus, setNotes, requestService, thirdParty } = useJob();
   const { colors, isDarkMode } = useTheme();
   const { showToast } = useToast();
   const { user } = useAuth();
@@ -477,6 +477,28 @@ export const RequestConfirmationScreen = () => {
             editable={!isSubmitting}
           />
         </View>
+
+        {/* ── Contact person card (third-party) ── */}
+        {thirdParty && (
+          <View style={[styles.card, { backgroundColor: cardBg, borderColor: cardBorder }]}>
+            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>CONTACT PERSON</Text>
+            <View style={[styles.contactRow, { borderBottomColor: cardBorder }]}>
+              <View style={[styles.contactIcon, { backgroundColor: colors.primary + '20' }]}>
+                <Ionicons name="person" size={18} color={colors.primary} />
+              </View>
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Text style={[styles.contactName, { color: colors.text }]}>{thirdParty.name}</Text>
+                <Text style={[styles.contactSub, { color: colors.textMuted }]}>Will be at the vehicle</Text>
+              </View>
+            </View>
+            <View style={[styles.contactRow, { borderBottomWidth: 0 }]}>
+              <View style={[styles.contactIcon, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#EDE9E2' }]}>
+                <Ionicons name="call-outline" size={18} color={colors.textMuted} />
+              </View>
+              <Text style={[styles.contactName, { color: colors.text, marginLeft: 12 }]}>{thirdParty.phone}</Text>
+            </View>
+          </View>
+        )}
       </ScrollView>
 
       <View style={[styles.footer, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
@@ -571,4 +593,10 @@ const styles = StyleSheet.create({
   optionLabel: { fontSize: 16, fontWeight: '600' },
   optionSub:   { fontSize: 12, marginTop: 2 },
   emptyVehicle:{ alignItems: 'center', paddingVertical: 24 },
+
+  // Contact person
+  contactRow:  { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
+  contactIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  contactName: { fontSize: 15, fontWeight: '600' },
+  contactSub:  { fontSize: 12, marginTop: 2 },
 });

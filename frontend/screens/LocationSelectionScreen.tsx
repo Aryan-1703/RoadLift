@@ -23,6 +23,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useJob } from "../context/JobContext";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
+import { WhoWillBeThereSheet } from "../components/WhoWillBeThereSheet";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { Location as AppLocation } from "../types";
 import { api } from "../services/api";
@@ -46,10 +47,25 @@ interface PlaceSuggestion {
 	};
 }
 
+/** Haversine distance in metres between two lat/lng points */
+function distanceMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
+	const R = 6_371_000;
+	const dLat = ((lat2 - lat1) * Math.PI) / 180;
+	const dLng = ((lng2 - lng1) * Math.PI) / 180;
+	const a =
+		Math.sin(dLat / 2) ** 2 +
+		Math.cos((lat1 * Math.PI) / 180) *
+		Math.cos((lat2 * Math.PI) / 180) *
+		Math.sin(dLng / 2) ** 2;
+	return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+const THIRD_PARTY_THRESHOLD_M = 200;
+
 export const LocationSelectionScreen = () => {
-	const { setCustomerLocation, setJobStatus } = useJob();
+	const { setCustomerLocation, setJobStatus, setThirdParty } = useJob();
 	const { user } = useAuth();
-	const { colors } = useTheme();
+	const { colors, isDarkMode } = useTheme();
 	const navigation = useNavigation<any>();
 	const mapRef = useRef<MapView>(null);
 	const insets = useSafeAreaInsets(); // ✅ replaces SafeAreaView
@@ -75,7 +91,11 @@ export const LocationSelectionScreen = () => {
 	const [isLocating, setIsLocating] = useState(true);
 	const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([]);
 	const [showSuggestions, setShowSuggestions] = useState(false);
+	const [showWhoSheet, setShowWhoSheet] = useState(false);
 	const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+	// User's actual GPS position — used for the 200 m third-party detection
+	const userGpsRef = useRef<{ lat: number; lng: number } | null>(null);
 
 	// ── Pin pulse loop ───────────────────────────────────────────────────────────
 	useEffect(() => {
@@ -120,6 +140,7 @@ export const LocationSelectionScreen = () => {
 					accuracy: Location.Accuracy.Balanced,
 				});
 				const { latitude, longitude } = loc.coords;
+				userGpsRef.current = { lat: latitude, lng: longitude };
 				await handleLocationSelect(latitude, longitude);
 				mapRef.current?.animateToRegion(
 					{ latitude, longitude, latitudeDelta: 0.01, longitudeDelta: 0.01 },
@@ -291,6 +312,7 @@ export const LocationSelectionScreen = () => {
 				accuracy: Location.Accuracy.Balanced,
 			});
 			const { latitude, longitude } = loc.coords;
+			userGpsRef.current = { lat: latitude, lng: longitude };
 			await handleLocationSelect(latitude, longitude);
 			mapRef.current?.animateToRegion(
 				{ latitude, longitude, latitudeDelta: 0.01, longitudeDelta: 0.01 },
@@ -666,7 +688,20 @@ export const LocationSelectionScreen = () => {
 					<PrimaryButton
 						title={isLocating ? "Detecting Location..." : "Get Help Now"}
 						onPress={() => {
-							if (selectedLocation) setJobStatus("selecting");
+							if (!selectedLocation) return;
+							const gps = userGpsRef.current;
+							if (gps) {
+								const dist = distanceMeters(
+									gps.lat, gps.lng,
+									selectedLocation.latitude, selectedLocation.longitude,
+								);
+								if (dist > THIRD_PARTY_THRESHOLD_M) {
+									setShowWhoSheet(true);
+									return;
+								}
+							}
+							setThirdParty(null);
+							setJobStatus("selecting");
 						}}
 						disabled={!selectedLocation || isLocating}
 					/>
@@ -676,6 +711,23 @@ export const LocationSelectionScreen = () => {
 					</Text>
 				</View>
 			</Animated.View>
+
+		<WhoWillBeThereSheet
+			visible={showWhoSheet}
+			colors={colors}
+			isDarkMode={isDarkMode ?? false}
+			onDismiss={() => setShowWhoSheet(false)}
+			onIWillBeThere={() => {
+				setShowWhoSheet(false);
+				setThirdParty(null);
+				setJobStatus("selecting");
+			}}
+			onThirdParty={info => {
+				setShowWhoSheet(false);
+				setThirdParty(info);
+				setJobStatus("selecting");
+			}}
+		/>
 		</View>
 	);
 };
