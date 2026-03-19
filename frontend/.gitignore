@@ -61,6 +61,9 @@ yarn-error.*
 .env
 .env*.local
 
+# EAS / Google Play service account key — contains secrets, never commit
+google-service-account.json
+
 # typescript
 *.tsbuildinfo
 
