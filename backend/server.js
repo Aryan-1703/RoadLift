@@ -16,7 +16,31 @@ io.attach(server);
 app.set("io", io);
 
 // --- MIDDLEWARE ---
-app.use(cors());
+// ── CORS: allow local network IPs in dev, locked domains in prod ──────────
+const DEV_ORIGINS = [
+	'http://localhost:3000',
+	'http://localhost:8081',
+	'http://localhost:19000',
+	/^http://192.168.d+.d+(:d+)?$/,
+	/^http://172.d+.d+.d+(:d+)?$/,
+	/^http://10.d+.d+.d+(:d+)?$/,
+];
+const PROD_ORIGINS = ['https://roadlift.app', 'https://api.roadlift.app'];
+app.use(cors({
+	origin: process.env.NODE_ENV === 'production' ? PROD_ORIGINS : DEV_ORIGINS,
+	methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+	credentials: true,
+}));
+
+// ── Rate limiting ──────────────────────────────────────────────────────────
+const rateLimit = require('express-rate-limit');
+const authLimiter = rateLimit({
+	windowMs: 15 * 60 * 1000,  // 15 minutes
+	max: 20,                     // max 20 login/register attempts per window
+	standardHeaders: true,
+	legacyHeaders: false,
+	message: { message: 'Too many attempts. Please try again in 15 minutes.' },
+});
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -32,7 +56,7 @@ const vehicleRoutes = require("./routes/vehicleRoutes");
 const mapsRoutes = require("./routes/mapsRoutes");
 const userRoutes = require("./routes/userRoutes");
 
-app.use("/api/auth", authRoutes);
+app.use("/api/auth", authLimiter, authRoutes);
 app.use("/api/jobs", jobRoutes);
 app.use("/api/driver", driverRoutes);
 app.use("/api/utils", utilsRoutes);

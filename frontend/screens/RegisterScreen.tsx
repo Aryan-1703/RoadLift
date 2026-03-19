@@ -35,6 +35,7 @@ export const RegisterScreen = () => {
 	const [role, setRole] = useState<"CUSTOMER" | "DRIVER">("CUSTOMER");
 	const [step, setStep] = useState(0); // 0=Role, 1=Personal, 2=Vehicle/Profile, 3=Password
 	const [isSubmitting, setIsSubmitting] = useState(false);
+	const [termsAccepted, setTermsAccepted] = useState(false);
 
 	// Slide animation
 	const slideAnim = useRef(new Animated.Value(0)).current;
@@ -102,7 +103,7 @@ export const RegisterScreen = () => {
 		if (s === 0) return true;
 		return stepFields[s].every(f => !errors[f]);
 	};
-	const isFormValid = Object.values(errors).every(e => e === "");
+	const isFormValid = Object.values(errors).every(e => e === "") && termsAccepted;
 
 	// ── Navigation ────────────────────────────────────────────────────────────
 	const animateStep = (direction: "forward" | "back", callback: () => void) => {
@@ -785,6 +786,8 @@ const styles = StyleSheet.create({
 		paddingBottom: Platform.OS === "ios" ? 8 : 16,
 		borderTopWidth: 1,
 	},
+	termsRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 12 },
+	termsText: { flex: 1, fontSize: 13, lineHeight: 18 },
 	loginLink: { alignItems: "center", paddingTop: 14 },
 	loginLinkText: { fontSize: 14 },
 });

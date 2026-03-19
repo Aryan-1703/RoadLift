@@ -1,54 +1,84 @@
 {
-	"expo": {
-		"name": "RoadLift",
-		"slug": "RoadLift",
-		"scheme": "roadlift",
-		"version": "1.0.0",
-		"sdkVersion": "54.0.0",
-		"platforms": ["ios", "android"],
-		"icon": "./assets/icon.png",
-		"splash": {
-			"image": "./assets/icon.png",
-			"resizeMode": "contain",
-			"backgroundColor": "#ffffff"
-		},
-		"plugins": [
-			[
-				"expo-notifications",
-				{
-					"icon": "./assets/icon.png",
-					"color": "#1A6BFF",
-					"sounds": []
-				}
-			]
-		],
-		"android": {
-			"package": "com.aryan1703.RoadLift",
-			"permissions": [
-				"ACCESS_COARSE_LOCATION",
-				"ACCESS_FINE_LOCATION",
-				"RECEIVE_BOOT_COMPLETED",
-				"VIBRATE",
-				"POST_NOTIFICATIONS"
-			]
-		},
-		"ios": {
-			"bundleIdentifier": "com.aryan1703.RoadLift",
-			"entitlements": {
-				"com.apple.developer.in-app-payments": ["merchant.com.aryan1703.RoadLift"]
-			},
-			"infoPlist": {
-				"ITSAppUsesNonExemptEncryption": false,
-				"NSLocationWhenInUseUsageDescription": "We need your location to show the driver where you are and to track your route.",
-				"NSLocationAlwaysAndWhenInUseUsageDescription": "We need your location to show the driver where you are and to track your route.",
-				"UIBackgroundModes": ["remote-notification", "location", "fetch"]
-			}
-		},
-		"extra": {
-			"eas": {
-				"projectId": "ad2db119-04d3-4517-be8a-4b4de6194806"
-			}
-		},
-		"owner": "aryan1703"
-	}
+  "expo": {
+    "name": "RoadLift",
+    "slug": "RoadLift",
+    "scheme": "roadlift",
+    "version": "1.0.0",
+    "sdkVersion": "54.0.0",
+    "platforms": ["ios", "android"],
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0a0e1a"
+    },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#1A6BFF",
+          "sounds": []
+        }
+      ],
+      "expo-tracking-transparency",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0a0e1a",
+          "image": "./assets/icon.png",
+          "imageWidth": 200
+        }
+      ]
+    ],
+    "android": {
+      "package": "com.aryan1703.RoadLift",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#0a0e1a"
+      },
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE",
+        "POST_NOTIFICATIONS"
+      ]
+    },
+    "ios": {
+      "bundleIdentifier": "com.aryan1703.RoadLift",
+      "supportsTablet": false,
+      "entitlements": {
+        "com.apple.developer.in-app-payments": ["merchant.com.aryan1703.RoadLift"]
+      },
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSUserTrackingUsageDescription": "We use this to measure app performance and improve your experience.",
+        "NSLocationWhenInUseUsageDescription": "We need your location to show the driver where you are and to track your route.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "We need your location to show the driver where you are and to track your route.",
+        "NSCameraUsageDescription": "Needed to take a profile photo.",
+        "NSPhotoLibraryUsageDescription": "Needed to select a profile photo from your library.",
+        "UIBackgroundModes": ["remote-notification", "location", "fetch"],
+        "NSPrivacyTrackingDomains": []
+      },
+      "privacyManifests": {
+        "NSPrivacyAccessedAPITypes": [
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
+            "NSPrivacyAccessedAPITypeReasons": ["CA92.1"]
+          },
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryFileTimestamp",
+            "NSPrivacyAccessedAPITypeReasons": ["C617.1"]
+          }
+        ]
+      }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "ad2db119-04d3-4517-be8a-4b4de6194806"
+      }
+    },
+    "owner": "aryan1703"
+  }
 }

@@ -100,6 +100,32 @@ const registerDriver = async (req, res) => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/auth/forgot-password
+// ─────────────────────────────────────────────────────────────────────────────
+const forgotPassword = async (req, res) => {
+	try {
+		const result = await authService.forgotPassword({ email: req.body.email });
+		return res.json(result);
+	} catch (error) {
+		return res.status(400).json({ message: error.message });
+	}
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/auth/reset-password
+// ─────────────────────────────────────────────────────────────────────────────
+const resetPassword = async (req, res) => {
+	try {
+		const { token, newPassword } = req.body;
+		const result = await authService.resetPassword({ token, newPassword });
+		return res.json(result);
+	} catch (error) {
+		return res.status(400).json({ message: error.message });
+	}
+};
+
 // Legacy shims — keep old endpoints alive during transition period.
 // These simply delegate to the unified handlers above.
 // Remove once mobile clients are fully updated to /api/auth/login.
@@ -109,6 +135,8 @@ const loginDriver = login;
 const registerUser = registerCustomer;
 
 module.exports = {
+	forgotPassword,
+	resetPassword,
 	login,
 	loginUser,
 	loginDriver,

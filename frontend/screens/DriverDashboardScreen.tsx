@@ -11,6 +11,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Location from "expo-location";
 import { useDriver } from "../context/DriverContext";
+import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { Card } from "../components/Card";
 import { Skeleton } from "../components/Skeleton";
@@ -72,7 +73,9 @@ export const DriverDashboardScreen = () => {
 		earnings,
 		fetchEarnings,
 	} = useDriver();
+	const { user } = useAuth();
 	const { colors, isDarkMode } = useTheme();
+	const approvalStatus = (user as any)?.driverProfile?.approvalStatus ?? "pending";
 	const navigation = useNavigation<any>();
 	const [refreshing, setRefreshing] = useState(false);
 	const [checkingForJobs, setCheckingForJobs] = useState(false);
@@ -199,6 +202,25 @@ export const DriverDashboardScreen = () => {
 	const onlineBorder = colors.greenBorder;
 	const offlineBg    = isDarkMode ? "rgba(255,255,255,0.05)" : "rgba(27,25,22,0.05)";
 	const offlineBorder = colors.border;
+
+	// ── Driver approval gate ──────────────────────────────────────────────────
+	if (approvalStatus !== "approved") {
+		return (
+			<SafeAreaView style={[{ flex: 1, alignItems: "center", justifyContent: "center", padding: 32 }, { backgroundColor: colors.background }]}>
+				<View style={{ width: 88, height: 88, borderRadius: 44, backgroundColor: (colors.amber ?? "#F59E0B") + "20", alignItems: "center", justifyContent: "center", marginBottom: 24 }}>
+					<Ionicons name="time-outline" size={44} color={colors.amber ?? "#F59E0B"} />
+				</View>
+				<Text style={{ fontSize: 22, fontWeight: "800", color: colors.text, marginBottom: 10, textAlign: "center" }}>
+					{approvalStatus === "rejected" ? "Application Rejected" : "Account Under Review"}
+				</Text>
+				<Text style={{ fontSize: 15, color: colors.textMuted, textAlign: "center", lineHeight: 24 }}>
+					{approvalStatus === "rejected"
+						? "Your driver application was not approved. Please contact support@roadlift.com for more information."
+						: "Your driver account is being reviewed by our team. You will be notified once approved — this typically takes 1–2 business days."}
+				</Text>
+			</SafeAreaView>
+		);
+	}
 
 	return (
 		<SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>

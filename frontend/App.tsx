@@ -19,6 +19,9 @@ import { JobFlowScreen } from "./screens/JobFlowScreen";
 import { SettingsNavigator } from "./navigation/SettingsNavigator";
 import { DriverFlowScreen } from "./screens/DriverFlowScreen";
 import { ActiveJobBanner } from "./components/ActiveJobBanner";
+import { ErrorBoundary } from "./components/ErrorBoundary";
+import { OfflineBanner } from "./components/OfflineBanner";
+import { ForgotPasswordScreen } from "./screens/ForgotPasswordScreen";
 
 const STRIPE_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_STRIPE_KEY ?? "";
 if (!STRIPE_PUBLISHABLE_KEY && __DEV__) {
@@ -56,6 +59,7 @@ const RootNavigator = () => {
 				<>
 					<Stack.Screen name="Login" component={LoginScreen} />
 					<Stack.Screen name="Register" component={RegisterScreen} />
+					<Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
 				</>
 			) : user.role === "CUSTOMER" ? (
 				<>
@@ -98,6 +102,7 @@ export default function App() {
 	}, []);
 
 	return (
+		<ErrorBoundary>
 		<GestureHandlerRootView style={{ flex: 1 }}>
 			<SafeAreaProvider>
 				<ThemeProvider>
@@ -134,5 +139,7 @@ export default function App() {
 				</ThemeProvider>
 			</SafeAreaProvider>
 		</GestureHandlerRootView>
+		<OfflineBanner />
+		</ErrorBoundary>
 	);
 }

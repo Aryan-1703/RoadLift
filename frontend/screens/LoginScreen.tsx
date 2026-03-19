@@ -488,6 +488,8 @@ const styles = StyleSheet.create({
 	signInBtn: { marginTop: 4 },
 
 	// Register footer card
+	forgotLink: { alignItems: "center", paddingTop: 12, paddingBottom: 4 },
+	forgotText: { fontSize: 13, fontWeight: "600" },
 	registerCard: {
 		flexDirection: "row",
 		alignItems: "center",

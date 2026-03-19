@@ -185,8 +185,72 @@ async function assertEmailNotTaken(email) {
 	}
 }
 
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Password reset — in-memory token store (replace with Redis in production)
+// ─────────────────────────────────────────────────────────────────────────────
+const crypto = require('crypto');
+const resetTokenStore = new Map(); // token → { userId, expiresAt }
+
+async function forgotPassword({ email }) {
+	if (!email) throw new Error('Email is required.');
+	const user = await User.findOne({ where: { email } });
+	// Always respond the same to avoid leaking whether an email exists
+	if (!user) return { sent: true };
+
+	const token = crypto.randomBytes(32).toString('hex');
+	resetTokenStore.set(token, { userId: user.id, expiresAt: Date.now() + 60 * 60 * 1000 });
+
+	try {
+		const nodemailer = require('nodemailer');
+		const smtpHost = process.env.SMTP_HOST;
+		const smtpUser = process.env.SMTP_USER;
+		const smtpPass = process.env.SMTP_PASS;
+		const from = process.env.SMTP_FROM || '"RoadLift" <' + smtpUser + '>';
+		const code = token.slice(0, 6).toUpperCase();
+
+		if (smtpHost && smtpUser && smtpPass) {
+			const transporter = nodemailer.createTransport({
+				host: smtpHost,
+				port: parseInt(process.env.SMTP_PORT || '587', 10),
+				secure: parseInt(process.env.SMTP_PORT || '587', 10) === 465,
+				auth: { user: smtpUser, pass: smtpPass },
+			});
+			await transporter.sendMail({
+				from,
+				to: email,
+				subject: 'Reset your RoadLift password',
+				html: '<p>Your RoadLift password reset code is:</p><h2 style="letter-spacing:4px;">' + code + '</h2><p>Enter this code in the app. Expires in 1 hour.</p><p>If you did not request this, ignore this email.</p>',
+			});
+		}
+	} catch (_) { /* SMTP not configured — token still usable in dev */ }
+
+	const resp = { sent: true };
+	if (process.env.NODE_ENV !== 'production') resp.token = token;
+	return resp;
+}
+
+async function resetPassword({ token, newPassword }) {
+	if (!token || !newPassword) throw new Error('Token and new password are required.');
+	if (newPassword.length < 8) throw new Error('Password must be at least 8 characters.');
+
+	const entry = resetTokenStore.get(token);
+	if (!entry) throw new Error('Invalid or expired reset token.');
+	if (Date.now() > entry.expiresAt) {
+		resetTokenStore.delete(token);
+		throw new Error('Reset token has expired. Please request a new one.');
+	}
+
+	const hashed = await bcrypt.hash(newPassword, SALT_ROUNDS);
+	await User.update({ password: hashed }, { where: { id: entry.userId } });
+	resetTokenStore.delete(token);
+	return { success: true };
+}
+
 module.exports = {
 	login,
+	forgotPassword,
+	resetPassword,
 	registerCustomer,
 	registerDriver,
 	signToken,

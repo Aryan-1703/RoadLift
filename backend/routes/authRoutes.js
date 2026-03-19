@@ -7,6 +7,8 @@ const {
 	registerCustomer,
 	registerDriver,
 	registerUser,
+	forgotPassword,
+	resetPassword,
 } = require("../controllers/authController");
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -29,6 +31,10 @@ router.post("/register/customer", registerCustomer);
  * POST /api/auth/register/driver
  */
 router.post("/register/driver", registerDriver);
+
+// Password reset
+router.post("/forgot-password", forgotPassword);
+router.post("/reset-password", resetPassword);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // LEGACY SHIMS — kept for backward compatibility with existing mobile clients.

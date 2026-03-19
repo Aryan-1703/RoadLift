@@ -58,6 +58,13 @@ module.exports = sequelize => {
 				type: DataTypes.INTEGER,
 				defaultValue: 0,
 			},
+			approvalStatus: {
+				type: DataTypes.STRING(10),
+				allowNull: false,
+				defaultValue: 'pending',
+				validate: { isIn: [['pending', 'approved', 'rejected']] },
+				comment: 'Admin must set to approved before driver can go online.',
+			},
 		},
 		{
 			// CRITICAL: must be lowercase — this is a new table we created, not Sequelize-generated
