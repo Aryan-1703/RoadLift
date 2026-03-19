@@ -20,8 +20,10 @@ import { SettingsNavigator } from "./navigation/SettingsNavigator";
 import { DriverFlowScreen } from "./screens/DriverFlowScreen";
 import { ActiveJobBanner } from "./components/ActiveJobBanner";
 
-const STRIPE_PUBLISHABLE_KEY =
-	"pk_test_51RpW2T7C4sCNpdjEa0WyFFkGanThDJKGp9fRal7rUIZhfW8QO6X34JgM7C4Dg2rZgpZgJwS9F5YLniAcZfy4A2Cy00qvB9Gwqf";
+const STRIPE_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_STRIPE_KEY ?? "";
+if (!STRIPE_PUBLISHABLE_KEY && __DEV__) {
+	console.warn("[App] EXPO_PUBLIC_STRIPE_KEY is not set. Add it to frontend/.env");
+}
 
 const Stack = createNativeStackNavigator();
 

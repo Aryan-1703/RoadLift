@@ -1,9 +1,16 @@
-import { Platform } from "react-native";
+// API base URL — set EXPO_PUBLIC_API_URL in your .env file.
+// For local dev on a physical device, set it to your machine's Wi-Fi IP:
+//   EXPO_PUBLIC_API_URL=http://192.168.1.100:3000
+const rawUrl = process.env.EXPO_PUBLIC_API_URL;
 
-// For Android Emulators, '10.0.2.2' points to your host machine's localhost.
-// For iOS Simulators, 'localhost' works perfectly.
-// If you are testing on a PHYSICAL device, change this to your computer's local Wi-Fi IP (e.g., '192.168.1.100')
-export const BACKEND_URL = "http://10.0.0.206:3000";
-// export const BACKEND_URL = "http://172.20.10.2:3000";
+if (!rawUrl && __DEV__) {
+	console.warn(
+		"[config] EXPO_PUBLIC_API_URL is not set. " +
+		"Create frontend/.env and add EXPO_PUBLIC_API_URL=http://<your-ip>:3000",
+	);
+}
+
+// Strip trailing slash so callers can safely append /api/...
+export const BACKEND_URL = (rawUrl ?? "http://localhost:3000").replace(/\/$/, "");
 
 export const API_URL = `${BACKEND_URL}/api`;
