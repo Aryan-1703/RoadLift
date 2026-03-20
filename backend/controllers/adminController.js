@@ -54,9 +54,9 @@ async function getDashboard(req, res) {
 			User.count({ where: { role: "ADMIN",    deletedAt: null } }),
 			User.count({ where: { role: "DRIVER", isActive: true, deletedAt: null } }),
 
-			Job.count({ where: { createdAt: { [Op.between]: [todayStart, todayEnd] } } }),
-			Job.count({ where: { createdAt: { [Op.gte]: weekAgo  } } }),
-			Job.count({ where: { createdAt: { [Op.gte]: monthAgo } } }),
+			Job.count({ where: { status: { [Op.ne]: "cancelled" }, createdAt: { [Op.between]: [todayStart, todayEnd] } } }),
+			Job.count({ where: { status: { [Op.ne]: "cancelled" }, createdAt: { [Op.gte]: weekAgo  } } }),
+			Job.count({ where: { status: { [Op.ne]: "cancelled" }, createdAt: { [Op.gte]: monthAgo } } }),
 
 			Job.count({ where: { status: { [Op.in]: ["accepted", "arrived", "in_progress"] } } }),
 			Job.count({ where: { status: "pending" } }),
@@ -289,8 +289,7 @@ async function approveService(req, res) {
 		const profile = await DriverProfile.findOne({ where: { userId: driverId } });
 		if (!profile) return res.status(404).json({ message: "Driver profile not found." });
 
-		const existing    = normalizeSvc((profile.unlockedServices || {})[serviceKey]);
-		const newIsEnabled = status === "approved" ? existing.isEnabled : false;
+		const newIsEnabled = status === "approved";
 
 		const services       = { ...(profile.unlockedServices || {}) };
 		services[serviceKey] = { status, isEnabled: newIsEnabled };

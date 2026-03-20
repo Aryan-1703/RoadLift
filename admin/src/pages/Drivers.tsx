@@ -22,6 +22,7 @@ export default function Drivers() {
 
   const { data, isLoading } = useQuery({
     queryKey: ['drivers', page, search, status],
+    refetchInterval: 30_000,
     queryFn: () => listDrivers({ page, limit: 20, ...(search && { search }), ...(status && { status }) }).then(r => r.data),
   });
 

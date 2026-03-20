@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Star, Briefcase, CheckCircle, XCircle, Clock, Lock } from 'lucide-react';
@@ -16,13 +17,14 @@ const SERVICE_LABELS: Record<string, string> = {
 };
 
 function ServiceCard({
-  serviceKey, state, driverId, media, onAction,
+  serviceKey, state, driverId, media, onAction, loading,
 }: {
   serviceKey: string;
   state: ServiceState;
   driverId: number;
   media: string[];
   onAction: (key: string, status: string) => void;
+  loading?: boolean;
 }) {
   const variant = statusBadge(state.status);
   return (
@@ -53,7 +55,8 @@ function ServiceCard({
         <Button
           size="sm"
           variant="success"
-          disabled={state.status === 'approved'}
+          disabled={state.status === 'approved' || loading}
+          loading={loading}
           icon={<CheckCircle size={13} />}
           onClick={() => onAction(serviceKey, 'approved')}
         >
@@ -62,7 +65,8 @@ function ServiceCard({
         <Button
           size="sm"
           variant="danger"
-          disabled={state.status === 'rejected'}
+          disabled={state.status === 'rejected' || loading}
+          loading={loading}
           icon={<XCircle size={13} />}
           onClick={() => onAction(serviceKey, 'rejected')}
         >
@@ -72,6 +76,7 @@ function ServiceCard({
           <Button
             size="sm"
             variant="ghost"
+            disabled={loading}
             icon={<Lock size={13} />}
             onClick={() => onAction(serviceKey, 'unapproved')}
           >
@@ -93,10 +98,18 @@ export default function DriverDetail() {
     queryFn: () => getDriver(id!).then(r => r.data),
   });
 
+  const [serviceError, setServiceError] = useState('');
   const serviceMutation = useMutation({
     mutationFn: ({ key, status }: { key: string; status: string }) =>
       approveService(driver!.id, key, status),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['driver', id] }),
+    onSuccess: () => {
+      setServiceError('');
+      queryClient.invalidateQueries({ queryKey: ['driver', id] });
+    },
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setServiceError(msg || 'Failed to update service status.');
+    },
   });
 
   const statusMutation = useMutation({
@@ -179,6 +192,9 @@ export default function DriverDetail() {
       {/* Services */}
       <Card title="Service Approvals">
         <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {serviceError && (
+            <p className="col-span-2 text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">{serviceError}</p>
+          )}
           {['battery', 'lockout', 'fuel', 'tire'].map(key => (
             <ServiceCard
               key={key}
@@ -186,6 +202,7 @@ export default function DriverDetail() {
               state={services[key] ?? { status: 'unapproved', isEnabled: false }}
               driverId={driver.id}
               media={media[key] ?? []}
+              loading={serviceMutation.isPending}
               onAction={(k, s) => serviceMutation.mutate({ key: k, status: s })}
             />
           ))}

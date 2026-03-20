@@ -20,6 +20,7 @@ export default function PendingApprovals() {
 
   const { data, isLoading } = useQuery({
     queryKey: ['pending-approvals'],
+    refetchInterval: 30_000,
     queryFn: () => getPendingApprovals().then(r => r.data),
   });
 

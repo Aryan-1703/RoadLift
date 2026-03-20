@@ -23,6 +23,7 @@ export default function Jobs() {
 
   const { data, isLoading } = useQuery({
     queryKey: ['jobs', page, status, serviceType, from, to],
+    refetchInterval: 15_000,
     queryFn: () => listJobs({
       page, limit: 20,
       ...(status      && { status }),

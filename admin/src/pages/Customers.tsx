@@ -20,6 +20,7 @@ export default function Customers() {
 
   const { data, isLoading } = useQuery({
     queryKey: ['customers', page, search, status],
+    refetchInterval: 30_000,
     queryFn: () => listCustomers({ page, limit: 20, ...(search && { search }), ...(status && { status }) }).then(r => r.data),
   });
 

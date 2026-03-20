@@ -29,7 +29,7 @@ const DEV_ORIGINS = [
 const PROD_ORIGINS = ['https://roadlift.app', 'https://api.roadlift.app', 'https://admin.roadlift.app'];
 app.use(cors({
 	origin: process.env.NODE_ENV === 'production' ? PROD_ORIGINS : DEV_ORIGINS,
-	methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+	methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
 	credentials: true,
 }));
 
