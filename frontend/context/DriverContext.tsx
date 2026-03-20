@@ -16,13 +16,18 @@ import { useToast } from "./ToastContext";
 
 const POLL_INTERVAL_MS = 30_000;
 
-type ServiceStatus = "unapproved" | "pending" | "approved";
+export type ServiceStatus = "unapproved" | "pending" | "approved" | "rejected";
 
-interface UnlockedServices {
-	battery: ServiceStatus;
-	lockout:  ServiceStatus;
-	fuel:     ServiceStatus;
-	tire:     ServiceStatus;
+export interface ServiceState {
+	status:    ServiceStatus;
+	isEnabled: boolean;
+}
+
+export interface UnlockedServices {
+	battery: ServiceState;
+	lockout:  ServiceState;
+	fuel:     ServiceState;
+	tire:     ServiceState;
 }
 
 interface DriverContextType {
@@ -31,6 +36,7 @@ interface DriverContextType {
 	activeJob:          Job | null;
 	earnings:           any;
 	unlockedServices:   UnlockedServices | null;
+	toggleService:      (serviceKey: string, isEnabled: boolean) => Promise<void>;
 	goOnline:           () => Promise<void>;
 	goOffline:          () => Promise<void>;
 	acceptJob:          (jobId: string) => Promise<void>;
@@ -108,6 +114,24 @@ export const DriverProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 			setIsOnline(user.isActive ?? false);
 		}
 	}, [user?.id]); // only re-run when the logged-in user changes, not on every update
+
+	// ── toggleService ────────────────────────────────────────────────────────
+	const toggleService = useCallback(async (serviceKey: string, isEnabled: boolean) => {
+		try {
+			await api.put(`/driver/services/${serviceKey}/toggle`, { isEnabled });
+			// Optimistically update local state so the Switch feels instant
+			setUnlockedServices(prev => {
+				if (!prev) return prev;
+				const key = serviceKey as keyof UnlockedServices;
+				return { ...prev, [key]: { ...prev[key], isEnabled } };
+			});
+		} catch (err: any) {
+			showToast(
+				err.response?.data?.message ?? "Failed to update service toggle",
+				"error",
+			);
+		}
+	}, [showToast]);
 
 	// ── refreshServices ──────────────────────────────────────────────────────
 	const refreshServices = useCallback(async () => {
@@ -332,6 +356,7 @@ export const DriverProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 				activeJob,
 				earnings,
 				unlockedServices,
+				toggleService,
 				goOnline,
 				goOffline,
 				acceptJob,

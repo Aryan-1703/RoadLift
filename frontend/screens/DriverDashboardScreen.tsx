@@ -76,8 +76,9 @@ export const DriverDashboardScreen = () => {
 	const { colors, isDarkMode } = useTheme();
 	const navigation = useNavigation<any>();
 
-	const hasApprovedService = unlockedServices
-		? Object.values(unlockedServices).some(s => s === "approved")
+	// Driver can go online only when at least one approved service is toggled on
+	const hasActiveService = unlockedServices
+		? Object.values(unlockedServices).some(s => s.status === "approved" && s.isEnabled)
 		: false;
 	const [refreshing, setRefreshing] = useState(false);
 	const [checkingForJobs, setCheckingForJobs] = useState(false);
@@ -283,7 +284,7 @@ export const DriverDashboardScreen = () => {
 							},
 						]}
 						onPress={isOnline ? goOffline : () => {
-						if (!hasApprovedService) {
+						if (!hasActiveService) {
 							navigation.navigate("SettingsNav", { screen: "ServiceHub" });
 						} else {
 							goOnline();
@@ -306,28 +307,28 @@ export const DriverDashboardScreen = () => {
 					style={[
 						styles.serviceHubBanner,
 						{
-							backgroundColor: hasApprovedService ? colors.greenBg : (colors.amber ?? "#F59E0B") + "14",
-							borderColor:     hasApprovedService ? colors.greenBorder : (colors.amber ?? "#F59E0B") + "50",
+							backgroundColor: hasActiveService ? colors.greenBg : (colors.amber ?? "#F59E0B") + "14",
+							borderColor:     hasActiveService ? colors.greenBorder : (colors.amber ?? "#F59E0B") + "50",
 						},
 					]}
 					onPress={() => navigation.navigate("SettingsNav", { screen: "ServiceHub" })}
 					activeOpacity={0.8}
 				>
-					<View style={[styles.serviceHubIconWrap, { backgroundColor: hasApprovedService ? colors.greenBg : (colors.amber ?? "#F59E0B") + "20" }]}>
+					<View style={[styles.serviceHubIconWrap, { backgroundColor: hasActiveService ? colors.greenBg : (colors.amber ?? "#F59E0B") + "20" }]}>
 						<Ionicons
-							name={hasApprovedService ? "shield-checkmark-outline" : "lock-open-outline"}
+							name={hasActiveService ? "shield-checkmark-outline" : "lock-open-outline"}
 							size={20}
-							color={hasApprovedService ? (colors.green ?? "#059669") : (colors.amber ?? "#F59E0B")}
+							color={hasActiveService ? (colors.green ?? "#059669") : (colors.amber ?? "#F59E0B")}
 						/>
 					</View>
 					<View style={{ flex: 1 }}>
 						<Text style={[styles.serviceHubTitle, { color: colors.text }]}>
-							{hasApprovedService ? "Service Hub" : "Unlock Services to Go Online"}
+							{hasActiveService ? "Service Hub" : "Enable a Service to Go Online"}
 						</Text>
 						<Text style={[styles.serviceHubSub, { color: colors.textMuted }]}>
-							{hasApprovedService
+							{hasActiveService
 								? "Manage your approved services and add new ones"
-								: "Submit equipment proof to start receiving job requests"}
+								: "Approve a service in the Service Hub and toggle it on"}
 						</Text>
 					</View>
 					<Ionicons name="chevron-forward" size={18} color={colors.textMuted} />

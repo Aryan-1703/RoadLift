@@ -7,93 +7,123 @@ import {
 	ScrollView,
 	ActivityIndicator,
 	RefreshControl,
+	Switch,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../context/ThemeContext";
-import { api } from "../services/api";
-
-// ── Types ─────────────────────────────────────────────────────────────────────
-type ServiceStatus = "unapproved" | "pending" | "approved";
-
-interface UnlockedServices {
-	battery: ServiceStatus;
-	lockout:  ServiceStatus;
-	fuel:     ServiceStatus;
-	tire:     ServiceStatus;
-}
+import { useDriver } from "../context/DriverContext";
+import type { ServiceState } from "../context/DriverContext";
 
 // ── Service catalogue ─────────────────────────────────────────────────────────
-const SERVICES = [
+const SERVICES: Array<{
+	key:       "battery" | "lockout" | "fuel" | "tire";
+	label:     string;
+	icon:      "battery-charging-outline" | "key-outline" | "water-outline" | "disc-outline";
+	equipment: string;
+	color:     string;
+}> = [
 	{
-		key:       "battery" as const,
+		key:       "battery",
 		label:     "Battery Boost",
-		icon:      "battery-charging-outline" as const,
+		icon:      "battery-charging-outline",
 		equipment: "jumper cables or a portable booster pack",
 		color:     "#F59E0B",
 	},
 	{
-		key:       "lockout" as const,
+		key:       "lockout",
 		label:     "Door Lockout",
-		icon:      "key-outline" as const,
+		icon:      "key-outline",
 		equipment: "slim jim, wedge tool, or lockout kit",
 		color:     "#3B82F6",
 	},
 	{
-		key:       "fuel" as const,
+		key:       "fuel",
 		label:     "Fuel Delivery",
-		icon:      "water-outline" as const,
+		icon:      "water-outline",
 		equipment: "approved fuel container (minimum 5L)",
 		color:     "#10B981",
 	},
 	{
-		key:       "tire" as const,
+		key:       "tire",
 		label:     "Tire Change",
-		icon:      "disc-outline" as const,
+		icon:      "disc-outline",
 		equipment: "spare tire, jack, and lug wrench",
 		color:     "#8B5CF6",
 	},
 ];
 
-// ── Status badge config ───────────────────────────────────────────────────────
-function statusBadge(status: ServiceStatus, colors: any) {
-	switch (status) {
-		case "approved":
-			return { icon: "checkmark-circle" as const, color: colors.green ?? "#059669", label: "Approved", bg: (colors.green ?? "#059669") + "18" };
-		case "pending":
-			return { icon: "time-outline" as const, color: colors.amber ?? "#F59E0B", label: "Under Review", bg: (colors.amber ?? "#F59E0B") + "18" };
-		default:
-			return { icon: "lock-closed-outline" as const, color: colors.textMuted, label: "Not Unlocked", bg: colors.border + "60" };
+// ── Status badge ──────────────────────────────────────────────────────────────
+function StatusBadge({ svc, colors }: { svc: ServiceState; colors: any }) {
+	if (svc.status === "approved") {
+		return (
+			<View style={[badge.wrap, { backgroundColor: (colors.green ?? "#059669") + "18" }]}>
+				<Ionicons name="checkmark-circle" size={13} color={colors.green ?? "#059669"} />
+				<Text style={[badge.text, { color: colors.green ?? "#059669" }]}>Approved</Text>
+			</View>
+		);
 	}
+	if (svc.status === "pending") {
+		return (
+			<View style={[badge.wrap, { backgroundColor: (colors.amber ?? "#F59E0B") + "18" }]}>
+				<Ionicons name="time-outline" size={13} color={colors.amber ?? "#F59E0B"} />
+				<Text style={[badge.text, { color: colors.amber ?? "#F59E0B" }]}>Under Review</Text>
+			</View>
+		);
+	}
+	if (svc.status === "rejected") {
+		return (
+			<View style={[badge.wrap, { backgroundColor: (colors.danger ?? "#EF4444") + "18" }]}>
+				<Ionicons name="close-circle-outline" size={13} color={colors.danger ?? "#EF4444"} />
+				<Text style={[badge.text, { color: colors.danger ?? "#EF4444" }]}>Rejected</Text>
+			</View>
+		);
+	}
+	return (
+		<View style={[badge.wrap, { backgroundColor: colors.border + "60" }]}>
+			<Ionicons name="lock-closed-outline" size={13} color={colors.textMuted} />
+			<Text style={[badge.text, { color: colors.textMuted }]}>Not Unlocked</Text>
+		</View>
+	);
 }
+
+const badge = StyleSheet.create({
+	wrap: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10 },
+	text: { fontSize: 11, fontWeight: "700" },
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 export const ServiceHubScreen = () => {
 	const { colors } = useTheme();
 	const navigation = useNavigation<any>();
+	const { unlockedServices, refreshServices, toggleService } = useDriver();
 
-	const [services, setServices]   = useState<UnlockedServices | null>(null);
-	const [loading,  setLoading]    = useState(true);
+	const [loading,    setLoading]    = useState(!unlockedServices);
 	const [refreshing, setRefreshing] = useState(false);
+	// Track which service keys are mid-toggle to disable the switch during the request
+	const [toggling,   setToggling]   = useState<Set<string>>(new Set());
 
 	const load = useCallback(async (silent = false) => {
 		if (!silent) setLoading(true);
-		try {
-			const res = await api.get<{ unlockedServices: UnlockedServices }>("/driver/services");
-			setServices(res.data.unlockedServices);
-		} catch {
-			// silently fail — retry on pull-to-refresh
-		} finally {
-			setLoading(false);
-			setRefreshing(false);
-		}
-	}, []);
+		await refreshServices();
+		setLoading(false);
+		setRefreshing(false);
+	}, [refreshServices]);
 
 	useEffect(() => { load(); }, [load]);
 
-	const approvedCount = services
-		? Object.values(services).filter(s => s === "approved").length
+	const handleToggle = async (key: string, value: boolean) => {
+		setToggling(prev => new Set(prev).add(key));
+		await toggleService(key, value);
+		setToggling(prev => { const n = new Set(prev); n.delete(key); return n; });
+	};
+
+	const approvedCount = unlockedServices
+		? Object.values(unlockedServices).filter(s => s.status === "approved").length
+		: 0;
+	const enabledCount = unlockedServices
+		? Object.values(unlockedServices).filter(s => s.status === "approved" && s.isEnabled).length
 		: 0;
 
 	if (loading) {
@@ -120,60 +150,98 @@ export const ServiceHubScreen = () => {
 				<View style={[styles.header, { backgroundColor: colors.card, borderColor: colors.border }]}>
 					<Text style={[styles.headerTitle, { color: colors.text }]}>Service Hub</Text>
 					<Text style={[styles.headerSub, { color: colors.textMuted }]}>
-						Unlock services by submitting proof of equipment. Each service is reviewed within 24 hours.
+						Unlock services by submitting equipment proof. Once approved, use the toggle to start receiving those job types.
 					</Text>
 					{approvedCount > 0 && (
-						<View style={[styles.approvedChip, { backgroundColor: (colors.green ?? "#059669") + "18" }]}>
-							<Ionicons name="checkmark-circle" size={14} color={colors.green ?? "#059669"} />
-							<Text style={[styles.approvedChipText, { color: colors.green ?? "#059669" }]}>
-								{approvedCount} service{approvedCount > 1 ? "s" : ""} unlocked
-							</Text>
+						<View style={styles.chipRow}>
+							<View style={[styles.chip, { backgroundColor: (colors.green ?? "#059669") + "18" }]}>
+								<Ionicons name="checkmark-circle" size={13} color={colors.green ?? "#059669"} />
+								<Text style={[styles.chipText, { color: colors.green ?? "#059669" }]}>
+									{approvedCount} approved
+								</Text>
+							</View>
+							{enabledCount > 0 && (
+								<View style={[styles.chip, { backgroundColor: colors.primary + "18" }]}>
+									<Ionicons name="radio-button-on" size={13} color={colors.primary} />
+									<Text style={[styles.chipText, { color: colors.primary }]}>
+										{enabledCount} active
+									</Text>
+								</View>
+							)}
 						</View>
 					)}
 				</View>
 
 				{/* Service cards */}
 				{SERVICES.map(svc => {
-					const status = services?.[svc.key] ?? "unapproved";
-					const badge  = statusBadge(status, colors);
+					const state: ServiceState = unlockedServices?.[svc.key] ?? { status: "unapproved", isEnabled: false };
+					const isApproved = state.status === "approved";
+					const isMidToggle = toggling.has(svc.key);
 
 					return (
 						<View
 							key={svc.key}
-							style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
+							style={[
+								styles.card,
+								{
+									backgroundColor: colors.card,
+									borderColor: isApproved && state.isEnabled
+										? (colors.green ?? "#059669") + "50"
+										: colors.border,
+									borderWidth: isApproved && state.isEnabled ? 1.5 : 1,
+								},
+							]}
 						>
-							<View style={styles.cardRow}>
-								{/* Service icon */}
+							{/* Top row: icon + info + badge */}
+							<View style={styles.cardTop}>
 								<View style={[styles.iconWrap, { backgroundColor: svc.color + "18" }]}>
 									<Ionicons name={svc.icon} size={26} color={svc.color} />
 								</View>
-
-								{/* Name + equipment hint */}
 								<View style={styles.cardInfo}>
 									<Text style={[styles.cardTitle, { color: colors.text }]}>{svc.label}</Text>
-									<Text style={[styles.cardEquip, { color: colors.textMuted }]}>
-										Required: {svc.equipment}
+									<Text style={[styles.cardEquip, { color: colors.textMuted }]} numberOfLines={1}>
+										Needs: {svc.equipment}
 									</Text>
 								</View>
-
-								{/* Status badge */}
-								<View style={[styles.badge, { backgroundColor: badge.bg }]}>
-									<Ionicons name={badge.icon} size={14} color={badge.color} />
-									<Text style={[styles.badgeText, { color: badge.color }]}>{badge.label}</Text>
-								</View>
+								<StatusBadge svc={state} colors={colors} />
 							</View>
 
-							{/* CTA — only show if not yet approved */}
-							{status !== "approved" && (
+							{/* Approved: show toggle row */}
+							{isApproved ? (
+								<View style={[styles.toggleRow, { borderTopColor: colors.border }]}>
+									<View style={{ flex: 1 }}>
+										<Text style={[styles.toggleLabel, { color: colors.text }]}>
+											Receive Jobs
+										</Text>
+										<Text style={[styles.toggleHint, { color: colors.textMuted }]}>
+											{state.isEnabled
+												? "You will be matched to " + svc.label.toLowerCase() + " requests"
+												: "Toggle on to accept " + svc.label.toLowerCase() + " jobs"}
+										</Text>
+									</View>
+									<Switch
+										value={state.isEnabled}
+										onValueChange={v => handleToggle(svc.key, v)}
+										disabled={isMidToggle}
+										trackColor={{ false: colors.border, true: colors.primary }}
+										thumbColor={state.isEnabled ? "#fff" : colors.textMuted}
+									/>
+								</View>
+							) : (
+								/* Not approved: show upload / status CTA */
 								<TouchableOpacity
 									style={[
 										styles.uploadBtn,
 										{
-											backgroundColor: status === "pending" ? colors.border : colors.primary,
-											opacity: status === "pending" ? 0.6 : 1,
+											backgroundColor: state.status === "pending"
+												? colors.border
+												: state.status === "rejected"
+													? (colors.danger ?? "#EF4444") + "18"
+													: colors.primary,
+											opacity: state.status === "pending" ? 0.6 : 1,
 										},
 									]}
-									disabled={status === "pending"}
+									disabled={state.status === "pending"}
 									activeOpacity={0.8}
 									onPress={() =>
 										navigation.navigate("EquipmentUpload", {
@@ -184,13 +252,26 @@ export const ServiceHubScreen = () => {
 									}
 								>
 									<Ionicons
-										name={status === "pending" ? "hourglass-outline" : "cloud-upload-outline"}
-										size={16}
-										color="#fff"
+										name={
+											state.status === "pending"
+												? "hourglass-outline"
+												: state.status === "rejected"
+													? "refresh-outline"
+													: "cloud-upload-outline"
+										}
+										size={15}
+										color={state.status === "rejected" ? (colors.danger ?? "#EF4444") : "#fff"}
 										style={{ marginRight: 6 }}
 									/>
-									<Text style={styles.uploadBtnText}>
-										{status === "pending" ? "Proof Submitted — Awaiting Review" : "Submit Equipment Proof"}
+									<Text style={[
+										styles.uploadBtnText,
+										{ color: state.status === "rejected" ? (colors.danger ?? "#EF4444") : "#fff" },
+									]}>
+										{state.status === "pending"
+											? "Proof Submitted — Awaiting Review"
+											: state.status === "rejected"
+												? "Re-submit Equipment Proof"
+												: "Submit Equipment Proof"}
 									</Text>
 								</TouchableOpacity>
 							)}
@@ -199,7 +280,7 @@ export const ServiceHubScreen = () => {
 				})}
 
 				<Text style={[styles.footer, { color: colors.textMuted }]}>
-					Pull down to refresh status. Approvals are sent by email once reviewed.
+					Pull to refresh. Approvals are reviewed within 24 hours.
 				</Text>
 			</ScrollView>
 		</SafeAreaView>
@@ -211,47 +292,29 @@ const styles = StyleSheet.create({
 	center:    { flex: 1, alignItems: "center", justifyContent: "center" },
 	scroll:    { padding: 16, paddingBottom: 40 },
 
-	header: {
-		borderRadius: 16,
-		borderWidth: 1,
-		padding: 20,
-		marginBottom: 16,
-	},
+	header:      { borderRadius: 16, borderWidth: 1, padding: 20, marginBottom: 16 },
 	headerTitle: { fontSize: 22, fontWeight: "800", marginBottom: 6 },
 	headerSub:   { fontSize: 14, lineHeight: 20 },
-	approvedChip: {
-		flexDirection: "row",
-		alignItems: "center",
-		gap: 6,
-		alignSelf: "flex-start",
-		paddingHorizontal: 10,
-		paddingVertical: 5,
-		borderRadius: 20,
-		marginTop: 12,
-	},
-	approvedChipText: { fontSize: 12, fontWeight: "700" },
+	chipRow:     { flexDirection: "row", gap: 8, marginTop: 12 },
+	chip:        { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
+	chipText:    { fontSize: 12, fontWeight: "700" },
 
-	card: {
-		borderRadius: 16,
-		borderWidth: 1,
-		padding: 16,
-		marginBottom: 12,
-	},
-	cardRow:   { flexDirection: "row", alignItems: "center", marginBottom: 12 },
-	iconWrap:  { width: 48, height: 48, borderRadius: 14, alignItems: "center", justifyContent: "center", marginRight: 14 },
-	cardInfo:  { flex: 1 },
-	cardTitle: { fontSize: 16, fontWeight: "700", marginBottom: 3 },
+	card:      { borderRadius: 16, padding: 16, marginBottom: 12 },
+	cardTop:   { flexDirection: "row", alignItems: "center", marginBottom: 12 },
+	iconWrap:  { width: 48, height: 48, borderRadius: 14, alignItems: "center", justifyContent: "center", marginRight: 14, flexShrink: 0 },
+	cardInfo:  { flex: 1, marginRight: 8 },
+	cardTitle: { fontSize: 15, fontWeight: "700", marginBottom: 3 },
 	cardEquip: { fontSize: 12, lineHeight: 17 },
 
-	badge: {
+	toggleRow: {
 		flexDirection: "row",
 		alignItems: "center",
-		gap: 4,
-		paddingHorizontal: 8,
-		paddingVertical: 4,
-		borderRadius: 10,
+		borderTopWidth: 1,
+		paddingTop: 12,
+		gap: 12,
 	},
-	badgeText: { fontSize: 11, fontWeight: "700" },
+	toggleLabel: { fontSize: 14, fontWeight: "700", marginBottom: 2 },
+	toggleHint:  { fontSize: 12, lineHeight: 17 },
 
 	uploadBtn: {
 		flexDirection: "row",
@@ -260,7 +323,7 @@ const styles = StyleSheet.create({
 		paddingVertical: 11,
 		borderRadius: 12,
 	},
-	uploadBtnText: { color: "#fff", fontWeight: "700", fontSize: 13 },
+	uploadBtnText: { fontWeight: "700", fontSize: 13 },
 
 	footer: { fontSize: 12, textAlign: "center", marginTop: 8, fontStyle: "italic" },
 });
