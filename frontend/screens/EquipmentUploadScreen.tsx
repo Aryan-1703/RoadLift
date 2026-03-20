@@ -12,7 +12,11 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
-import * as ImagePicker from "expo-image-picker";
+// expo-image-picker requires a native module not bundled in Expo Go.
+// Module-level try/catch prevents the app from crashing at startup.
+// The component renders a fallback banner when IP is null.
+let IP: typeof import("expo-image-picker") | null = null;
+try { IP = require("expo-image-picker"); } catch { /* Expo Go */ }
 import { useTheme } from "../context/ThemeContext";
 import { API_URL } from "../config";
 import { useAuth } from "../context/AuthContext";
@@ -48,14 +52,15 @@ export const EquipmentUploadScreen = () => {
 
 	// ── Pickers ───────────────────────────────────────────────────────────────
 	const requestPermission = async (type: "camera" | "library"): Promise<boolean> => {
+		if (!IP) return false;
 		if (type === "camera") {
-			const { status } = await ImagePicker.requestCameraPermissionsAsync();
+			const { status } = await IP.requestCameraPermissionsAsync();
 			if (status !== "granted") {
 				Alert.alert("Permission required", "Camera access is needed to take a photo.");
 				return false;
 			}
 		} else {
-			const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+			const { status } = await IP.requestMediaLibraryPermissionsAsync();
 			if (status !== "granted") {
 				Alert.alert("Permission required", "Photo library access is needed to choose a file.");
 				return false;
@@ -65,9 +70,10 @@ export const EquipmentUploadScreen = () => {
 	};
 
 	const pickFromCamera = async () => {
+		if (!IP) return;
 		if (!(await requestPermission("camera"))) return;
-		const result = await ImagePicker.launchCameraAsync({
-			mediaTypes: ImagePicker.MediaType.All,
+		const result = await IP.launchCameraAsync({
+			mediaTypes: (IP as any).MediaType?.All ?? (IP as any).MediaTypeOptions?.All,
 			quality: 0.8,
 			videoMaxDuration: 30,
 		});
@@ -79,9 +85,10 @@ export const EquipmentUploadScreen = () => {
 	};
 
 	const pickFromGallery = async () => {
+		if (!IP) return;
 		if (!(await requestPermission("library"))) return;
-		const result = await ImagePicker.launchImageLibraryAsync({
-			mediaTypes: ImagePicker.MediaType.All,
+		const result = await IP.launchImageLibraryAsync({
+			mediaTypes: (IP as any).MediaType?.All ?? (IP as any).MediaTypeOptions?.All,
 			quality: 0.8,
 			videoMaxDuration: 60,
 		});
@@ -153,6 +160,20 @@ export const EquipmentUploadScreen = () => {
 					</View>
 				</View>
 
+				{/* Expo Go fallback — camera module unavailable */}
+				{!IP && (
+					<View style={[styles.devBanner, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+						<Ionicons name="construct-outline" size={28} color={colors.textMuted} style={{ marginBottom: 10 }} />
+						<Text style={[styles.devBannerTitle, { color: colors.text }]}>
+							Camera unavailable in Expo Go
+						</Text>
+						<Text style={[styles.devBannerBody, { color: colors.textMuted }]}>
+							Equipment uploads work in the production and development builds.{"\n"}
+							Run <Text style={{ color: colors.primary }}>npx expo run:ios</Text> to test on a real device.
+						</Text>
+					</View>
+				)}
+
 				{/* Media preview */}
 				{mediaUri ? (
 					<View style={[styles.previewWrap, { borderColor: colors.border }]}>
@@ -187,18 +208,20 @@ export const EquipmentUploadScreen = () => {
 				{/* Picker buttons */}
 				<View style={styles.pickerBtns}>
 					<TouchableOpacity
-						style={[styles.pickerBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+						style={[styles.pickerBtn, { backgroundColor: colors.card, borderColor: colors.border, opacity: IP ? 1 : 0.4 }]}
 						onPress={pickFromCamera}
 						activeOpacity={0.8}
+						disabled={!IP}
 					>
 						<Ionicons name="camera-outline" size={20} color={colors.text} />
 						<Text style={[styles.pickerBtnText, { color: colors.text }]}>Camera</Text>
 					</TouchableOpacity>
 
 					<TouchableOpacity
-						style={[styles.pickerBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+						style={[styles.pickerBtn, { backgroundColor: colors.card, borderColor: colors.border, opacity: IP ? 1 : 0.4 }]}
 						onPress={pickFromGallery}
 						activeOpacity={0.8}
+						disabled={!IP}
 					>
 						<Ionicons name="images-outline" size={20} color={colors.text} />
 						<Text style={[styles.pickerBtnText, { color: colors.text }]}>Gallery</Text>
@@ -314,4 +337,15 @@ const styles = StyleSheet.create({
 	uploadBtnText: { color: "#fff", fontSize: 16, fontWeight: "800" },
 
 	disclaimer: { fontSize: 12, textAlign: "center", lineHeight: 18, fontStyle: "italic" },
+
+	devBanner: {
+		borderRadius: 16,
+		borderWidth: 1,
+		borderStyle: "dashed",
+		alignItems: "center",
+		padding: 28,
+		marginBottom: 16,
+	},
+	devBannerTitle: { fontSize: 15, fontWeight: "700", marginBottom: 8, textAlign: "center" },
+	devBannerBody:  { fontSize: 13, lineHeight: 20, textAlign: "center" },
 });
