@@ -130,7 +130,9 @@ async function cancelJob(jobId, userId) {
 		const { stopDispatch } = require("./dispatchService");
 		stopDispatch(job.id);
 		if (job.paymentIntentId) {
-			await paymentService.cancelAuthorization(job.paymentIntentId);
+			await paymentService.cancelAuthorization(job.paymentIntentId).catch(err =>
+				console.warn("[jobService] Could not cancel authorization:", err.message),
+			);
 		}
 	} else {
 		// Late cancellation (accepted / arrived) — charge $5 fee
