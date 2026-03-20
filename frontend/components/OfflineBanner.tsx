@@ -1,37 +1,37 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Animated, Text, StyleSheet, AppState, AppStateStatus } from "react-native";
-import * as Network from "expo-network";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-const POLL_INTERVAL_MS = 5000;
+const POLL_INTERVAL_MS = 6000;
+// Tiny public endpoint — just needs to respond 200; we discard the body
+const PING_URL = "https://www.google.com/generate_204";
+
+async function isOnline(): Promise<boolean> {
+	try {
+		const res = await fetch(PING_URL, { method: "HEAD", cache: "no-store" });
+		return res.status < 400;
+	} catch {
+		return false;
+	}
+}
 
 export const OfflineBanner = () => {
-	const [isOffline, setIsOffline] = useState(false);
+	const [offline, setOffline] = useState(false);
 	const slideAnim = useRef(new Animated.Value(-60)).current;
 	const insets = useSafeAreaInsets();
 
 	const check = async () => {
-		try {
-			const state = await Network.getNetworkStateAsync();
-			setIsOffline(!state.isConnected || !state.isInternetReachable);
-		} catch {
-			// If the check fails we assume online to avoid false offline banners
-		}
+		const online = await isOnline();
+		setOffline(!online);
 	};
 
 	useEffect(() => {
 		check();
-
-		// Poll while the app is in the foreground
 		const interval = setInterval(check, POLL_INTERVAL_MS);
-
-		// Also re-check when app comes back to foreground (e.g. user left + returned)
-		const handleAppState = (next: AppStateStatus) => {
+		const sub = AppState.addEventListener("change", (next: AppStateStatus) => {
 			if (next === "active") check();
-		};
-		const sub = AppState.addEventListener("change", handleAppState);
-
+		});
 		return () => {
 			clearInterval(interval);
 			sub.remove();
@@ -40,12 +40,12 @@ export const OfflineBanner = () => {
 
 	useEffect(() => {
 		Animated.spring(slideAnim, {
-			toValue: isOffline ? insets.top : -60,
+			toValue: offline ? insets.top : -60,
 			useNativeDriver: true,
 			tension: 80,
 			friction: 10,
 		}).start();
-	}, [isOffline, insets.top]);
+	}, [offline, insets.top]);
 
 	return (
 		<Animated.View
