@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Animated, Text, StyleSheet, AppState, AppStateStatus } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const POLL_INTERVAL_MS = 6000;
 // Tiny public endpoint — just needs to respond 200; we discard the body
@@ -19,7 +18,6 @@ async function isOnline(): Promise<boolean> {
 export const OfflineBanner = () => {
 	const [offline, setOffline] = useState(false);
 	const slideAnim = useRef(new Animated.Value(-60)).current;
-	const insets = useSafeAreaInsets();
 
 	const check = async () => {
 		const online = await isOnline();
@@ -40,12 +38,12 @@ export const OfflineBanner = () => {
 
 	useEffect(() => {
 		Animated.spring(slideAnim, {
-			toValue: offline ? insets.top : -60,
+			toValue: offline ? 0 : -60,
 			useNativeDriver: true,
 			tension: 80,
 			friction: 10,
 		}).start();
-	}, [offline, insets.top]);
+	}, [offline]);
 
 	return (
 		<Animated.View
