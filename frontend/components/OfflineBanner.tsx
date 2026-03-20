@@ -1,19 +1,41 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Animated, Text, StyleSheet, View } from "react-native";
-import NetInfo from "@react-native-community/netinfo";
+import { Animated, Text, StyleSheet, AppState, AppStateStatus } from "react-native";
+import * as Network from "expo-network";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+const POLL_INTERVAL_MS = 5000;
 
 export const OfflineBanner = () => {
 	const [isOffline, setIsOffline] = useState(false);
 	const slideAnim = useRef(new Animated.Value(-60)).current;
 	const insets = useSafeAreaInsets();
 
+	const check = async () => {
+		try {
+			const state = await Network.getNetworkStateAsync();
+			setIsOffline(!state.isConnected || !state.isInternetReachable);
+		} catch {
+			// If the check fails we assume online to avoid false offline banners
+		}
+	};
+
 	useEffect(() => {
-		const unsub = NetInfo.addEventListener(state => {
-			setIsOffline(!(state.isConnected && state.isInternetReachable !== false));
-		});
-		return () => unsub();
+		check();
+
+		// Poll while the app is in the foreground
+		const interval = setInterval(check, POLL_INTERVAL_MS);
+
+		// Also re-check when app comes back to foreground (e.g. user left + returned)
+		const handleAppState = (next: AppStateStatus) => {
+			if (next === "active") check();
+		};
+		const sub = AppState.addEventListener("change", handleAppState);
+
+		return () => {
+			clearInterval(interval);
+			sub.remove();
+		};
 	}, []);
 
 	useEffect(() => {
