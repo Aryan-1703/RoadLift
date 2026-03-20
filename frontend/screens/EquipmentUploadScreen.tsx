@@ -12,17 +12,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
-// Lazy-require: expo-image-picker needs native modules not bundled in Expo Go.
-// The import crashes at startup in Expo Go; require() inside a function defers
-// it to call time so the rest of the app keeps running.
-function getImagePicker(): typeof import("expo-image-picker") | null {
-	try {
-		// eslint-disable-next-line @typescript-eslint/no-var-requires
-		return require("expo-image-picker");
-	} catch {
-		return null;
-	}
-}
+import * as ImagePicker from "expo-image-picker";
 import { useTheme } from "../context/ThemeContext";
 import { API_URL } from "../config";
 import { useAuth } from "../context/AuthContext";
@@ -56,24 +46,16 @@ export const EquipmentUploadScreen = () => {
 	const [mediaType, setMediaType] = useState<"image" | "video" | null>(null);
 	const [uploading, setUploading] = useState(false);
 
-	const pickerUnavailable = () =>
-		Alert.alert(
-			"Update required",
-			"Camera and gallery access require the production or preview build of RoadLift. This feature is not available in Expo Go.",
-		);
-
 	// ── Pickers ───────────────────────────────────────────────────────────────
 	const requestPermission = async (type: "camera" | "library"): Promise<boolean> => {
-		const IP = getImagePicker();
-		if (!IP) { pickerUnavailable(); return false; }
 		if (type === "camera") {
-			const { status } = await IP.requestCameraPermissionsAsync();
+			const { status } = await ImagePicker.requestCameraPermissionsAsync();
 			if (status !== "granted") {
 				Alert.alert("Permission required", "Camera access is needed to take a photo.");
 				return false;
 			}
 		} else {
-			const { status } = await IP.requestMediaLibraryPermissionsAsync();
+			const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
 			if (status !== "granted") {
 				Alert.alert("Permission required", "Photo library access is needed to choose a file.");
 				return false;
@@ -83,11 +65,9 @@ export const EquipmentUploadScreen = () => {
 	};
 
 	const pickFromCamera = async () => {
-		const IP = getImagePicker();
-		if (!IP) { pickerUnavailable(); return; }
 		if (!(await requestPermission("camera"))) return;
-		const result = await IP.launchCameraAsync({
-			mediaTypes: IP.MediaTypeOptions.All,
+		const result = await ImagePicker.launchCameraAsync({
+			mediaTypes: ImagePicker.MediaType.All,
 			quality: 0.8,
 			videoMaxDuration: 30,
 		});
@@ -99,11 +79,9 @@ export const EquipmentUploadScreen = () => {
 	};
 
 	const pickFromGallery = async () => {
-		const IP = getImagePicker();
-		if (!IP) { pickerUnavailable(); return; }
 		if (!(await requestPermission("library"))) return;
-		const result = await IP.launchImageLibraryAsync({
-			mediaTypes: IP.MediaTypeOptions.All,
+		const result = await ImagePicker.launchImageLibraryAsync({
+			mediaTypes: ImagePicker.MediaType.All,
 			quality: 0.8,
 			videoMaxDuration: 60,
 		});
