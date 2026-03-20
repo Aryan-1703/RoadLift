@@ -195,6 +195,13 @@ export const DriverProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 			}
 		};
 
+		// Another driver accepted this job — remove it from our list immediately
+		// (don't wait for the 30-second poll to clean it up)
+		const handleJobTaken = (data: { jobId: string | number }) => {
+			const id = String(data.jobId);
+			setAvailableJobs(prev => prev.filter(j => j.id !== id));
+		};
+
 		const handlePaymentReceived = (data: { jobId: string; amount: number }) => {
 			showToast(`Payment received: $${data.amount.toFixed(2)}`, "success");
 			fetchEarnings();
@@ -204,6 +211,7 @@ export const DriverProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 			socketClient.emit("driver-online", { driverId: user.id });
 			socketClient.on("new-job-available", handleNewJob);
 			socketClient.on("job-cancelled",      handleJobCancelled);
+			socketClient.on("job-taken",          handleJobTaken);
 			pollIntervalRef.current = setInterval(fetchAvailableJobs, POLL_INTERVAL_MS);
 		} else {
 			socketClient.emit("driver-offline", { driverId: user.id });
@@ -227,6 +235,7 @@ export const DriverProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 		return () => {
 			socketClient.off("new-job-available", handleNewJob);
 			socketClient.off("job-cancelled",      handleJobCancelled);
+			socketClient.off("job-taken",          handleJobTaken);
 			socketClient.off("payment-received",   handlePaymentReceived);
 			socketClient.off("job-completed-notice", handleJobCompletedNotice);
 			if (pollIntervalRef.current) {

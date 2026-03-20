@@ -174,12 +174,13 @@ async function driverCancelJob(jobId, driverId) {
 	job.status   = "pending";
 	await job.save();
 
-	// Re-start the dispatch search
+	// Re-start the dispatch search, but exclude the driver who just cancelled
+	// so they never receive the same job again.
 	const { startDispatch } = require("./dispatchService");
 	const lat = job.pickupLocation?.coordinates?.[1];
 	const lng = job.pickupLocation?.coordinates?.[0];
 	if (lat && lng) {
-		startDispatch(job, lat, lng).catch(err =>
+		startDispatch(job, lat, lng, { excludeDriverId: driverId }).catch(err =>
 			console.error("[jobService] Re-dispatch after driver cancel failed:", err.message),
 		);
 	}

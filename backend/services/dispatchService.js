@@ -235,7 +235,9 @@ async function runStage(jobId, stageIndex, jobMeta) {
  * @param {number} pickupLat  Already-parsed latitude (avoids PostGIS WKB parsing)
  * @param {number} pickupLng  Already-parsed longitude
  */
-async function startDispatch(job, pickupLat, pickupLng) {
+// opts.excludeDriverId — pre-seed notifiedDriverIds so this driver never gets
+// re-notified (used when re-dispatching after a driver cancel).
+async function startDispatch(job, pickupLat, pickupLng, opts = {}) {
 	const jobId = String(job.id);
 
 	// Use the explicitly passed floats (most reliable).
@@ -272,9 +274,14 @@ async function startDispatch(job, pickupLat, pickupLng) {
 		serviceType: job.serviceType,
 	};
 
+	// Pre-seed excluded driver (e.g. the one who just cancelled) so they are
+	// never re-notified for this same job.
+	const initialExcluded = new Set();
+	if (opts.excludeDriverId) initialExcluded.add(String(opts.excludeDriverId));
+
 	activeDispatches.set(jobId, {
 		timer:             null,
-		notifiedDriverIds: new Set(),
+		notifiedDriverIds: initialExcluded,
 	});
 
 	console.log(`[Dispatch] Starting dispatch for job ${jobId} at [${lat.toFixed(5)}, ${lng.toFixed(5)}]`);

@@ -96,7 +96,7 @@ const VEHICLE_INCLUDE = {
 // ─────────────────────────────────────────────────────────────────────────────
 async function getAvailableJobs() {
 	const jobs = await Job.findAll({
-		where: { status: "pending" },
+		where: { status: "pending", driverId: null },
 		include: [CUSTOMER_INCLUDE, VEHICLE_INCLUDE],
 		order: [["createdAt", "DESC"]],
 	});
