@@ -19,13 +19,14 @@ app.set("io", io);
 // ── CORS: allow local network IPs in dev, locked domains in prod ──────────
 const DEV_ORIGINS = [
 	'http://localhost:3000',
+	'http://localhost:3001', // admin panel
 	'http://localhost:8081',
 	'http://localhost:19000',
 	// /^http://192.168.d+.d+(:d+)?$/,
 	// /^http://172.d+.d+.d+(:d+)?$/,
 	// /^http://10.d+.d+.d+(:d+)?$/,
 ];
-const PROD_ORIGINS = ['https://roadlift.app', 'https://api.roadlift.app'];
+const PROD_ORIGINS = ['https://roadlift.app', 'https://api.roadlift.app', 'https://admin.roadlift.app'];
 app.use(cors({
 	origin: process.env.NODE_ENV === 'production' ? PROD_ORIGINS : DEV_ORIGINS,
 	methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],

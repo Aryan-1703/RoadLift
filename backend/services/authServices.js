@@ -44,14 +44,17 @@ function sanitizeUser(userInstance) {
  * @param {{ phoneNumber: string, password: string }} credentials
  * @returns {{ user: object, token: string }}
  */
-async function login({ phoneNumber, password }) {
-	if (!phoneNumber || !password) {
+async function login({ phoneNumber, email, password }) {
+	if ((!phoneNumber && !email) || !password) {
 		throw new Error("Phone number and password are required.");
 	}
 
+	const { Op } = require("sequelize");
+	const whereClause = email ? { email } : { phoneNumber };
+
 	// Single query — no dual-table fallback needed
 	const user = await User.findOne({
-		where: { phoneNumber },
+		where: whereClause,
 		include: [
 			{
 				model: DriverProfile,

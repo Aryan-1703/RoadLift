@@ -33,7 +33,7 @@ const SERVICES: Array<{
 	},
 	{
 		key:       "lockout",
-		label:     "Door Lockout",
+		label:     "Car Lockout",
 		icon:      "key-outline",
 		equipment: "slim jim, wedge tool, or lockout kit",
 		color:     "#3B82F6",
@@ -48,6 +48,7 @@ const SERVICES: Array<{
 	{
 		key:       "tire",
 		label:     "Tire Change",
+		
 		icon:      "disc-outline",
 		equipment: "spare tire, jack, and lug wrench",
 		color:     "#8B5CF6",

@@ -6,8 +6,8 @@ const authService = require("../services/authServices");
 // ─────────────────────────────────────────────────────────────────────────────
 const login = async (req, res) => {
 	try {
-		const { phoneNumber, password } = req.body;
-		const { user, token } = await authService.login({ phoneNumber, password });
+		const { phoneNumber, email, password } = req.body;
+		const { user, token } = await authService.login({ phoneNumber, email, password });
 
 		return res.status(200).json({
 			message: "Logged in successfully.",
