@@ -147,6 +147,22 @@ const updateStatus = async (req, res) => {
 			return res.status(400).json({ message: "isActive must be a boolean." });
 		}
 
+		// Guard: driver must have at least one approved + enabled service before going online
+		if (isActive) {
+			const { DriverProfile } = require('../models');
+			const profile = await DriverProfile.findOne({ where: { userId: driverId } });
+			if (profile) {
+				const svcs = normalizeAllServices(profile.unlockedServices);
+				const hasActive = Object.values(svcs).some(s => s.status === 'approved' && s.isEnabled);
+				if (!hasActive) {
+					return res.status(403).json({
+						message: 'Enable at least one approved service in the Service Hub before going online.',
+						code: 'NO_ACTIVE_SERVICES',
+					});
+				}
+			}
+		}
+
 		await User.update({ isActive }, { where: { id: driverId } });
 		return res.status(200).json({ isActive });
 	} catch (error) {
@@ -164,6 +180,24 @@ const SERVICE_KEY_MAP = {
 	'fuel-delivery': 'fuel', 'fuel': 'fuel',
 	'tire-change': 'tire', 'tire': 'tire',
 };
+
+
+// ── Service-entry normaliser — handles both old flat strings and new {status,isEnabled} ──
+// Old format: 'approved'  (string)
+// New format: { status: 'approved', isEnabled: true }
+function normalizeSvc(val) {
+	if (!val || typeof val === 'string') {
+		return { status: val || 'unapproved', isEnabled: false };
+	}
+	return { status: val.status || 'unapproved', isEnabled: val.isEnabled ?? false };
+}
+function normalizeAllServices(raw) {
+	const out = {};
+	for (const key of ['battery', 'lockout', 'fuel', 'tire']) {
+		out[key] = normalizeSvc((raw || {})[key]);
+	}
+	return out;
+}
 
 // ── getServiceStatus ─────────────────────────────────────────────────────────
 const getServiceStatus = async (req, res) => {
@@ -206,10 +240,10 @@ const uploadEquipment = async (req, res) => {
 		if (!profile) return res.status(404).json({ message: 'Driver profile not found.' });
 
 		// Update unlockedServices: only move forward (unapproved → pending)
-		// Don't downgrade from 'approved' back to 'pending'
-		const services = { ...(profile.unlockedServices || {}) };
-		if (services[serviceKey] !== 'approved') {
-			services[serviceKey] = 'pending';
+		// Don't downgrade from 'approved' back to 'pending'. Normalise shape on the way.
+		const services = normalizeAllServices(profile.unlockedServices);
+		if (services[serviceKey].status !== 'approved') {
+			services[serviceKey] = { status: 'pending', isEnabled: false };
 		}
 
 		const media = { ...(profile.equipmentMedia || {}) };
@@ -223,10 +257,53 @@ const uploadEquipment = async (req, res) => {
 		await profile.save();
 
 		console.log('[Equipment] Driver', req.user.id, '- service', serviceKey, '-> pending. File:', fileUrl);
-		res.json({ success: true, serviceKey, status: services[serviceKey], fileUrl });
+		res.json({ success: true, serviceKey, status: services[serviceKey].status, fileUrl });
 	} catch (err) {
 		console.error('[driverController] uploadEquipment:', err.message);
 		res.status(500).json({ message: 'Upload failed.' });
+	}
+};
+
+
+// ── toggleService ─────────────────────────────────────────────────────────────
+// PUT /api/driver/services/:serviceKey/toggle
+// Body: { isEnabled: boolean }
+// Validation: can only enable a service if its status is 'approved'.
+const toggleService = async (req, res) => {
+	try {
+		const { serviceKey } = req.params;
+		const { isEnabled }  = req.body;
+
+		if (!['battery', 'lockout', 'fuel', 'tire'].includes(serviceKey)) {
+			return res.status(400).json({ message: 'Invalid service key. Must be battery, lockout, fuel, or tire.' });
+		}
+		if (typeof isEnabled !== 'boolean') {
+			return res.status(400).json({ message: 'isEnabled must be a boolean.' });
+		}
+
+		const { DriverProfile } = require('../models');
+		const profile = await DriverProfile.findOne({ where: { userId: req.user.id } });
+		if (!profile) return res.status(404).json({ message: 'Driver profile not found.' });
+
+		const services = normalizeAllServices(profile.unlockedServices);
+		const svc = services[serviceKey];
+
+		if (isEnabled && svc.status !== 'approved') {
+			return res.status(403).json({
+				message: 'Cannot enable ' + serviceKey + ' — service must be approved first.',
+			});
+		}
+
+		services[serviceKey] = { ...svc, isEnabled };
+		profile.unlockedServices = services;
+		profile.changed('unlockedServices', true);
+		await profile.save();
+
+		console.log('[toggleService] Driver', req.user.id, '-', serviceKey, '->', isEnabled ? 'enabled' : 'disabled');
+		res.json({ success: true, serviceKey, status: svc.status, isEnabled });
+	} catch (err) {
+		console.error('[driverController] toggleService:', err.message);
+		res.status(500).json({ message: 'Server error.' });
 	}
 };
 
@@ -299,6 +376,7 @@ const getPayoutStatus = async (req, res) => {
 };
 
 module.exports = {
+	toggleService,
 	getAvailableJobs,
 	getServiceStatus,
 	uploadEquipment,

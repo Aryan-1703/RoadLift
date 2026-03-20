@@ -59,17 +59,18 @@ module.exports = sequelize => {
 				defaultValue: 0,
 			},
 			// Per-service qualification tracking.
-			// Each key: 'unapproved' | 'pending' | 'approved'
-			unlockedServices: {
-				type: DataTypes.JSONB,
-				allowNull: false,
-				defaultValue: {
-					battery: 'unapproved',
-					lockout:  'unapproved',
-					fuel:     'unapproved',
-					tire:     'unapproved',
-				},
+		// Each entry: { status: 'unapproved'|'pending'|'approved'|'rejected', isEnabled: boolean }
+		// isEnabled is the driver's own on/off toggle — only settable when status === 'approved'.
+		unlockedServices: {
+			type: DataTypes.JSONB,
+			allowNull: false,
+			defaultValue: {
+				battery: { status: 'unapproved', isEnabled: false },
+				lockout:  { status: 'unapproved', isEnabled: false },
+				fuel:     { status: 'unapproved', isEnabled: false },
+				tire:     { status: 'unapproved', isEnabled: false },
 			},
+		},
 			// URLs of uploaded equipment proof photos/videos per service
 			equipmentMedia: {
 				type: DataTypes.JSONB,

@@ -13,6 +13,7 @@ const {
 	getPayoutStatus,
 	getServiceStatus,
 	uploadEquipment,
+	toggleService,
 } = require("../controllers/driverController");
 
 // ── Multer: disk storage for equipment uploads ─────────────────────────────
@@ -70,6 +71,7 @@ router.put("/jobs/:jobId/complete", protect, protectDriver, completeJob);
 // Service qualifications
 router.get("/services",                            protect, protectDriver, getServiceStatus);
 router.post("/equipment/upload/:serviceType",      protect, protectDriver, upload.single('file'), uploadEquipment);
+router.put("/services/:serviceKey/toggle",         protect, protectDriver, toggleService);
 
 // Earnings
 router.get("/earnings", protect, protectDriver, getEarnings);

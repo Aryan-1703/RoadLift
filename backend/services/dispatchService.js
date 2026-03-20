@@ -100,7 +100,14 @@ async function runStage(jobId, stageIndex, jobMeta) {
 			const approvedProfiles = await DriverProfile.findAll({ attributes: ['userId', 'unlockedServices'] });
 			approvedDriverIds = new Set(
 				approvedProfiles
-					.filter(p => (p.unlockedServices || {})[serviceKey] === 'approved')
+					.filter(p => {
+						const raw = (p.unlockedServices || {})[serviceKey];
+						// Handle both old flat-string format and new {status,isEnabled} format
+						const svc = (!raw || typeof raw === 'string')
+							? { status: raw || 'unapproved', isEnabled: false }
+							: { status: raw.status || 'unapproved', isEnabled: raw.isEnabled ?? false };
+						return svc.status === 'approved' && svc.isEnabled === true;
+					})
 					.map(p => String(p.userId))
 			);
 		}
