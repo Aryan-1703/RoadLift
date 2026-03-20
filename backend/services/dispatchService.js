@@ -139,11 +139,13 @@ async function runStage(jobId, stageIndex, jobMeta) {
 		});
 
 		// ── Find new drivers in this radius ───────────────────────────────────
+		// approvedDriverIds is passed so findDriversInRadius enforces the service gate
 		const newDriverIds = findDriversInRadius(
 			jobMeta.lat,
 			jobMeta.lng,
 			stage.radiusKm,
 			state.notifiedDriverIds,
+			approvedDriverIds,
 		);
 
 		if (newDriverIds.length > 0) {
@@ -170,27 +172,30 @@ async function runStage(jobId, stageIndex, jobMeta) {
 				sendPushNotification(driver.pushToken, { id: jobId, serviceType: jobMeta.serviceType }).catch(() => {});
 			}
 		} else {
-			// No location data for nearby drivers → broadcast to all active drivers
-			io.to("drivers").emit("new-job-available", {
-				jobId:     String(jobId),
-				radiusKm:  stage.radiusKm,
-				travelFee: stage.travelFee,
-			});
-
-			// Push notify all active drivers not already notified
+			// No GPS location data in memory for any nearby driver.
+			// Fall back to notifying approved drivers individually by their user-room.
+			// Never broadcast to the whole "drivers" room — that ignores service gating.
 			const allDrivers = await User.findAll({
 				where: { role: "DRIVER", isActive: true, pushToken: { [Op.ne]: null } },
 				attributes: ["id", "pushToken"],
 			});
-			// Only push-notify drivers approved for this service
-			const pushApproved = approvedDriverIds
+
+			const eligible = approvedDriverIds
 				? allDrivers.filter(d => approvedDriverIds.has(String(d.id)))
 				: allDrivers;
-			for (const driver of pushApproved) {
+
+			for (const driver of eligible) {
 				const id = String(driver.id);
 				if (!state.notifiedDriverIds.has(id)) {
 					state.notifiedDriverIds.add(id);
-					sendPushNotification(driver.pushToken, { id: jobId, serviceType: jobMeta.serviceType }).catch(() => {});
+					io.to(id).emit("new-job-available", {
+						jobId:     String(jobId),
+						radiusKm:  stage.radiusKm,
+						travelFee: stage.travelFee,
+					});
+					if (driver.pushToken) {
+						sendPushNotification(driver.pushToken, { id: jobId, serviceType: jobMeta.serviceType }).catch(() => {});
+					}
 				}
 			}
 		}
