@@ -21,9 +21,9 @@ const DEV_ORIGINS = [
 	'http://localhost:3000',
 	'http://localhost:8081',
 	'http://localhost:19000',
-	/^http://192.168.d+.d+(:d+)?$/,
-	/^http://172.d+.d+.d+(:d+)?$/,
-	/^http://10.d+.d+.d+(:d+)?$/,
+	// /^http://192.168.d+.d+(:d+)?$/,
+	// /^http://172.d+.d+.d+(:d+)?$/,
+	// /^http://10.d+.d+.d+(:d+)?$/,
 ];
 const PROD_ORIGINS = ['https://roadlift.app', 'https://api.roadlift.app'];
 app.use(cors({
@@ -54,7 +54,8 @@ const paymentRoutes = require("./routes/paymentRoutes");
 const geocodingRoutes = require("./routes/geocodingRoutes");
 const vehicleRoutes = require("./routes/vehicleRoutes");
 const mapsRoutes = require("./routes/mapsRoutes");
-const userRoutes = require("./routes/userRoutes");
+const userRoutes   = require("./routes/userRoutes");
+const adminRoutes  = require("./routes/adminRoutes");
 
 app.use("/api/auth", authLimiter, authRoutes);
 app.use("/api/jobs", jobRoutes);
@@ -66,6 +67,10 @@ app.use("/api/geocode", geocodingRoutes);
 app.use("/api/vehicles", vehicleRoutes);
 app.use("/api/maps", mapsRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/admin", adminRoutes);
+
+// Serve driver equipment uploads
+app.use("/uploads", require("express").static(require("path").join(__dirname, "../uploads")));
 
 // --- HEALTH CHECK ---
 app.get("/", (req, res) => res.send("RoadLift API is running..."));

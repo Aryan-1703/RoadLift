@@ -16,11 +16,21 @@ import { useToast } from "./ToastContext";
 
 const POLL_INTERVAL_MS = 30_000;
 
+type ServiceStatus = "unapproved" | "pending" | "approved";
+
+interface UnlockedServices {
+	battery: ServiceStatus;
+	lockout:  ServiceStatus;
+	fuel:     ServiceStatus;
+	tire:     ServiceStatus;
+}
+
 interface DriverContextType {
 	isOnline:           boolean;
 	availableJobs:      Job[];
 	activeJob:          Job | null;
 	earnings:           any;
+	unlockedServices:   UnlockedServices | null;
 	goOnline:           () => Promise<void>;
 	goOffline:          () => Promise<void>;
 	acceptJob:          (jobId: string) => Promise<void>;
@@ -29,6 +39,7 @@ interface DriverContextType {
 	cancelActiveJob:    () => Promise<void>;
 	fetchEarnings:      () => Promise<void>;
 	fetchAvailableJobs: () => Promise<void>;
+	refreshServices:    () => Promise<void>;
 }
 
 const DriverContext = createContext<DriverContextType | undefined>(undefined);
@@ -81,12 +92,13 @@ export const DriverProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 	const { user } = useAuth();
 	const { showToast } = useToast();
 
-	const [isOnline,       setIsOnline]       = useState(() =>
+	const [isOnline,          setIsOnline]          = useState(() =>
 		user?.role === "DRIVER" && (user?.isActive ?? false)
 	);
-	const [availableJobs,  setAvailableJobs]  = useState<Job[]>([]);
-	const [activeJob,      setActiveJob]      = useState<Job | null>(null);
-	const [earnings,       setEarnings]       = useState({ today: 0, completedJobs: [] });
+	const [availableJobs,     setAvailableJobs]     = useState<Job[]>([]);
+	const [activeJob,         setActiveJob]         = useState<Job | null>(null);
+	const [earnings,          setEarnings]          = useState({ today: 0, completedJobs: [] });
+	const [unlockedServices,  setUnlockedServices]  = useState<UnlockedServices | null>(null);
 
 	const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -97,6 +109,16 @@ export const DriverProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 		}
 	}, [user?.id]); // only re-run when the logged-in user changes, not on every update
 
+	// ── refreshServices ──────────────────────────────────────────────────────
+	const refreshServices = useCallback(async () => {
+		try {
+			const res = await api.get<{ unlockedServices: UnlockedServices }>("/driver/services");
+			setUnlockedServices(res.data.unlockedServices ?? null);
+		} catch {
+			// silently fail — stale data is fine
+		}
+	}, []);
+
 	// ── Reset on logout ──────────────────────────────────────────────────────
 	useEffect(() => {
 		if (!user) {
@@ -104,6 +126,7 @@ export const DriverProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 			setAvailableJobs([]);
 			setActiveJob(null);
 			setEarnings({ today: 0, completedJobs: [] });
+			setUnlockedServices(null);
 			return;
 		}
 		// Restore any active job from the server after cold-start / crash
@@ -113,8 +136,9 @@ export const DriverProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 					if (res.data) setActiveJob(mapApiJob(res.data));
 				})
 				.catch(() => {});
+			refreshServices();
 		}
-	}, [user?.id]);
+	}, [user?.id, refreshServices]);
 
 	// ── Fetch available jobs ─────────────────────────────────────────────────
 	const fetchAvailableJobs = useCallback(async () => {
@@ -307,6 +331,7 @@ export const DriverProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 				availableJobs,
 				activeJob,
 				earnings,
+				unlockedServices,
 				goOnline,
 				goOffline,
 				acceptJob,
@@ -315,6 +340,7 @@ export const DriverProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 				cancelActiveJob,
 				fetchEarnings,
 				fetchAvailableJobs,
+				refreshServices,
 			}}
 		>
 			{children}

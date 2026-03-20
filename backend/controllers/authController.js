@@ -88,6 +88,7 @@ const registerDriver = async (req, res) => {
 				phoneNumber:   user.phoneNumber,
 				role:          user.role,
 				driverProfile: user.driverProfile || null,
+				unlockedServices: user.driverProfile?.unlockedServices ?? null,
 			},
 		});
 	} catch (error) {

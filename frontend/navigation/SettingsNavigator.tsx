@@ -13,6 +13,8 @@ import { HelpCenterScreen } from "../screens/HelpCenterScreen";
 import { TermsScreen } from "../screens/TermsScreen";
 import { JobHistoryScreen } from "../screens/JobHistoryScreen";
 import { StripeOnboardingScreen } from "../screens/StripeOnboardingScreen";
+import { ServiceHubScreen } from "../screens/ServiceHubScreen";
+import { EquipmentUploadScreen } from "../screens/EquipmentUploadScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -77,6 +79,18 @@ export const SettingsNavigator = () => {
 				name="Security"
 				component={SecurityScreen}
 				options={{ title: "Security & Privacy" }}
+			/>
+
+			{/* Driver: Service unlock */}
+			<Stack.Screen
+				name="ServiceHub"
+				component={ServiceHubScreen}
+				options={{ title: "Service Hub" }}
+			/>
+			<Stack.Screen
+				name="EquipmentUpload"
+				component={EquipmentUploadScreen}
+				options={({ route }: any) => ({ title: route.params?.serviceLabel ?? "Upload Equipment" })}
 			/>
 
 			{/* Support */}

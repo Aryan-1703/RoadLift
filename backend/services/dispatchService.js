@@ -1,5 +1,15 @@
 "use strict";
 
+// Maps customer serviceType values to the driver's unlockedServices key
+const SERVICE_KEY_MAP = {
+	'battery-boost': 'battery', battery: 'battery',
+	lockout: 'lockout', 'door-lockout': 'lockout',
+	'fuel-delivery': 'fuel', fuel: 'fuel',
+	'tire-change': 'tire', tire: 'tire',
+	towing: null, // no unlock gate for towing yet
+};
+
+
 /**
  * Geo-based staged dispatch service.
  *
@@ -42,11 +52,15 @@ function haversineKm(lat1, lng1, lat2, lng2) {
 }
 
 // ── findDriversInRadius ────────────────────────────────────────────────────
-function findDriversInRadius(lat, lng, radiusKm, excludeIds) {
+// Returns driverIds within radius. If approvedForService is provided, only
+// includes drivers whose unlockedServices[approvedForService] === 'approved'.
+// approvedDriverIds is a Set<string> from the DB query — passed by runStage.
+function findDriversInRadius(lat, lng, radiusKm, excludeIds, approvedDriverIds) {
 	const allLocations = driverLocationStore.getAll();
 	const result = [];
 	for (const [driverId, loc] of allLocations.entries()) {
 		if (excludeIds.has(driverId)) continue;
+		if (approvedDriverIds && !approvedDriverIds.has(driverId)) continue;
 		if (haversineKm(lat, lng, loc.lat, loc.lng) <= radiusKm) {
 			result.push(driverId);
 		}
@@ -77,6 +91,19 @@ async function runStage(jobId, stageIndex, jobMeta) {
 		const stage = STAGES[stageIndex];
 		const state = activeDispatches.get(String(jobId));
 		if (!state) return; // stopDispatch was called
+
+		// Build set of drivers approved for this service type
+		const serviceKey = SERVICE_KEY_MAP[jobMeta.serviceType] || null;
+		let approvedDriverIds = null;
+		if (serviceKey) {
+			const { DriverProfile } = require('../models');
+			const approvedProfiles = await DriverProfile.findAll({ attributes: ['userId', 'unlockedServices'] });
+			approvedDriverIds = new Set(
+				approvedProfiles
+					.filter(p => (p.unlockedServices || {})[serviceKey] === 'approved')
+					.map(p => String(p.userId))
+			);
+		}
 
 		const currentPrice = jobMeta.basePrice + stage.travelFee;
 
@@ -148,7 +175,11 @@ async function runStage(jobId, stageIndex, jobMeta) {
 				where: { role: "DRIVER", isActive: true, pushToken: { [Op.ne]: null } },
 				attributes: ["id", "pushToken"],
 			});
-			for (const driver of allDrivers) {
+			// Only push-notify drivers approved for this service
+			const pushApproved = approvedDriverIds
+				? allDrivers.filter(d => approvedDriverIds.has(String(d.id)))
+				: allDrivers;
+			for (const driver of pushApproved) {
 				const id = String(driver.id);
 				if (!state.notifiedDriverIds.has(id)) {
 					state.notifiedDriverIds.add(id);

@@ -4,9 +4,9 @@ const DEV_ORIGINS = [
   'http://localhost:3000',
   'http://localhost:8081',
   'http://localhost:19000',
-  /^http://192.168.d+.d+(:d+)?$/,
-  /^http://172.d+.d+.d+(:d+)?$/,
-  /^http://10.d+.d+.d+(:d+)?$/,
+  // /^http://192.168.d+.d+(:d+)?$/,
+  // /^http://172.d+.d+.d+(:d+)?$/,
+  // /^http://10.d+.d+.d+(:d+)?$/,
 ];
 
 const PROD_ORIGINS = [

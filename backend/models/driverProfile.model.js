@@ -58,13 +58,25 @@ module.exports = sequelize => {
 				type: DataTypes.INTEGER,
 				defaultValue: 0,
 			},
-			approvalStatus: {
-				type: DataTypes.STRING(10),
+			// Per-service qualification tracking.
+			// Each key: 'unapproved' | 'pending' | 'approved'
+			unlockedServices: {
+				type: DataTypes.JSONB,
 				allowNull: false,
-				defaultValue: 'pending',
-				validate: { isIn: [['pending', 'approved', 'rejected']] },
-				comment: 'Admin must set to approved before driver can go online.',
+				defaultValue: {
+					battery: 'unapproved',
+					lockout:  'unapproved',
+					fuel:     'unapproved',
+					tire:     'unapproved',
+				},
 			},
+			// URLs of uploaded equipment proof photos/videos per service
+			equipmentMedia: {
+				type: DataTypes.JSONB,
+				allowNull: true,
+				defaultValue: null,
+			},
+
 		},
 		{
 			// CRITICAL: must be lowercase — this is a new table we created, not Sequelize-generated

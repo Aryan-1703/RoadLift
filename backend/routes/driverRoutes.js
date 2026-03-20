@@ -11,7 +11,32 @@ const {
 	createStripeOnboardingLink,
 	removePushToken,
 	getPayoutStatus,
+	getServiceStatus,
+	uploadEquipment,
 } = require("../controllers/driverController");
+
+// ── Multer: disk storage for equipment uploads ─────────────────────────────
+const multer = require('multer');
+const path   = require('path');
+const fs_    = require('fs');
+const uploadDir = path.join(__dirname, '../../uploads');
+if (!fs_.existsSync(uploadDir)) fs_.mkdirSync(uploadDir, { recursive: true });
+
+const storage = multer.diskStorage({
+	destination: (_req, _file, cb) => cb(null, uploadDir),
+	filename:    (_req, file, cb) => {
+		const ext = path.extname(file.originalname) || '.jpg';
+		cb(null, 'equip_' + Date.now() + '_' + Math.random().toString(36).slice(2) + ext);
+	},
+});
+const upload = multer({
+	storage,
+	limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB max
+	fileFilter: (_req, file, cb) => {
+		const allowed = /image\/|video\//;
+		cb(null, allowed.test(file.mimetype));
+	},
+});
 const { protect, protectDriver } = require("../middleware/authMiddleware");
 
 // Jobs
@@ -41,6 +66,10 @@ router.get("/jobs/available", protect, protectDriver, getAvailableJobs);
 router.put("/jobs/:jobId/accept", protect, protectDriver, acceptJob);
 router.put("/jobs/:jobId/status", protect, protectDriver, updateJobStatus);
 router.put("/jobs/:jobId/complete", protect, protectDriver, completeJob);
+
+// Service qualifications
+router.get("/services",                            protect, protectDriver, getServiceStatus);
+router.post("/equipment/upload/:serviceType",      protect, protectDriver, upload.single('file'), uploadEquipment);
 
 // Earnings
 router.get("/earnings", protect, protectDriver, getEarnings);

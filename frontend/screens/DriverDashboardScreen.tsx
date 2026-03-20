@@ -11,7 +11,6 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Location from "expo-location";
 import { useDriver } from "../context/DriverContext";
-import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { Card } from "../components/Card";
 import { Skeleton } from "../components/Skeleton";
@@ -72,11 +71,14 @@ export const DriverDashboardScreen = () => {
 		rejectJob,
 		earnings,
 		fetchEarnings,
+		unlockedServices,
 	} = useDriver();
-	const { user } = useAuth();
 	const { colors, isDarkMode } = useTheme();
-	const approvalStatus = (user as any)?.driverProfile?.approvalStatus ?? "pending";
 	const navigation = useNavigation<any>();
+
+	const hasApprovedService = unlockedServices
+		? Object.values(unlockedServices).some(s => s === "approved")
+		: false;
 	const [refreshing, setRefreshing] = useState(false);
 	const [checkingForJobs, setCheckingForJobs] = useState(false);
 	const [driverLat, setDriverLat] = useState<number | null>(null);
@@ -203,25 +205,6 @@ export const DriverDashboardScreen = () => {
 	const offlineBg    = isDarkMode ? "rgba(255,255,255,0.05)" : "rgba(27,25,22,0.05)";
 	const offlineBorder = colors.border;
 
-	// ── Driver approval gate ──────────────────────────────────────────────────
-	if (approvalStatus !== "approved") {
-		return (
-			<SafeAreaView style={[{ flex: 1, alignItems: "center", justifyContent: "center", padding: 32 }, { backgroundColor: colors.background }]}>
-				<View style={{ width: 88, height: 88, borderRadius: 44, backgroundColor: (colors.amber ?? "#F59E0B") + "20", alignItems: "center", justifyContent: "center", marginBottom: 24 }}>
-					<Ionicons name="time-outline" size={44} color={colors.amber ?? "#F59E0B"} />
-				</View>
-				<Text style={{ fontSize: 22, fontWeight: "800", color: colors.text, marginBottom: 10, textAlign: "center" }}>
-					{approvalStatus === "rejected" ? "Application Rejected" : "Account Under Review"}
-				</Text>
-				<Text style={{ fontSize: 15, color: colors.textMuted, textAlign: "center", lineHeight: 24 }}>
-					{approvalStatus === "rejected"
-						? "Your driver application was not approved. Please contact support@roadlift.com for more information."
-						: "Your driver account is being reviewed by our team. You will be notified once approved — this typically takes 1–2 business days."}
-				</Text>
-			</SafeAreaView>
-		);
-	}
-
 	return (
 		<SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
 			{/* Header */}
@@ -299,7 +282,13 @@ export const DriverDashboardScreen = () => {
 								borderColor: isOnline ? colors.dangerBorder : colors.greenBorder,
 							},
 						]}
-						onPress={isOnline ? goOffline : goOnline}
+						onPress={isOnline ? goOffline : () => {
+						if (!hasApprovedService) {
+							navigation.navigate("SettingsNav", { screen: "ServiceHub" });
+						} else {
+							goOnline();
+						}
+					}}
 					>
 						<Text
 							style={[
@@ -311,6 +300,38 @@ export const DriverDashboardScreen = () => {
 						</Text>
 					</TouchableOpacity>
 				</View>
+
+				{/* Service Hub banner */}
+				<TouchableOpacity
+					style={[
+						styles.serviceHubBanner,
+						{
+							backgroundColor: hasApprovedService ? colors.greenBg : (colors.amber ?? "#F59E0B") + "14",
+							borderColor:     hasApprovedService ? colors.greenBorder : (colors.amber ?? "#F59E0B") + "50",
+						},
+					]}
+					onPress={() => navigation.navigate("SettingsNav", { screen: "ServiceHub" })}
+					activeOpacity={0.8}
+				>
+					<View style={[styles.serviceHubIconWrap, { backgroundColor: hasApprovedService ? colors.greenBg : (colors.amber ?? "#F59E0B") + "20" }]}>
+						<Ionicons
+							name={hasApprovedService ? "shield-checkmark-outline" : "lock-open-outline"}
+							size={20}
+							color={hasApprovedService ? (colors.green ?? "#059669") : (colors.amber ?? "#F59E0B")}
+						/>
+					</View>
+					<View style={{ flex: 1 }}>
+						<Text style={[styles.serviceHubTitle, { color: colors.text }]}>
+							{hasApprovedService ? "Service Hub" : "Unlock Services to Go Online"}
+						</Text>
+						<Text style={[styles.serviceHubSub, { color: colors.textMuted }]}>
+							{hasApprovedService
+								? "Manage your approved services and add new ones"
+								: "Submit equipment proof to start receiving job requests"}
+						</Text>
+					</View>
+					<Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+				</TouchableOpacity>
 
 				{/* Earnings Summary */}
 				<View style={styles.earningsGrid}>
@@ -658,6 +679,26 @@ const styles = StyleSheet.create({
 	declineBtn:     { paddingHorizontal: 16, paddingVertical: 12, borderRadius: 12, borderWidth: 1, alignItems: "center", justifyContent: "center" },
 	declineBtnText: { fontSize: 14, fontWeight: "600" },
 	acceptBtnWrap:  { flex: 1 },
+
+	// Service Hub banner
+	serviceHubBanner: {
+		flexDirection: "row",
+		alignItems: "center",
+		gap: 12,
+		borderRadius: 16,
+		borderWidth: 1,
+		padding: 14,
+		marginBottom: 16,
+	},
+	serviceHubIconWrap: {
+		width: 40,
+		height: 40,
+		borderRadius: 12,
+		alignItems: "center",
+		justifyContent: "center",
+	},
+	serviceHubTitle: { fontSize: 14, fontWeight: "700", marginBottom: 2 },
+	serviceHubSub:   { fontSize: 12, lineHeight: 17 },
 
 	// Skeleton cards
 	skeletonCard: {

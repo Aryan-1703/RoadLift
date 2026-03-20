@@ -156,6 +156,80 @@ const updateStatus = async (req, res) => {
 };
 
 // ── storePushToken ────────────────────────────────────────────────────────────
+
+// ── Service-type normalizer ─────────────────────────────────────────────────
+const SERVICE_KEY_MAP = {
+	'battery-boost': 'battery', 'battery': 'battery',
+	'lockout': 'lockout', 'door-lockout': 'lockout',
+	'fuel-delivery': 'fuel', 'fuel': 'fuel',
+	'tire-change': 'tire', 'tire': 'tire',
+};
+
+// ── getServiceStatus ─────────────────────────────────────────────────────────
+const getServiceStatus = async (req, res) => {
+	try {
+		const { DriverProfile } = require('../models');
+		const profile = await DriverProfile.findOne({ where: { userId: req.user.id } });
+		if (!profile) return res.status(404).json({ message: 'Driver profile not found.' });
+		res.json({
+			unlockedServices: profile.unlockedServices,
+			equipmentMedia:   profile.equipmentMedia,
+		});
+	} catch (err) {
+		console.error('[driverController] getServiceStatus:', err.message);
+		res.status(500).json({ message: 'Server error.' });
+	}
+};
+
+// ── uploadEquipment ──────────────────────────────────────────────────────────
+// POST /api/driver/equipment/upload/:serviceType
+// Accepts multipart/form-data with field "file".
+// Sets unlockedServices[serviceType] = 'pending' and saves media URL.
+const uploadEquipment = async (req, res) => {
+	try {
+		const { serviceType } = req.params;
+		const serviceKey = SERVICE_KEY_MAP[serviceType];
+		if (!serviceKey) {
+			return res.status(400).json({ message: 'Invalid service type. Must be battery, lockout, fuel, or tire.' });
+		}
+
+		if (!req.file) {
+			return res.status(400).json({ message: 'No file uploaded. Include a photo or video as "file" in the form data.' });
+		}
+
+		// Build the accessible URL for the saved file
+		const baseUrl = process.env.API_BASE_URL || 'http://localhost:3000';
+		const fileUrl = baseUrl + '/uploads/' + req.file.filename;
+
+		const { DriverProfile } = require('../models');
+		const profile = await DriverProfile.findOne({ where: { userId: req.user.id } });
+		if (!profile) return res.status(404).json({ message: 'Driver profile not found.' });
+
+		// Update unlockedServices: only move forward (unapproved → pending)
+		// Don't downgrade from 'approved' back to 'pending'
+		const services = { ...(profile.unlockedServices || {}) };
+		if (services[serviceKey] !== 'approved') {
+			services[serviceKey] = 'pending';
+		}
+
+		const media = { ...(profile.equipmentMedia || {}) };
+		media[serviceKey + 'Url'] = fileUrl;
+
+		// Sequelize JSONB: must set new object reference to trigger change detection
+		profile.unlockedServices = services;
+		profile.equipmentMedia   = media;
+		profile.changed('unlockedServices', true);
+		profile.changed('equipmentMedia', true);
+		await profile.save();
+
+		console.log('[Equipment] Driver', req.user.id, '- service', serviceKey, '-> pending. File:', fileUrl);
+		res.json({ success: true, serviceKey, status: services[serviceKey], fileUrl });
+	} catch (err) {
+		console.error('[driverController] uploadEquipment:', err.message);
+		res.status(500).json({ message: 'Upload failed.' });
+	}
+};
+
 const storePushToken = async (req, res) => {
 	try {
 		const { token: pushToken } = req.body;
@@ -226,6 +300,8 @@ const getPayoutStatus = async (req, res) => {
 
 module.exports = {
 	getAvailableJobs,
+	getServiceStatus,
+	uploadEquipment,
 	acceptJob,
 	updateJobStatus,
 	completeJob,
