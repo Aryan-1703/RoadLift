@@ -1,5 +1,6 @@
 const { Job, User, Review, sequelize } = require("../models");
 const paymentService = require("./paymentService");
+const { getSetting } = require("../utils/settingsCache");
 
 // normalizeJob lives in driverService (inlined there to avoid circular deps).
 // jobService imports it lazily inside each function — DO NOT top-level require
@@ -105,8 +106,8 @@ async function getJobById(id) {
 	return getNormalize()(job);
 }
 
-// Flat cancellation fee charged when a customer cancels after driver is assigned
-const CUSTOMER_CANCEL_FEE_CENTS = 500; // $5.00
+// Cancellation fee is loaded from AdminSettings at runtime (default $10).
+// getSetting('cancellationFee') returns dollars — convert to cents for Stripe.
 
 // ─────────────────────────────────────────────────────────────────────────────
 // cancelJob  (customer-initiated)
@@ -135,11 +136,13 @@ async function cancelJob(jobId, userId) {
 			);
 		}
 	} else {
-		// Late cancellation (accepted / arrived) — charge $5 fee
+		// Late cancellation (accepted / arrived) — charge cancellation fee
 		if (job.paymentIntentId) {
 			try {
-				await paymentService.capturePartialAndCancel(job.paymentIntentId, CUSTOMER_CANCEL_FEE_CENTS);
-				cancellationFee = CUSTOMER_CANCEL_FEE_CENTS / 100;
+				const cancelFeeUSD   = await getSetting("cancellationFee"); // dollars e.g. 10
+				const cancelFeeCents = Math.round(cancelFeeUSD * 100);
+				await paymentService.capturePartialAndCancel(job.paymentIntentId, cancelFeeCents);
+				cancellationFee = cancelFeeUSD;
 			} catch (err) {
 				console.warn("[jobService] Could not charge cancellation fee:", err.message);
 				// Still release the full hold so customer isn't left charged

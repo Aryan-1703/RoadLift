@@ -2,6 +2,7 @@
 
 const bcrypt = require("bcryptjs");
 const { Op, fn, col, literal } = require("sequelize");
+const { getSetting, clearSettingsCache } = require("../utils/settingsCache");
 
 // ── helpers ────────────────────────────────────────────────────────────────
 function paginate(query) {
@@ -92,7 +93,7 @@ async function getDashboard(req, res) {
 			})
 		).length;
 
-		const fee = 0.20;
+		const fee = await getSetting("platformFee"); // e.g. 0.20
 		res.json({
 			users: {
 				customers:     totalCustomers,
@@ -843,26 +844,27 @@ async function getDriverEarnings(req, res) {
 		]);
 
 		const t = totals[0] || {};
+		const fee = await getSetting("platformFee"); // e.g. 0.20
 		res.json({
 			totals: {
 				totalJobs:     +t.total     || 0,
 				completed:     +t.completed || 0,
 				cancelled:     +t.cancelled || 0,
 				totalEarnings: +(+(t.totalEarnings || 0)).toFixed(2),
-				driverPayout:  +(+(t.totalEarnings || 0) * 0.80).toFixed(2),
-				platformFee:   +(+(t.totalEarnings || 0) * 0.20).toFixed(2),
+				driverPayout:  +(+(t.totalEarnings || 0) * (1 - fee)).toFixed(2),
+				platformFee:   +(+(t.totalEarnings || 0) * fee).toFixed(2),
 			},
 			byMonth: byMonth.map(m => ({
 				month:   m.month,
 				jobs:    +m.jobs,
 				revenue: +(+(m.revenue || 0)).toFixed(2),
-				payout:  +(+(m.revenue || 0) * 0.80).toFixed(2),
+				payout:  +(+(m.revenue || 0) * (1 - fee)).toFixed(2),
 			})),
 			byService: byService.map(s => ({
 				serviceType: s.serviceType,
 				jobs:        +s.jobs,
 				revenue:     +(+(s.revenue || 0)).toFixed(2),
-				payout:      +(+(s.revenue || 0) * 0.80).toFixed(2),
+				payout:      +(+(s.revenue || 0) * (1 - fee)).toFixed(2),
 			})),
 		});
 	} catch (err) {
@@ -958,6 +960,7 @@ async function getAnalyticsOverview(req, res) {
 			Job.sum("finalCost", { where: { status: "completed", updatedAt: { [Op.between]: [from, to] } } }),
 		]);
 
+		const analyticsFee = await getSetting("platformFee");
 		res.json({
 			range:  { from, to },
 			totals: {
@@ -965,7 +968,7 @@ async function getAnalyticsOverview(req, res) {
 				completed:       completedJobs,
 				cancelled:       cancelledJobs,
 				revenue:         +(totalRevenue || 0).toFixed(2),
-				platformRevenue: +((totalRevenue || 0) * 0.20).toFixed(2),
+				platformRevenue: +((totalRevenue || 0) * analyticsFee).toFixed(2),
 				completionRate:  totalJobs > 0 ? +((completedJobs / totalJobs) * 100).toFixed(1) : 0,
 			},
 			jobsByDay:    jobsByDay.map(d => ({
@@ -1061,6 +1064,7 @@ async function updateSettings(req, res) {
 			await Setting.upsert({ key, value, updatedBy: req.user.name });
 		}
 
+		clearSettingsCache(); // force next read to re-fetch from DB
 		await logAudit(req, "setting.update", "Setting", null, { keys: Object.keys(updates) });
 		res.json({ success: true, updated: Object.keys(updates) });
 	} catch (err) {

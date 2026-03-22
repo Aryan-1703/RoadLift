@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
 	View,
 	Text,
@@ -14,6 +14,7 @@ import { SERVICES } from "../constants";
 import { ServiceTypeId } from "../types";
 import { Ionicons } from "@expo/vector-icons";
 import { PrimaryButton } from "../components/PrimaryButton";
+import { API_URL } from "../config";
 
 // ── Icon + color config per service ──────────────────────────────────────────
 const SERVICE_META: Record<
@@ -65,6 +66,21 @@ export const ServiceSelectionScreen = () => {
 	const { colors, isDarkMode } = useTheme();
 	const [selectedId, setSelectedId] = useState<ServiceTypeId | null>(null);
 
+	// Live prices from backend (falls back to constants if fetch fails)
+	const [livePrices, setLivePrices] = useState<Record<string, number>>({});
+	useEffect(() => {
+		fetch(`${API_URL}/utils/pricing`)
+			.then(r => r.json())
+			.then((data: Record<string, { base: number }>) => {
+				const prices: Record<string, number> = {};
+				for (const [id, val] of Object.entries(data)) prices[id] = val.base;
+				setLivePrices(prices);
+			})
+			.catch(() => {}); // silent — constants.ts fallback stays in place
+	}, []);
+
+	const priceFor = (id: string, fallback: number) => livePrices[id] ?? fallback;
+
 	// Button press scale
 	const scaleAnims = useRef<Record<string, Animated.Value>>(
 		Object.fromEntries(SERVICES.map(s => [s.id, new Animated.Value(1)])),
@@ -92,7 +108,7 @@ export const ServiceSelectionScreen = () => {
 	const handleConfirm = () => {
 		if (!selectedId) return;
 		const service = SERVICES.find(s => s.id === selectedId)!;
-		selectService(selectedId, service.basePrice);
+		selectService(selectedId, priceFor(selectedId, service.basePrice));
 	};
 
 	const selected = SERVICES.find(s => s.id === selectedId);
@@ -223,7 +239,7 @@ export const ServiceSelectionScreen = () => {
 										from
 									</Text>
 									<Text style={[styles.priceValue, { color: colors.text }]}>
-										${service.basePrice}
+										${priceFor(service.id, service.basePrice)}
 									</Text>
 									<View
 										style={[
@@ -294,7 +310,7 @@ export const ServiceSelectionScreen = () => {
 									{selected?.title}
 								</Text>
 								<Text style={[styles.footerServicePrice, { color: colors.textMuted }]}>
-									Starting at ${selected?.basePrice}
+									Starting at ${selected ? priceFor(selected.id, selected.basePrice) : "-"}
 								</Text>
 							</View>
 						</View>

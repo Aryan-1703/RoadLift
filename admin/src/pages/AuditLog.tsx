@@ -2,10 +2,10 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Shield, Filter } from 'lucide-react';
 import { getAuditLogs } from '../lib/api';
-import { Card } from '../components/ui/Card';
-import { Badge } from '../components/ui/Badge';
-import { Pagination } from '../components/ui/Pagination';
-import { Spinner } from '../components/ui/Spinner';
+import Card from '../components/ui/Card';
+import Badge from '../components/ui/Badge';
+import Pagination from '../components/ui/Pagination';
+import Spinner from '../components/ui/Spinner';
 
 const ACTION_LABELS: Record<string, { label: string; variant: 'success' | 'danger' | 'warning' | 'info' | 'default' | 'purple' }> = {
   'user.suspend':          { label: 'Suspend',          variant: 'danger'  },
@@ -103,7 +103,7 @@ export default function AuditLog() {
       </Card>
 
       {/* Table */}
-      <Card padding={false}>
+      <Card>
         {isLoading ? (
           <div className="flex justify-center py-16"><Spinner /></div>
         ) : !data?.logs?.length ? (

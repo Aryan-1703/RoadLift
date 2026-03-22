@@ -1,6 +1,4 @@
-// API base URL — set EXPO_PUBLIC_API_URL in your .env file.
-// For local dev on a physical device, set it to your machine's Wi-Fi IP:
-//   EXPO_PUBLIC_API_URL=http://192.168.1.100:3000
+	//   EXPO_PUBLIC_API_URL=http://192.168.1.100:3000
 const rawUrl = process.env.EXPO_PUBLIC_API_URL;
 
 if (!rawUrl && __DEV__) {

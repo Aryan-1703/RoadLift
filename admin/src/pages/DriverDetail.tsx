@@ -3,10 +3,10 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Star, CheckCircle, XCircle, Lock, Edit2, TrendingUp } from 'lucide-react';
 import { getDriver, approveService, updateDriverStatus, updateDriverProfile, getDriverEarnings, getMediaUrl } from '../lib/api';
-import { Card } from '../components/ui/Card';
-import { Badge, statusBadge } from '../components/ui/Badge';
-import { Button } from '../components/ui/Button';
-import { Modal } from '../components/ui/Modal';
+import Card from '../components/ui/Card';
+import Badge, { statusBadge } from '../components/ui/Badge';
+import Button from '../components/ui/Button';
+import Modal from '../components/ui/Modal';
 import { PageLoader } from '../components/ui/Spinner';
 import type { ServiceState } from '../types';
 

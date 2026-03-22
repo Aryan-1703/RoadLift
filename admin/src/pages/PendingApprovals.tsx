@@ -3,9 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle, XCircle, CheckSquare } from 'lucide-react';
 import { getPendingApprovals, approveService, bulkApproveServices, getMediaUrl } from '../lib/api';
-import { Card } from '../components/ui/Card';
-import { Badge, statusBadge } from '../components/ui/Badge';
-import { Button } from '../components/ui/Button';
+import Card from '../components/ui/Card';
+import Badge, { statusBadge } from '../components/ui/Badge';
+import Button from '../components/ui/Button';
 import { PageLoader } from '../components/ui/Spinner';
 
 const SERVICE_LABELS: Record<string, string> = {

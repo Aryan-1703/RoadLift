@@ -26,15 +26,23 @@ const driverLocationStore = require("./driverLocationStore");
 const { sendPushNotification } = require("../utils/sendPushNotification");
 const { User, Job } = require("../models");
 const { Op } = require("sequelize");
+const { getSetting } = require("../utils/settingsCache");
 
-// ── Stage configuration ────────────────────────────────────────────────────
-const STAGES = [
-	{ radiusKm: 5,  durationMs: 120_000, travelFee: 0  },
-	{ radiusKm: 10, durationMs:  70_000, travelFee: 10 },
-	{ radiusKm: 15, durationMs:  70_000, travelFee: 20 },
-	{ radiusKm: 20, durationMs:  70_000, travelFee: 30 },
-	{ radiusKm: 25, durationMs:  70_000, travelFee: 40 },
-];
+// ── Build stages from searchRadius setting ────────────────────────────────
+// e.g. { initial: 5, max: 25, step: 5 } → 5 stages at 5/10/15/20/25 km
+// First stage: 120s wait, $0 travel fee. Each subsequent: 70s, +$10.
+function buildStages({ initial = 5, max = 25, step = 5 } = {}) {
+	const stages = [];
+	for (let r = initial; r <= max; r += step) {
+		const i = stages.length;
+		stages.push({
+			radiusKm:   r,
+			durationMs: i === 0 ? 120_000 : 70_000,
+			travelFee:  i * 10,
+		});
+	}
+	return stages.length ? stages : [{ radiusKm: 5, durationMs: 120_000, travelFee: 0 }];
+}
 
 // jobId (string) → { timer: NodeJS.Timeout | null, notifiedDriverIds: Set<string> }
 const activeDispatches = new Map();
@@ -88,7 +96,7 @@ async function runStage(jobId, stageIndex, jobMeta) {
 			return;
 		}
 
-		const stage = STAGES[stageIndex];
+		const stage = jobMeta.stages[stageIndex];
 		const state = activeDispatches.get(String(jobId));
 		if (!state) return; // stopDispatch was called
 
@@ -205,7 +213,7 @@ async function runStage(jobId, stageIndex, jobMeta) {
 
 		const timer = setTimeout(async () => {
 			try {
-				if (nextStageIndex < STAGES.length) {
+				if (nextStageIndex < jobMeta.stages.length) {
 					await runStage(jobId, nextStageIndex, jobMeta);
 				} else {
 					// All 5 stages exhausted — cancel job and notify customer
@@ -256,10 +264,12 @@ async function startDispatch(job, pickupLat, pickupLng, opts = {}) {
 			// No coordinates at all — one-time broadcast and give up
 			console.warn(`[Dispatch] Job ${jobId}: no pickup coordinates — falling back to broadcast.`);
 			io.to("drivers").emit("new-job-available", { jobId: String(jobId) });
+			const fbRadius = await getSetting("searchRadius");
+			const fbStages = buildStages(fbRadius);
 			io.to(String(job.userId)).emit("job-search-started", {
 				jobId:     String(jobId),
 				stage:     0,
-				radiusKm:  5,
+				radiusKm:  fbStages[0]?.radiusKm ?? 5,
 				travelFee: 0,
 				currentPrice: job.estimatedCost ? parseFloat(String(job.estimatedCost)) : 0,
 				message:   "Searching for providers...",
@@ -269,7 +279,9 @@ async function startDispatch(job, pickupLat, pickupLng, opts = {}) {
 		[lng, lat] = coords;
 	}
 
-	const basePrice = job.estimatedCost ? parseFloat(String(job.estimatedCost)) : 0;
+	const basePrice    = job.estimatedCost ? parseFloat(String(job.estimatedCost)) : 0;
+	const searchRadius = await getSetting("searchRadius");
+	const stages       = buildStages(searchRadius);
 
 	const jobMeta = {
 		lat,
@@ -277,6 +289,7 @@ async function startDispatch(job, pickupLat, pickupLng, opts = {}) {
 		userId:      job.userId,
 		basePrice,
 		serviceType: job.serviceType,
+		stages,
 	};
 
 	// Pre-seed excluded driver (e.g. the one who just cancelled) so they are

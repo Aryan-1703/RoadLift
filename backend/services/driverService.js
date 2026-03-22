@@ -5,6 +5,7 @@ const paymentService = require("./paymentService");
 const { Op } = require("sequelize");
 const { sendPushNotification } = require("../utils/sendPushNotification");
 const driverLocationStore = require("./driverLocationStore");
+const { getSetting } = require("../utils/settingsCache");
 
 // ─────────────────────────────────────────────────────────────────────────────
 // normalizeJob — inlined to avoid any circular-dependency / import issues.
@@ -166,8 +167,8 @@ async function acceptJob(jobId, driverId) {
 	return normalizeJob(jobWithCustomer);
 }
 
-// Platform keeps this % of the pre-tax job amount; driver receives the rest.
-const PLATFORM_FEE_PERCENT = 20;
+// Platform fee % is loaded from AdminSettings at runtime (default 20%).
+// getSetting('platformFee') returns a decimal e.g. 0.20
 
 // ─────────────────────────────────────────────────────────────────────────────
 // completeJob
@@ -209,9 +210,10 @@ async function completeJob(jobId, driverId, opts = {}) {
 				// Re-check live payout eligibility from Stripe (don't trust stale DB flag)
 				const account = await stripe.accounts.retrieve(driver.stripeAccountId);
 				if (account.payouts_enabled) {
-					// Driver gets (100 - platform fee)% of pre-tax amount
-					const preTaxAmount    = parseFloat(String(job.finalCost));
-					const driverShare     = preTaxAmount * (1 - PLATFORM_FEE_PERCENT / 100);
+					// Driver gets (1 - platformFee) of pre-tax amount (e.g. 0.80 if fee = 0.20)
+					const platformFee      = await getSetting("platformFee"); // decimal e.g. 0.20
+					const preTaxAmount     = parseFloat(String(job.finalCost));
+					const driverShare      = preTaxAmount * (1 - platformFee);
 					const driverShareCents = Math.round(driverShare * 100);
 
 					await stripe.transfers.create({

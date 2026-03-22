@@ -2,9 +2,9 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Settings2, Save, DollarSign, MapPin, Phone, Mail } from 'lucide-react';
 import { getSettings, updateSettings } from '../lib/api';
-import { Card } from '../components/ui/Card';
-import { Button } from '../components/ui/Button';
-import { Spinner } from '../components/ui/Spinner';
+import Card from '../components/ui/Card';
+import Button from '../components/ui/Button';
+import Spinner from '../components/ui/Spinner';
 import type { PlatformSettings } from '../types';
 
 export default function Settings() {
