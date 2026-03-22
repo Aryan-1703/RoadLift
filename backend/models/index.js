@@ -10,6 +10,8 @@ db.Job           = require("./job.model")(sequelize);
 db.Review        = require("./review.model")(sequelize);
 db.Vehicle       = require("./vehicle.model")(sequelize);
 db.Message       = require("./message.model")(sequelize);
+db.AuditLog      = require("./auditLog.model")(sequelize);
+db.Setting       = require("./setting.model")(sequelize);
 
 // ── Associations ──────────────────────────────────────────────────────────────
 

@@ -13,6 +13,8 @@ import JobDetail from './pages/JobDetail';
 import Analytics from './pages/Analytics';
 import Notifications from './pages/Notifications';
 import AdminUsers from './pages/AdminUsers';
+import Settings from './pages/Settings';
+import AuditLog from './pages/AuditLog';
 
 const Protected = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated } = useAuth();
@@ -42,6 +44,8 @@ export default function App() {
         <Route path="analytics" element={<Analytics />} />
         <Route path="notifications" element={<Notifications />} />
         <Route path="admins" element={<AdminUsers />} />
+        <Route path="settings" element={<Settings />} />
+        <Route path="audit-log" element={<AuditLog />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

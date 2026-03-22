@@ -29,9 +29,25 @@ function normalizeSvc(val) {
 	return { status: val.status || "unapproved", isEnabled: val.isEnabled ?? false };
 }
 
+// Silent audit helper — never throws so it never breaks a request
+async function logAudit(req, action, targetType, targetId, details = {}) {
+	try {
+		const { AuditLog } = require("../models");
+		await AuditLog.create({
+			adminId:    req.user.id,
+			adminName:  req.user.name,
+			action,
+			targetType: targetType || null,
+			targetId:   targetId != null ? String(targetId) : null,
+			details,
+		});
+	} catch (e) {
+		console.warn("[AuditLog] failed to write:", e.message);
+	}
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // DASHBOARD
-// GET /api/admin/dashboard
 // ─────────────────────────────────────────────────────────────────────────────
 async function getDashboard(req, res) {
 	try {
@@ -112,7 +128,6 @@ async function getDashboard(req, res) {
 // DRIVERS
 // ─────────────────────────────────────────────────────────────────────────────
 
-// GET /api/admin/drivers?page=&limit=&search=&status=active|inactive|suspended
 async function listDrivers(req, res) {
 	try {
 		const { User, DriverProfile } = require("../models");
@@ -168,7 +183,6 @@ async function listDrivers(req, res) {
 	}
 }
 
-// GET /api/admin/drivers/pending
 async function getPendingApprovals(req, res) {
 	try {
 		const { DriverProfile, User } = require("../models");
@@ -197,7 +211,6 @@ async function getPendingApprovals(req, res) {
 	}
 }
 
-// GET /api/admin/drivers/:id
 async function getDriver(req, res) {
 	try {
 		const { User, DriverProfile, Job, Review } = require("../models");
@@ -233,6 +246,7 @@ async function getDriver(req, res) {
 			isActive:     user.isActive,
 			isSuspended:  !!user.deletedAt,
 			suspendedAt:  user.deletedAt || null,
+			suspensionReason: user.suspensionReason || null,
 			joinedAt:     user.createdAt,
 			stripeAccountId:      user.stripeAccountId,
 			stripePayoutsEnabled: user.stripePayoutsEnabled,
@@ -273,10 +287,9 @@ async function getDriver(req, res) {
 }
 
 // PATCH /api/admin/driver/:driverId/service/:serviceType
-// Body: { status: "approved" | "rejected" | "unapproved" }
 async function approveService(req, res) {
 	try {
-		const { DriverProfile } = require("../models");
+		const { DriverProfile, User } = require("../models");
 		const { driverId, serviceType } = req.params;
 		const { status } = req.body;
 
@@ -289,15 +302,21 @@ async function approveService(req, res) {
 		const profile = await DriverProfile.findOne({ where: { userId: driverId } });
 		if (!profile) return res.status(404).json({ message: "Driver profile not found." });
 
-		const newIsEnabled = status === "approved";
+		// Get driver name for audit
+		const driver = await User.findByPk(driverId, { attributes: ["name"] });
 
+		const newIsEnabled = status === "approved";
 		const services       = { ...(profile.unlockedServices || {}) };
 		services[serviceKey] = { status, isEnabled: newIsEnabled };
 		profile.unlockedServices = services;
 		profile.changed("unlockedServices", true);
 		await profile.save();
 
-		console.log("[Admin] Driver " + driverId + " service '" + serviceKey + "' -> " + status);
+		await logAudit(req, "service." + status, "User", driverId, {
+			serviceType: serviceKey,
+			driverName:  driver?.name,
+		});
+
 		res.json({ success: true, driverId, serviceKey, status, isEnabled: newIsEnabled });
 	} catch (err) {
 		console.error("[Admin] approveService:", err.message);
@@ -305,16 +324,62 @@ async function approveService(req, res) {
 	}
 }
 
+// PATCH /api/admin/drivers/:id  or  /api/admin/customers/:id
+// Body: { name, email, phoneNumber }  — for drivers also: { vehicleType, licenseNumber, companyName, serviceArea }
+async function updateUserProfile(req, res) {
+	try {
+		const { User, DriverProfile } = require("../models");
+		const { id } = req.params;
+		const { name, email, phoneNumber, vehicleType, licenseNumber, companyName, serviceArea } = req.body;
+
+		const user = await User.findByPk(id);
+		if (!user) return res.status(404).json({ message: "User not found." });
+
+		// Check uniqueness if changing email/phone
+		if (email && email !== user.email) {
+			const exists = await User.findOne({ where: { email, id: { [Op.ne]: id } } });
+			if (exists) return res.status(409).json({ message: "Email already in use." });
+		}
+		if (phoneNumber && phoneNumber !== user.phoneNumber) {
+			const exists = await User.findOne({ where: { phoneNumber, id: { [Op.ne]: id } } });
+			if (exists) return res.status(409).json({ message: "Phone number already in use." });
+		}
+
+		const updates = {};
+		if (name)        updates.name        = name;
+		if (email)       updates.email       = email;
+		if (phoneNumber) updates.phoneNumber = phoneNumber;
+		await user.update(updates);
+
+		// Driver profile fields
+		if (user.role === "DRIVER" && (vehicleType || licenseNumber || companyName || serviceArea)) {
+			const profile = await DriverProfile.findOne({ where: { userId: id } });
+			if (profile) {
+				const pUpdates = {};
+				if (vehicleType)    pUpdates.vehicleType    = vehicleType;
+				if (licenseNumber)  pUpdates.licenseNumber  = licenseNumber;
+				if (companyName)    pUpdates.companyName    = companyName;
+				if (serviceArea)    pUpdates.serviceArea    = serviceArea;
+				await profile.update(pUpdates);
+			}
+		}
+
+		await logAudit(req, "user.update", "User", id, { changes: { ...updates } });
+		res.json({ success: true, id: user.id });
+	} catch (err) {
+		console.error("[Admin] updateUserProfile:", err.message);
+		res.status(500).json({ message: "Server error." });
+	}
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // SHARED: Update User Status
-// PATCH /api/admin/drivers/:id/status  or  /api/admin/customers/:id/status
-// Body: { action: "suspend" | "unsuspend" | "activate" | "deactivate" }
 // ─────────────────────────────────────────────────────────────────────────────
 async function updateUserStatus(req, res) {
 	try {
 		const { User } = require("../models");
 		const { id }    = req.params;
-		const { action } = req.body;
+		const { action, reason } = req.body;
 
 		const user = await User.findByPk(id);
 		if (!user) return res.status(404).json({ message: "User not found." });
@@ -323,11 +388,13 @@ async function updateUserStatus(req, res) {
 
 		switch (action) {
 			case "suspend":
-				user.deletedAt = new Date();
-				user.isActive  = false;
+				user.deletedAt        = new Date();
+				user.isActive         = false;
+				user.suspensionReason = reason || null;
 				break;
 			case "unsuspend":
-				user.deletedAt = null;
+				user.deletedAt        = null;
+				user.suspensionReason = null;
 				break;
 			case "activate":
 				user.isActive = true;
@@ -340,6 +407,12 @@ async function updateUserStatus(req, res) {
 		}
 
 		await user.save();
+		await logAudit(req, "user." + action, "User", id, {
+			name:   user.name,
+			role:   user.role,
+			reason: reason || null,
+		});
+
 		res.json({ success: true, id: user.id, isActive: user.isActive, isSuspended: !!user.deletedAt });
 	} catch (err) {
 		console.error("[Admin] updateUserStatus:", err.message);
@@ -351,7 +424,6 @@ async function updateUserStatus(req, res) {
 // CUSTOMERS
 // ─────────────────────────────────────────────────────────────────────────────
 
-// GET /api/admin/customers?page=&limit=&search=&status=
 async function listCustomers(req, res) {
 	try {
 		const { User, Job } = require("../models");
@@ -406,7 +478,6 @@ async function listCustomers(req, res) {
 	}
 }
 
-// GET /api/admin/customers/:id
 async function getCustomer(req, res) {
 	try {
 		const { User, Vehicle, Job } = require("../models");
@@ -434,6 +505,7 @@ async function getCustomer(req, res) {
 			email:       user.email,
 			phone:       user.phoneNumber,
 			isSuspended: !!user.deletedAt,
+			suspensionReason: user.suspensionReason || null,
 			joinedAt:    user.createdAt,
 			stripeCustomerId:     user.stripeCustomerId,
 			defaultPaymentMethod: user.defaultPaymentMethodId,
@@ -465,7 +537,6 @@ async function getCustomer(req, res) {
 // JOBS
 // ─────────────────────────────────────────────────────────────────────────────
 
-// GET /api/admin/jobs?status=&serviceType=&search=&from=&to=&page=&limit=
 async function listJobs(req, res) {
 	try {
 		const { Job, User, Vehicle } = require("../models");
@@ -517,7 +588,6 @@ async function listJobs(req, res) {
 	}
 }
 
-// GET /api/admin/jobs/:id
 async function getJob(req, res) {
 	try {
 		const { Job, User, Vehicle, Message, Review } = require("../models");
@@ -598,9 +668,254 @@ async function forceCancelJob(req, res) {
 			});
 		}
 
+		await logAudit(req, "job.cancel", "Job", job.id, { previousStatus: job.status });
 		res.json({ success: true, jobId: job.id });
 	} catch (err) {
 		console.error("[Admin] forceCancelJob:", err.message);
+		res.status(500).json({ message: "Server error." });
+	}
+}
+
+// PATCH /api/admin/jobs/:id/status
+// Body: { status, reason }
+async function overrideJobStatus(req, res) {
+	try {
+		const { Job } = require("../models");
+		const { id } = req.params;
+		const { status, reason } = req.body;
+
+		const VALID = ["pending", "accepted", "arrived", "in_progress", "completed", "cancelled"];
+		if (!VALID.includes(status))
+			return res.status(400).json({ message: "Invalid status. Must be one of: " + VALID.join(", ") });
+
+		const job = await Job.findByPk(id);
+		if (!job) return res.status(404).json({ message: "Job not found." });
+
+		const prev = job.status;
+		await job.update({ status });
+
+		await logAudit(req, "job.status_override", "Job", id, { from: prev, to: status, reason: reason || null });
+		res.json({ success: true, id: job.id, status });
+	} catch (err) {
+		console.error("[Admin] overrideJobStatus:", err.message);
+		res.status(500).json({ message: "Server error." });
+	}
+}
+
+// POST /api/admin/jobs/:id/refund
+// Body: { amount } — optional, defaults to full finalCost
+async function issueRefund(req, res) {
+	try {
+		const { Job } = require("../models");
+		const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+		const { id } = req.params;
+		const { amount } = req.body;
+
+		const job = await Job.findByPk(id);
+		if (!job) return res.status(404).json({ message: "Job not found." });
+		if (!job.paymentIntentId)
+			return res.status(400).json({ message: "No payment intent on this job." });
+
+		// Get the PaymentIntent to find the charge
+		const pi = await stripe.paymentIntents.retrieve(job.paymentIntentId);
+		if (!pi.latest_charge)
+			return res.status(400).json({ message: "No charge found on this payment intent." });
+
+		const refundAmount = amount
+			? Math.round(parseFloat(amount) * 100)
+			: undefined; // undefined = full refund
+
+		const refund = await stripe.refunds.create({
+			charge: pi.latest_charge,
+			...(refundAmount ? { amount: refundAmount } : {}),
+		});
+
+		await logAudit(req, "job.refund", "Job", id, {
+			refundId:        refund.id,
+			amount:          refund.amount / 100,
+			paymentIntentId: job.paymentIntentId,
+		});
+
+		res.json({ success: true, refundId: refund.id, amount: refund.amount / 100, status: refund.status });
+	} catch (err) {
+		console.error("[Admin] issueRefund:", err.message);
+		const msg = err.type === "StripeInvalidRequestError" ? err.message : "Refund failed.";
+		res.status(500).json({ message: msg });
+	}
+}
+
+// PATCH /api/admin/jobs/:id/reassign
+// Body: { driverId } — optional. If omitted, clears driver and re-queues as pending.
+async function reassignJob(req, res) {
+	try {
+		const { Job, User } = require("../models");
+		const { stopDispatch } = require("../services/dispatchService");
+		const io = require("../socket");
+		const { id } = req.params;
+		const { driverId } = req.body;
+
+		const job = await Job.findByPk(id);
+		if (!job) return res.status(404).json({ message: "Job not found." });
+		if (["completed", "cancelled"].includes(job.status))
+			return res.status(400).json({ message: "Cannot reassign a " + job.status + " job." });
+
+		stopDispatch(job.id);
+		const prevDriverId = job.driverId;
+
+		if (driverId) {
+			const driver = await User.findOne({ where: { id: driverId, role: "DRIVER", isActive: true, deletedAt: null } });
+			if (!driver) return res.status(404).json({ message: "Driver not found or unavailable." });
+
+			await job.update({ driverId, status: "accepted", dispatchStage: null });
+
+			// Notify new driver
+			io.to(String(driverId)).emit("job-assigned", { jobId: String(job.id) });
+		} else {
+			// Clear driver and re-queue
+			await job.update({ driverId: null, status: "pending", dispatchStage: null, currentRadius: null });
+		}
+
+		// Notify old driver if there was one
+		if (prevDriverId && prevDriverId !== driverId) {
+			io.to(String(prevDriverId)).emit("job-cancelled", {
+				jobId:   String(job.id),
+				message: "Job has been reassigned by administrator.",
+			});
+		}
+
+		await logAudit(req, "job.reassign", "Job", id, {
+			previousDriverId: prevDriverId,
+			newDriverId:      driverId || null,
+		});
+
+		res.json({ success: true, jobId: job.id, driverId: driverId || null });
+	} catch (err) {
+		console.error("[Admin] reassignJob:", err.message);
+		res.status(500).json({ message: "Server error." });
+	}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DRIVER EARNINGS
+// ─────────────────────────────────────────────────────────────────────────────
+
+// GET /api/admin/drivers/:id/earnings
+async function getDriverEarnings(req, res) {
+	try {
+		const { Job } = require("../models");
+		const { id } = req.params;
+
+		const [byMonth, byService, totals] = await Promise.all([
+			// Earnings by month (last 12 months)
+			Job.findAll({
+				where: { driverId: id, status: "completed" },
+				attributes: [
+					[fn("DATE_TRUNC", "month", col("updatedAt")), "month"],
+					[fn("COUNT", col("id")),     "jobs"],
+					[fn("SUM", col("finalCost")), "revenue"],
+				],
+				group: [fn("DATE_TRUNC", "month", col("updatedAt"))],
+				order: [[fn("DATE_TRUNC", "month", col("updatedAt")), "ASC"]],
+				raw: true,
+			}),
+			// Earnings by service type
+			Job.findAll({
+				where: { driverId: id, status: "completed" },
+				attributes: [
+					"serviceType",
+					[fn("COUNT", col("id")),     "jobs"],
+					[fn("SUM", col("finalCost")), "revenue"],
+				],
+				group: ["serviceType"],
+				raw: true,
+			}),
+			// All-time totals
+			Job.findAll({
+				where: { driverId: id },
+				attributes: [
+					[fn("COUNT", col("id")), "total"],
+					[fn("SUM", literal("CASE WHEN status = 'completed' THEN 1 ELSE 0 END")), "completed"],
+					[fn("SUM", literal("CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END")), "cancelled"],
+					[fn("SUM", literal("CASE WHEN status = 'completed' THEN \"finalCost\" ELSE 0 END")), "totalEarnings"],
+				],
+				raw: true,
+			}),
+		]);
+
+		const t = totals[0] || {};
+		res.json({
+			totals: {
+				totalJobs:     +t.total     || 0,
+				completed:     +t.completed || 0,
+				cancelled:     +t.cancelled || 0,
+				totalEarnings: +(+(t.totalEarnings || 0)).toFixed(2),
+				driverPayout:  +(+(t.totalEarnings || 0) * 0.80).toFixed(2),
+				platformFee:   +(+(t.totalEarnings || 0) * 0.20).toFixed(2),
+			},
+			byMonth: byMonth.map(m => ({
+				month:   m.month,
+				jobs:    +m.jobs,
+				revenue: +(+(m.revenue || 0)).toFixed(2),
+				payout:  +(+(m.revenue || 0) * 0.80).toFixed(2),
+			})),
+			byService: byService.map(s => ({
+				serviceType: s.serviceType,
+				jobs:        +s.jobs,
+				revenue:     +(+(s.revenue || 0)).toFixed(2),
+				payout:      +(+(s.revenue || 0) * 0.80).toFixed(2),
+			})),
+		});
+	} catch (err) {
+		console.error("[Admin] getDriverEarnings:", err.message);
+		res.status(500).json({ message: "Server error." });
+	}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BULK APPROVALS
+// ─────────────────────────────────────────────────────────────────────────────
+
+// POST /api/admin/drivers/bulk-approve
+// Body: { approvals: [{ driverId, serviceType, status }] }
+async function bulkApproveServices(req, res) {
+	try {
+		const { DriverProfile, User } = require("../models");
+		const { approvals } = req.body;
+		if (!Array.isArray(approvals) || approvals.length === 0)
+			return res.status(400).json({ message: "approvals array is required." });
+
+		const results = [];
+		for (const item of approvals) {
+			const { driverId, serviceType, status } = item;
+			const serviceKey = SERVICE_KEY_MAP[serviceType];
+			if (!serviceKey || !["approved", "rejected"].includes(status)) {
+				results.push({ driverId, serviceType, success: false, error: "Invalid service or status" });
+				continue;
+			}
+
+			const profile = await DriverProfile.findOne({ where: { userId: driverId } });
+			if (!profile) {
+				results.push({ driverId, serviceType, success: false, error: "Profile not found" });
+				continue;
+			}
+
+			const services = { ...(profile.unlockedServices || {}) };
+			services[serviceKey] = { status, isEnabled: status === "approved" };
+			profile.unlockedServices = services;
+			profile.changed("unlockedServices", true);
+			await profile.save();
+			results.push({ driverId, serviceType, success: true, status });
+		}
+
+		const driver = approvals[0] ? await User.findByPk(approvals[0].driverId, { attributes: ["name"] }) : null;
+		await logAudit(req, "service.bulk_approve", "User", null, {
+			count:     approvals.length,
+			approvals: results,
+		});
+
+		res.json({ success: true, results });
+	} catch (err) {
+		console.error("[Admin] bulkApproveServices:", err.message);
 		res.status(500).json({ message: "Server error." });
 	}
 }
@@ -609,7 +924,6 @@ async function forceCancelJob(req, res) {
 // ANALYTICS
 // ─────────────────────────────────────────────────────────────────────────────
 
-// GET /api/admin/analytics/overview?from=YYYY-MM-DD&to=YYYY-MM-DD
 async function getAnalyticsOverview(req, res) {
 	try {
 		const { Job } = require("../models");
@@ -671,7 +985,6 @@ async function getAnalyticsOverview(req, res) {
 	}
 }
 
-// GET /api/admin/analytics/services?from=&to=
 async function getServiceBreakdown(req, res) {
 	try {
 		const { Job } = require("../models");
@@ -707,10 +1020,163 @@ async function getServiceBreakdown(req, res) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// PLATFORM SETTINGS
+// ─────────────────────────────────────────────────────────────────────────────
+
+const DEFAULT_SETTINGS = {
+	platformFee:    0.20,
+	searchRadius:   { initial: 5, max: 50, step: 5 },
+	pricing: {
+		battery:  { base: 60, perKm: 2 },
+		lockout:  { base: 75, perKm: 2 },
+		fuel:     { base: 55, perKm: 2 },
+		tire:     { base: 65, perKm: 2 },
+	},
+	cancellationFee: 10,
+	supportEmail:    "support@roadlift.ca",
+	supportPhone:    "+1 (416) 000-0000",
+};
+
+async function getSettings(req, res) {
+	try {
+		const { Setting } = require("../models");
+		const rows = await Setting.findAll();
+		const result = { ...DEFAULT_SETTINGS };
+		for (const row of rows) result[row.key] = row.value;
+		res.json(result);
+	} catch (err) {
+		console.error("[Admin] getSettings:", err.message);
+		res.status(500).json({ message: "Server error." });
+	}
+}
+
+async function updateSettings(req, res) {
+	try {
+		const { Setting } = require("../models");
+		const updates = req.body; // { key: value, ... }
+		if (!updates || typeof updates !== "object")
+			return res.status(400).json({ message: "Body must be a key-value object." });
+
+		for (const [key, value] of Object.entries(updates)) {
+			await Setting.upsert({ key, value, updatedBy: req.user.name });
+		}
+
+		await logAudit(req, "setting.update", "Setting", null, { keys: Object.keys(updates) });
+		res.json({ success: true, updated: Object.keys(updates) });
+	} catch (err) {
+		console.error("[Admin] updateSettings:", err.message);
+		res.status(500).json({ message: "Server error." });
+	}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EXPORT TO CSV
+// ─────────────────────────────────────────────────────────────────────────────
+
+// GET /api/admin/export/:type  (jobs | drivers | customers)
+async function exportData(req, res) {
+	try {
+		const { User, Job, DriverProfile, Vehicle } = require("../models");
+		const { type } = req.params;
+		const { from, to } = dateRange(req.query);
+
+		let rows = [];
+		let headers = [];
+
+		if (type === "jobs") {
+			headers = ["ID", "Status", "Service", "Customer", "Driver", "Final Cost", "Pickup Address", "Created At"];
+			const jobs = await Job.findAll({
+				where: { createdAt: { [Op.between]: [from, to] } },
+				include: [
+					{ model: User, as: "customer", attributes: ["name"] },
+					{ model: User, as: "driver",   attributes: ["name"], required: false },
+				],
+				order: [["createdAt", "DESC"]],
+			});
+			rows = jobs.map(j => [
+				j.id, j.status, j.serviceType,
+				j.customer?.name || "",
+				j.driver?.name   || "Unassigned",
+				j.finalCost ? +parseFloat(j.finalCost).toFixed(2) : "",
+				`"${(j.pickupAddress || "").replace(/"/g, '""')}"`,
+				new Date(j.createdAt).toISOString(),
+			]);
+		} else if (type === "drivers") {
+			headers = ["ID", "Name", "Email", "Phone", "Status", "Rating", "Jobs Completed", "Payouts Enabled", "Joined At"];
+			const drivers = await User.findAll({
+				where:   { role: "DRIVER" },
+				include: [{ model: DriverProfile, as: "driverProfile", required: false }],
+				order:   [["createdAt", "DESC"]],
+			});
+			rows = drivers.map(u => [
+				u.id, u.name, u.email || "", u.phoneNumber,
+				u.deletedAt ? "Suspended" : u.isActive ? "Active" : "Inactive",
+				u.driverProfile?.averageRating || "",
+				u.driverProfile?.totalJobsCompleted || 0,
+				u.stripePayoutsEnabled ? "Yes" : "No",
+				new Date(u.createdAt).toISOString(),
+			]);
+		} else if (type === "customers") {
+			headers = ["ID", "Name", "Email", "Phone", "Status", "Stripe Customer ID", "Joined At"];
+			const customers = await User.findAll({
+				where: { role: "CUSTOMER" },
+				order: [["createdAt", "DESC"]],
+			});
+			rows = customers.map(u => [
+				u.id, u.name, u.email || "", u.phoneNumber,
+				u.deletedAt ? "Suspended" : "Active",
+				u.stripeCustomerId || "",
+				new Date(u.createdAt).toISOString(),
+			]);
+		} else {
+			return res.status(400).json({ message: "type must be jobs, drivers, or customers." });
+		}
+
+		const csv = [headers, ...rows].map(r => r.join(",")).join("\n");
+		res.setHeader("Content-Type", "text/csv");
+		res.setHeader("Content-Disposition", `attachment; filename="${type}-${Date.now()}.csv"`);
+		res.send(csv);
+	} catch (err) {
+		console.error("[Admin] exportData:", err.message);
+		res.status(500).json({ message: "Server error." });
+	}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AUDIT LOG
+// ─────────────────────────────────────────────────────────────────────────────
+
+// GET /api/admin/audit-logs?page=&action=&adminId=&from=&to=
+async function getAuditLogs(req, res) {
+	try {
+		const { AuditLog } = require("../models");
+		const { limit, offset, page } = paginate(req.query);
+		const { action, adminId, from, to } = req.query;
+
+		const where = {};
+		if (action)  where.action  = { [Op.iLike]: `%${action}%` };
+		if (adminId) where.adminId = adminId;
+		if (from || to) {
+			const range = dateRange(req.query);
+			where.createdAt = { [Op.between]: [range.from, range.to] };
+		}
+
+		const { count, rows } = await AuditLog.findAndCountAll({
+			where, limit, offset,
+			order: [["createdAt", "DESC"]],
+		});
+
+		res.json({ total: count, page, pages: Math.ceil(count / limit), logs: rows });
+	} catch (err) {
+		console.error("[Admin] getAuditLogs:", err.message);
+		res.status(500).json({ message: "Server error." });
+	}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // ADMIN USER MANAGEMENT
 // ─────────────────────────────────────────────────────────────────────────────
 
-// GET /api/admin/admins
 async function listAdmins(req, res) {
 	try {
 		const { User } = require("../models");
@@ -726,8 +1192,6 @@ async function listAdmins(req, res) {
 	}
 }
 
-// POST /api/admin/admins
-// Body: { name, email, phoneNumber, password }
 async function createAdmin(req, res) {
 	try {
 		const { User } = require("../models");
@@ -739,8 +1203,14 @@ async function createAdmin(req, res) {
 		if (exists) return res.status(409).json({ message: "Email already in use." });
 
 		const hashed = await bcrypt.hash(password, 10);
-		const admin  = await User.create({ name, email, phoneNumber: phoneNumber || null, password: hashed, role: "ADMIN" });
+		const admin  = await User.create({
+			name, email,
+			phoneNumber: phoneNumber || String(Date.now()),
+			password: hashed,
+			role: "ADMIN",
+		});
 
+		await logAudit(req, "admin.create", "User", admin.id, { name: admin.name, email: admin.email });
 		res.status(201).json({ id: admin.id, name: admin.name, email: admin.email });
 	} catch (err) {
 		console.error("[Admin] createAdmin:", err.message);
@@ -748,7 +1218,6 @@ async function createAdmin(req, res) {
 	}
 }
 
-// DELETE /api/admin/admins/:id
 async function deleteAdmin(req, res) {
 	try {
 		const { User } = require("../models");
@@ -760,6 +1229,7 @@ async function deleteAdmin(req, res) {
 		if (!admin) return res.status(404).json({ message: "Admin not found." });
 
 		await admin.update({ deletedAt: new Date(), isActive: false });
+		await logAudit(req, "admin.delete", "User", id, { name: admin.name, email: admin.email });
 		res.json({ success: true });
 	} catch (err) {
 		console.error("[Admin] deleteAdmin:", err.message);
@@ -771,8 +1241,6 @@ async function deleteAdmin(req, res) {
 // PUSH NOTIFICATIONS
 // ─────────────────────────────────────────────────────────────────────────────
 
-// POST /api/admin/notifications/broadcast
-// Body: { title, body, audience: "drivers" | "customers" | "all" }
 async function broadcastNotification(req, res) {
 	try {
 		const { User } = require("../models");
@@ -797,18 +1265,17 @@ async function broadcastNotification(req, res) {
 			attributes: ["id", "pushToken"],
 		});
 
-		// Real-time socket broadcast (online drivers room)
 		if (audience === "drivers" || audience === "all") {
 			io.to("drivers").emit("admin-broadcast", { title, body });
 		}
 
-		// Push notifications for all matching users
 		let sent = 0;
 		for (const u of users) {
 			await sendPushNotification(u.pushToken, { title, body, type: "admin-broadcast" }).catch(() => {});
 			sent++;
 		}
 
+		await logAudit(req, "notification.broadcast", null, null, { title, audience, sent });
 		res.json({ success: true, sent });
 	} catch (err) {
 		console.error("[Admin] broadcastNotification:", err.message);
@@ -822,14 +1289,24 @@ module.exports = {
 	getPendingApprovals,
 	getDriver,
 	approveService,
+	updateUserProfile,
 	updateUserStatus,
 	listCustomers,
 	getCustomer,
 	listJobs,
 	getJob,
 	forceCancelJob,
+	overrideJobStatus,
+	issueRefund,
+	reassignJob,
+	getDriverEarnings,
+	bulkApproveServices,
 	getAnalyticsOverview,
 	getServiceBreakdown,
+	getSettings,
+	updateSettings,
+	exportData,
+	getAuditLogs,
 	listAdmins,
 	createAdmin,
 	deleteAdmin,

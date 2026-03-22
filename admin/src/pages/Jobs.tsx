@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Search } from 'lucide-react';
-import { listJobs } from '../lib/api';
+import { Search, Download } from 'lucide-react';
+import { listJobs, exportCsv } from '../lib/api';
+import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import Table, { Column } from '../components/ui/Table';
 import Badge, { statusBadge } from '../components/ui/Badge';
@@ -106,6 +107,9 @@ export default function Jobs() {
             Clear filters
           </button>
         )}
+        <Button variant="secondary" size="sm" className="mt-5" onClick={() => exportCsv('jobs', from || undefined, to || undefined)}>
+          <Download size={14} className="mr-1.5" /> Export CSV
+        </Button>
       </div>
 
       <Card>

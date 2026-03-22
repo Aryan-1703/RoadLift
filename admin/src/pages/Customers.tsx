@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Search } from 'lucide-react';
-import { listCustomers, updateCustomerStatus } from '../lib/api';
+import { Search, Download } from 'lucide-react';
+import { listCustomers, updateCustomerStatus, exportCsv } from '../lib/api';
 import Card from '../components/ui/Card';
 import Table, { Column } from '../components/ui/Table';
 import Badge from '../components/ui/Badge';
@@ -83,6 +83,9 @@ export default function Customers() {
             <option value="suspended">Suspended</option>
           </Select>
         </div>
+        <Button variant="secondary" size="sm" onClick={() => exportCsv('customers')}>
+          <Download size={14} className="mr-1.5" /> Export CSV
+        </Button>
       </div>
 
       <Card>

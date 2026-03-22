@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Search } from 'lucide-react';
-import { listDrivers, updateDriverStatus } from '../lib/api';
+import { Search, Download } from 'lucide-react';
+import { listDrivers, updateDriverStatus, exportCsv } from '../lib/api';
 import Card from '../components/ui/Card';
 import Table, { Column } from '../components/ui/Table';
 import Badge, { statusBadge } from '../components/ui/Badge';
@@ -114,6 +114,9 @@ export default function Drivers() {
             <option value="suspended">Suspended</option>
           </Select>
         </div>
+        <Button variant="secondary" size="sm" onClick={() => exportCsv('drivers')}>
+          <Download size={14} className="mr-1.5" /> Export CSV
+        </Button>
       </div>
 
       <Card>

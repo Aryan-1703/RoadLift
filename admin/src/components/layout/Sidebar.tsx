@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, Car, ClipboardCheck, Users, Briefcase,
-  BarChart2, Bell, Shield, LogOut, Zap,
+  BarChart2, Bell, Shield, LogOut, Zap, ScrollText, Settings2,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useQuery } from '@tanstack/react-query';
@@ -16,6 +16,8 @@ const nav = [
   { to: '/analytics',        icon: BarChart2,       label: 'Analytics'                       },
   { to: '/notifications',    icon: Bell,            label: 'Notifications'                   },
   { to: '/admins',           icon: Shield,          label: 'Admin Users'                     },
+  { to: '/settings',         icon: Settings2,       label: 'Settings'                        },
+  { to: '/audit-log',        icon: ScrollText,      label: 'Audit Log'                       },
 ];
 
 export default function Sidebar() {

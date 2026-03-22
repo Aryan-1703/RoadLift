@@ -3,6 +3,7 @@ import type {
   DashboardData, DriversResponse, Driver, PendingApproval,
   CustomersResponse, Customer, JobsResponse, Job,
   AnalyticsOverview, ServiceBreakdown, AdminUser,
+  AuditLogsResponse, PlatformSettings, DriverEarnings,
 } from '../types';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
@@ -50,11 +51,20 @@ export const getPendingApprovals = () =>
 export const getDriver = (id: number | string) =>
   api.get<Driver>(`/admin/drivers/${id}`);
 
-export const updateDriverStatus = (id: number, action: string) =>
-  api.patch(`/admin/drivers/${id}/status`, { action });
+export const updateDriverStatus = (id: number, action: string, reason?: string) =>
+  api.patch(`/admin/drivers/${id}/status`, { action, reason });
+
+export const updateDriverProfile = (id: number, data: Record<string, string>) =>
+  api.patch(`/admin/drivers/${id}`, data);
+
+export const getDriverEarnings = (id: number | string) =>
+  api.get<DriverEarnings>(`/admin/drivers/${id}/earnings`);
 
 export const approveService = (driverId: number, serviceType: string, status: string) =>
   api.patch(`/admin/driver/${driverId}/service/${serviceType}`, { status });
+
+export const bulkApproveServices = (approvals: { driverId: number; serviceType: string; status: string }[]) =>
+  api.post('/admin/drivers/bulk-approve', { approvals });
 
 // ── Customers ────────────────────────────────────────────────────────────────
 export const listCustomers = (params: Record<string, string | number>) =>
@@ -63,8 +73,11 @@ export const listCustomers = (params: Record<string, string | number>) =>
 export const getCustomer = (id: number | string) =>
   api.get<Customer>(`/admin/customers/${id}`);
 
-export const updateCustomerStatus = (id: number, action: string) =>
-  api.patch(`/admin/customers/${id}/status`, { action });
+export const updateCustomerStatus = (id: number, action: string, reason?: string) =>
+  api.patch(`/admin/customers/${id}/status`, { action, reason });
+
+export const updateCustomerProfile = (id: number, data: Record<string, string>) =>
+  api.patch(`/admin/customers/${id}`, data);
 
 // ── Jobs ─────────────────────────────────────────────────────────────────────
 export const listJobs = (params: Record<string, string | number>) =>
@@ -75,6 +88,15 @@ export const getJobDetail = (id: number | string) =>
 
 export const cancelJob = (id: number) =>
   api.patch(`/admin/jobs/${id}/cancel`);
+
+export const overrideJobStatus = (id: number, status: string, reason?: string) =>
+  api.patch(`/admin/jobs/${id}/status`, { status, reason });
+
+export const issueRefund = (id: number, amount?: number) =>
+  api.post(`/admin/jobs/${id}/refund`, { amount });
+
+export const reassignJob = (id: number, driverId?: number) =>
+  api.patch(`/admin/jobs/${id}/reassign`, { driverId });
 
 // ── Analytics ────────────────────────────────────────────────────────────────
 export const getAnalyticsOverview = (from: string, to: string) =>
@@ -92,6 +114,31 @@ export const createAdmin = (data: { name: string; email: string; phoneNumber?: s
 
 export const deleteAdmin = (id: number) =>
   api.delete(`/admin/admins/${id}`);
+
+// ── Settings ─────────────────────────────────────────────────────────────────
+export const getSettings = () =>
+  api.get<PlatformSettings>('/admin/settings');
+
+export const updateSettings = (data: Partial<PlatformSettings>) =>
+  api.patch('/admin/settings', data);
+
+// ── Export ────────────────────────────────────────────────────────────────────
+export const exportCsv = async (type: 'jobs' | 'drivers' | 'customers', from?: string, to?: string) => {
+  const params: Record<string, string> = {};
+  if (from) params.from = from;
+  if (to)   params.to   = to;
+  const res = await api.get(`/admin/export/${type}`, { params, responseType: 'blob' });
+  const url = URL.createObjectURL(new Blob([res.data], { type: 'text/csv' }));
+  const a   = document.createElement('a');
+  a.href     = url;
+  a.download = `${type}-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
+// ── Audit Log ─────────────────────────────────────────────────────────────────
+export const getAuditLogs = (params: Record<string, string | number>) =>
+  api.get<AuditLogsResponse>('/admin/audit-logs', { params });
 
 // ── Notifications ────────────────────────────────────────────────────────────
 export const broadcastNotification = (data: { title: string; body: string; audience: string }) =>

@@ -87,6 +87,10 @@ module.exports = sequelize => {
 				type: DataTypes.DATE,
 				allowNull: true,
 			},
+			suspensionReason: {
+				type: DataTypes.STRING(500),
+				allowNull: true,
+			},
 		},
 		{
 			// CRITICAL: must match your existing DB table name exactly — "Users" not "users"

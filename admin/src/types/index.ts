@@ -33,6 +33,7 @@ export interface Driver {
   isActive: boolean;
   isSuspended: boolean;
   suspendedAt?: string | null;
+  suspensionReason?: string | null;
   joinedAt: string;
   stripeAccountId?: string;
   stripePayoutsEnabled: boolean;
@@ -48,6 +49,7 @@ export interface Customer {
   email: string;
   phone: string;
   isSuspended: boolean;
+  suspensionReason?: string | null;
   joinedAt: string;
   totalJobs: number;
   totalSpent?: number;
@@ -197,4 +199,41 @@ export interface ServiceBreakdown {
     cancelled: number;
     revenue: number;
   }[];
+}
+
+export interface AuditLog {
+  id: number;
+  adminId: number;
+  adminName: string;
+  action: string;
+  targetType: string | null;
+  targetId: string | null;
+  details: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+export interface AuditLogsResponse extends Paginated<AuditLog> {
+  logs: AuditLog[];
+}
+
+export interface PlatformSettings {
+  platformFee: number;
+  searchRadius: { initial: number; max: number; step: number };
+  pricing: Record<string, { base: number; perKm: number }>;
+  cancellationFee: number;
+  supportEmail: string;
+  supportPhone: string;
+}
+
+export interface DriverEarnings {
+  totals: {
+    totalJobs: number;
+    completed: number;
+    cancelled: number;
+    totalEarnings: number;
+    driverPayout: number;
+    platformFee: number;
+  };
+  byMonth: { month: string; jobs: number; revenue: number; payout: number }[];
+  byService: { serviceType: string; jobs: number; revenue: number; payout: number }[];
 }
